@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miraqua | Smart Irrigation</title>
+
+ 
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="frontpage.css" />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      scroll-behavior: smooth;
+    }
+
+    /* ✅ NAVBAR */
+    header {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      padding: 1.2rem 4rem;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .logo {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-left: -1rem;
+    }
+
+    .logo a {
+      text-decoration: none;
+      color: white;
+      transition: color 0.3s ease;
+    }
+
+    .logo a:hover {
+      color: #1fc2a0;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    nav ul li a {
+      text-decoration: none;
+      color: white;
+      font-weight: 500;
+      font-size: 1rem;
+      transition: 0.3s ease;
+    }
+
+    nav ul li a:hover {
+      color: #1fc2a0;
+      border-bottom: 2px solid #1fc2a0;
+    }
+
+    /* ✅ HERO SECTION */
+    #hero {
+      background: url('mpback.jpg') center/cover no-repeat;
+      height: 100vh;
+      position: relative;
+      color: white;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 0 2rem;
+    }
+
+    #hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px); /* Safari */
+      z-index: 1;
+    }
+
+    #hero > div {
+      position: relative;
+      z-index: 2;
+      max-width: 800px;
+    }
+
+    #hero h1 {
+      font-size: 2.8rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-shadow: 1px 1px 3px black;
+    }
+
+    #hero p {
+      font-size: 1.2rem;
+      margin-bottom: 1.5rem;
+      text-shadow: 1px 1px 2px black;
+    }
+
+    .hero-btn {
+      background-color: #1fc2a0;
+      color: white;
+      padding: 0.8rem 1.5rem;
+      font-weight: bold;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    section {
+      padding: 100px 4rem;
+    }
+
+    #about {
+      background: black;
+      color: white;
+    }
+
+    #optimizer {
+  background: #e6f4ea; 
+}
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      font-size: 1.1rem;
+      max-width: 800px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ✅ NAVIGATION -->
+  <header>
+    <div class="logo"><a href="frontpage.html#hero">Miraqua</a></div>
+    <nav>
+      <ul>
+        <li><a href="frontpage.html#how-it-works">HOW IT WORKS</a></li>
+        <li><a href="frontpage.html#future">FUTURE PLANS</a></li>
+
+      </ul>
+    </nav>
+  </header>
+
+  <!-- ✅ HERO SECTION -->
+  <section id="hero">
+    <div>
+      <h1>Smart Farming Starts with Smart Watering</h1>
+      <p>Precision irrigation. Designed for farmers. Driven by data.</p>
+      <a class="hero-btn" href="optimizer.html">Launch Optimizer</a>
+    </div>
+  </section>
+
+ 
+  <section id="how-it-works">
+  <h2>How It Works</h2>
+  <p>
+    Miraqua calculates your farm's daily water needs by combining your inputs with powerful data sources:
+  </p>
+  <ul class="how-it-works-list">
+    <li> User inputs like crop type, land area, rainfall, root depth, and soil moisture</li>
+    <li> Live weather and soil data pulled from trusted external APIs</li>
+    <li> A machine learning model trained on UC Merced agricultural and climate research</li>
+    <li> An algorithm that estimates water needs using both farmer inputs and real-time conditions</li>
+    <li> Final recommendations cross-check both methods to ensure accuracy and consistency</li>
+  </ul>
+</section>
+
+ 
+  <section id="future">
+    <h2>Future Plans</h2>
+    <p>
+      Miraqua is built to scale across regions and farm sizes. We’re designing for flexibility, efficiency, and sustainability — now and into the future.
+    </p>
+    <ul class="future-plans-list">
+      <li> Sensor compatibility: Our tool works with soil moisture sensors and flow meters for enhanced accuracy.</li>
+      <li> Minimal input needed: Runs with just ZIP code, land area, and crop type — no hardware required.</li>
+      <li> Efficiency-focused: Designed to apply the least water necessary while maintaining healthy crop growth.</li>
+      <li> Ideal for small and mid-sized farms that can't afford expensive irrigation systems.</li>
+      <li> Scalable and region-adaptable thanks to sensor data and real-time environmental inputs.</li>
+      <li> Easily integrates with existing infrastructure in large-scale operations for optimized automation.</li>
+    </ul>
+  </section>
+
+</body>
+</html>

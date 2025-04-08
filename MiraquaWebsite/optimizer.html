@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Water Optimizer | Miraqua</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="optimizer.css" />
+</head>
+<body>
+  <header>
+    <div class="logo"><a href="frontpage.html#hero" style="text-decoration: none; color: white;">Miraqua</a></div>
+    <nav>
+      <ul>
+        <li><a href="frontpage.html#about">ABOUT</a></li>
+        <li><a href="frontpage.html#optimizer">OPTIMIZER</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="overlay">
+    <main>
+      <div class="form-container">
+        <h1>Smart Water Optimizer</h1>
+        <form id="optimizer-form">
+          <!-- form inputs unchanged -->
+          <div class="form-group">
+            <label for="zip">📍 ZIP Code:</label>
+            <input id="zip" placeholder="e.g. 95340" />
+          </div>
+          <div class="form-group">
+            <label for="crop">🌱 Crop:</label>
+            <select id="crop">
+              <option value="">-- Choose --</option>
+              <option value="Tomato">Tomato</option>
+              <option value="Almond">Almond</option>
+              <option value="Grape">Grape</option>
+              <option value="Citrus">Citrus</option>
+              <option value="Lettuce">Lettuce</option>
+              <option value="Corn">Corn</option>
+              <option value="Spinach">Spinach</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="area">📀 Land Area (m²):</label>
+            <input id="area" type="number" placeholder="e.g. 1000" />
+          </div>
+          <div class="form-group">
+            <label for="knowRoot">📏 Do you know the root depth?</label>
+            <select id="knowRoot">
+              <option value="">-- Choose --</option>
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div class="form-group" id="rootSection" style="display:none;">
+            <label for="rootDepth">Root Depth (cm):</label>
+            <input id="rootDepth" type="number" />
+          </div>
+          <div class="form-group" id="ageSection" style="display:none;">
+            <label for="cropAge">Crop Age (months):</label>
+            <input id="cropAge" type="number" />
+          </div>
+          <div class="form-group">
+            <label for="gauge">☔ Rain Gauge Used?</label>
+            <select id="gauge">
+              <option value="">-- Choose --</option>
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div class="form-group" id="rainSection" style="display:none;">
+            <label for="rain">Rainfall Today (mm):</label>
+            <input id="rain" type="number" />
+          </div>
+          <div class="form-group">
+            <label for="knowMoisture">🌡️ Do you know the soil moisture?</label>
+            <select id="knowMoisture">
+              <option value="">-- Choose --</option>
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div class="form-group" id="moistureSection" style="display:none;">
+            <label for="soilMoisture">🌱 Soil Moisture (m³/m³):</label>
+            <input id="soilMoisture" type="number" step="0.001" />
+          </div>
+          <div class="form-group">
+            <label for="applied">💦 Water Applied Today (liters):</label>
+            <input id="applied" type="number" />
+          </div>
+          <button type="submit">Get 5-Day Schedule</button>
+        </form>
+
+        <div id="schedule"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="cropMoistureData.js"></script>
+  <script>
+    // ✅ Normalize crop names to match cropMoistureData
+    function normalizeCropName(name) {
+      const aliases = {
+        "Tomato": "Tomato Fresh",
+        "Almond": "Almonds",
+        "Grape": "Vineyard",
+        "Citrus": "Citrus",
+        "Lettuce": "Lettuce",
+        "Corn": "Corn",
+        "Spinach": "Truck Crops"
+      };
+      return aliases[name] || name;
+    }
+
+    function getMoistureMessage(cropName, value) {
+      const match = cropMoistureData.find(c => c.cropname === cropName);
+      if (!match) return "";
+      const min = parseFloat(match.low);
+      const max = parseFloat(match.high);
+      if (value < min) return "⚠️ Too Dry";
+      if (value > max) return "⚠️ Too Wet";
+      return "✅ Optimal";
+    }
+
+    document.getElementById("optimizer-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      getWateringPlan();
+    });
+
+    document.getElementById("knowRoot").addEventListener("change", e => {
+      const showRoot = e.target.value === "yes";
+      document.getElementById("rootSection").style.display = showRoot ? "block" : "none";
+      document.getElementById("ageSection").style.display = !showRoot ? "block" : "none";
+    });
+
+    document.getElementById("gauge").addEventListener("change", e => {
+      document.getElementById("rainSection").style.display = e.target.value === "yes" ? "block" : "none";
+    });
+
+    document.getElementById("knowMoisture").addEventListener("change", e => {
+      document.getElementById("moistureSection").style.display = e.target.value === "yes" ? "block" : "none";
+    });
+
+    async function getWateringPlan() {
+      const zip = document.getElementById("zip").value;
+      const crop = document.getElementById("crop").value;
+      const area = parseFloat(document.getElementById("area").value);
+      const knowRoot = document.getElementById("knowRoot").value;
+      const rootDepth = parseFloat(document.getElementById("rootDepth").value) || 0;
+      const cropAge = parseFloat(document.getElementById("cropAge").value) || 1;
+      const gauge = document.getElementById("gauge").value;
+      const rain = parseFloat(document.getElementById("rain").value) || 0;
+      const knowMoisture = document.getElementById("knowMoisture").value;
+      const soilMoisture = parseFloat(document.getElementById("soilMoisture").value) || 0;
+      const applied = parseFloat(document.getElementById("applied").value) || 0;
+
+      const payload = {
+        zip, crop, area,
+        know_root: knowRoot,
+        root_depth: rootDepth,
+        crop_age: cropAge,
+        gauge, rain,
+        know_moisture: knowMoisture,
+        soil_moisture: soilMoisture,
+        applied
+      };
+
+      try {
+        const res = await fetch("http://127.0.0.1:5000/get_plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch from backend");
+        const data = await res.json();
+
+        document.getElementById("schedule").innerHTML = `
+  <div class="calendar-grid">
+    ${data.schedule.map(d => {
+      const cropName = document.getElementById("crop").value;
+      const normalizedCrop = normalizeCropName(cropName);
+      const status = getMoistureMessage(normalizeCropName(crop), d.soil_moisture);
+      let moistureClass = "";
+      if (status.includes("Optimal")) moistureClass = "optimal";
+      else if (status.includes("Too Dry")) moistureClass = "too-dry";
+      else if (status.includes("Too Wet")) moistureClass = "too-wet";
+              return `
+             <div class="calendar-day ${moistureClass}">
+                <h4>${d.day.split(" ")[0]}</h4>
+                <p>${d.date}</p>
+                <p>🌡️ Temp: <strong>${d.temp}°F</strong></p>
+                <p>☔ Rain: <strong>${d.rain} mm</strong></p>
+                <div class="soil-box">
+                  <p><strong>Soil Moisture <span title='Amount of water held in soil, shown in cubic meters per cubic meter'>ℹ️</span></strong></p>
+                  <p>🌱 <strong>${d.soil_moisture} m³/m³</strong> — ${status}</p>
+                </div>
+                <p>🌤️ ET₀: <strong>${d.et0} mm</strong></p>
+                <p>🌿 ETc: <strong>${d.etc} mm</strong></p>
+                <p>💧 Water: <strong>${d.liters} L</strong></p>
+              </div>`;
+            }).join("")}
+          </div>
+          <div class="summary-box">${data.summary}</div>
+        `;
+      } catch (err) {
+        document.getElementById("schedule").innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
