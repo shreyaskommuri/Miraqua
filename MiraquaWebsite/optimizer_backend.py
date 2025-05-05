@@ -10,6 +10,10 @@ from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
+# optimizer_backend.py
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)  # Allow external access
 
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
