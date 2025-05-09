@@ -1,18 +1,39 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { getPlots } from '../api/api';
+// MiraquaApp/screens/HomeScreen.tsx
 
-interface Plot {
-  id: string;
-  crop: string;
-  area: number;
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+import { getPlots } from '../api/api';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+
+export interface Plot {
+  id: number;
   zip: string;
-  summary: string;
-  schedule: { day: string; date: string; soil_moisture: number }[];
+  crop: string;
+  area: string;
+  soil_moisture?: number;
+  temp?: number;
+  last_run?: string;
+  next_run?: string;
+  summary?: string;
+  liters?: number;
+  avgLiters?: number;
+  schedule?: any[];
 }
 
 const HomeScreen = () => {
   const [plots, setPlots] = useState<Plot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isFocused = useIsFocused();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const fetchPlots = async () => {
     try {
@@ -20,60 +41,89 @@ const HomeScreen = () => {
       setPlots(data);
     } catch (error) {
       console.error('Error loading plots:', error);
-      Alert.alert('Error', 'Failed to fetch plots');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPlots();
-  }, []);
+    if (isFocused) {
+      fetchPlots();
+    }
+  }, [isFocused]);
 
-  const renderItem = ({ item }: { item: Plot }) => {
-    const today = item.schedule?.[0];
-    return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{item.crop}</Text>
-        <Text>Soil Moisture: {today?.soil_moisture ?? '--'}%</Text>
-        <Text>Last run: {today?.date ?? '--'}</Text>
-        <Text>Next run: {item.schedule?.[1]?.date ?? '--'}</Text>
-        <TouchableOpacity>
-          <Text style={styles.adjustText}>🔧 ADJUST</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  const renderItem = ({ item }: { item: Plot }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate('PlotDetails', { plot: item })}
+    >
+      <Text style={styles.crop}>{item.crop}</Text>
+      <Text>
+        Soil Moisture:{' '}
+        {item.soil_moisture !== undefined
+          ? `${(item.soil_moisture * 100).toFixed(1)}%`
+          : 'N/A'}
+      </Text>
+      <Text>Last run: {item.last_run || '—'}</Text>
+      <Text>Next run: {item.next_run || '—'}</Text>
+      <Text style={styles.adjust}>🛠️ ADJUST</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>My Plots</Text>
-      <FlatList
-        data={plots}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-      />
+      <Text style={styles.title}>My Plots</Text>
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : (
+        <FlatList
+          data={plots}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.content}
+        />
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f6f9', padding: 10 },
-  header: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 10 },
-  row: { justifyContent: 'space-between' },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginVertical: 10,
-    flex: 0.48,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
-  adjustText: { color: '#007AFF', fontWeight: '600', marginTop: 8 },
-});
-
 export default HomeScreen;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: 16,
+    backgroundColor: '#F2F3F4',
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+    width: '48%',
+    marginBottom: 15,
+  },
+  crop: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  adjust: {
+    color: '#007AFF',
+    marginTop: 5,
+  },
+});
