@@ -6,6 +6,9 @@ import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
+from uuid import uuid4
+import json
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -24,7 +27,18 @@ CROP_KC = {
     "default": 0.95
 }
 
-PLOTS = []  # In-memory store for plots
+PLOTS_FILE = "plots.json"
+
+# Load plots from disk if file exists
+if os.path.exists(PLOTS_FILE):
+    with open(PLOTS_FILE, "r") as f:
+        PLOTS = json.load(f)
+else:
+    PLOTS = []
+
+def save_plots_to_file():
+    with open(PLOTS_FILE, "w") as f:
+        json.dump(PLOTS, f, indent=2)
 
 def get_lat_lon(zip_code):
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={zip_code}&country=US&count=1"
@@ -136,13 +150,14 @@ def get_plan():
 @app.route("/add_plot", methods=["POST"])
 def add_plot():
     plot = request.get_json()
-    plot["id"] = len(PLOTS) + 1
+    plot["id"] = str(uuid4())  # Generate unique string ID
     PLOTS.append(plot)
+    save_plots_to_file()
     return jsonify({"success": True})
 
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
-    return jsonify(PLOTS)
+    return jsonify({"plots": PLOTS})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050) #replace w p
+    app.run(host="0.0.0.0", port=5050)
