@@ -1,30 +1,21 @@
-// MiraquaAppExpo/navigation/AppNavigator.tsx
+// navigation/AppNavigator.tsx
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SignInScreen from '../screens/SignInScreen';
 import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
-import type { Plot } from '../screens/HomeScreen';
-
-export type RootStackParamList = {
-  SignIn: undefined;
-  MainTabs: undefined;
-  PlotDetails: { plot: Plot };
-};
+import FarmerChatScreen from '../screens/FarmerChatScreen';
+import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const AppNavigator = (): JSX.Element => {
+export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="SignIn" component={SignInScreen} />
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="PlotDetails" component={PlotDetailsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator initialRouteName="SignIn">
+      <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="PlotDetails" component={PlotDetailsScreen} />
+      <Stack.Screen name="FarmerChat" component={FarmerChatScreen} />
+    </Stack.Navigator>
   );
-};
-
-export default AppNavigator;
+}

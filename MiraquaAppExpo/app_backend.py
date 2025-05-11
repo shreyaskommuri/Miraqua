@@ -29,11 +29,14 @@ CROP_KC = {
 
 PLOTS_FILE = "plots.json"
 
-# Load plots from disk if file exists
-if os.path.exists(PLOTS_FILE):
+# ✅ Always load saved plots if file exists
+print("Loading saved plots from file...")
+try:
     with open(PLOTS_FILE, "r") as f:
         PLOTS = json.load(f)
-else:
+    print("Loaded plots:", PLOTS)
+except Exception as e:
+    print("Failed to load plots:", e)
     PLOTS = []
 
 def save_plots_to_file():
@@ -153,11 +156,13 @@ def add_plot():
     plot["id"] = str(uuid4())  # Generate unique string ID
     PLOTS.append(plot)
     save_plots_to_file()
+    print("Plot added:", plot)
     return jsonify({"success": True})
 
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
-    return jsonify({"plots": PLOTS})
+    print("Returning plots:", PLOTS)
+    return jsonify({"success": True, "plots": PLOTS})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050)

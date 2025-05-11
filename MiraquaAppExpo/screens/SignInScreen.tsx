@@ -1,23 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+// screens/SignInScreen.tsx
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 
 const SignInScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSignIn = () => {
+    navigation.navigate('MainTabs');
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Miraqua</Text>
-      <Text style={styles.subtitle}>Smart Irrigation Planner</Text>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('MainTabs')}
-      >
-        <Text style={styles.buttonText}>Enter App</Text>
-      </TouchableOpacity>
+      <View style={styles.card}>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+        <Button title="Sign In" onPress={handleSignIn} color="#1aa179" />
+      </View>
     </View>
   );
 };
@@ -25,14 +41,34 @@ const SignInScreen = () => {
 export default SignInScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#e8f5e9' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#388e3c', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#555', marginBottom: 40 },
-  button: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 10,
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#f9fdfb',
   },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 32,
+    color: '#1aa179',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  input: {
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+  },
 });

@@ -1,52 +1,30 @@
-const API_URL = 'http://10.35.67.235:5050';
+import { MYIPADRESS } from '@env';
 
-export const getIrrigationPlan = async (zip: string, crop: string, area: string) => {
+export const addPlot = async (plot: any) => {
   try {
-    const response = await fetch(`${API_URL}/get_plan`, {
+    console.log('Sending plot:', plot);
+    const response = await fetch(`http://${MYIPADRESS}:5050/add_plot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zip, crop, area }),
+      body: JSON.stringify(plot),
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch irrigation plan');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch irrigation plan failed:', error);
-    throw error;
+    const json = await response.json();
+    console.log('Add plot response:', json);
+    return json;
+  } catch (err) {
+    console.error('Failed to add plot', err);
+    return { success: false };
   }
 };
 
 export const getPlots = async () => {
   try {
-    const response = await fetch(`${API_URL}/get_plots`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch plots');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch plots failed:', error);
-    return [];
-  }
-};
-
-export const savePlot = async (plot: any) => {
-  try {
-    const response = await fetch(`${API_URL}/add_plot`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(plot),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to save plot');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to save plot:', error);
-    throw error;
+    const response = await fetch(`http://${MYIPADRESS}:5050/get_plots`);
+    const json = await response.json();
+    console.log('Received plots:', json);
+    return json;
+  } catch (err) {
+    console.error('Failed to fetch plots', err);
+    return { success: false, plots: [] };
   }
 };

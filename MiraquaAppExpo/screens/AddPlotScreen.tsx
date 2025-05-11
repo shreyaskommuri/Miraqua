@@ -1,54 +1,34 @@
+// screens/AddPlotScreen.tsx
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { addPlot } from '../api/api';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { MainTabParamList } from '../navigation/types';
 
 const AddPlotScreen = () => {
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const [name, setName] = useState('');
   const [crop, setCrop] = useState('');
-  const [location, setLocation] = useState('');
-  const [size, setSize] = useState('');
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [zipCode, setZipCode] = useState('');
 
   const handleSubmit = async () => {
-    if (!name || !crop || !location || !size) {
-      Alert.alert('Please fill out all fields');
-      return;
-    }
-
-    try {
-      const response = await fetch('http://10.35.67.235:5050/add_plot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, crop, location, size }),
-      });
-
-      if (response.ok) {
-        Alert.alert('Plot added successfully!');
-        navigation.navigate('MainTabs');
-      } else {
-        Alert.alert('Error adding plot');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      Alert.alert('Failed to connect to backend');
+    const plot = { name, crop, zip_code: zipCode };
+    const response = await addPlot(plot);
+    if (response.success) {
+      navigation.navigate('Home');
     }
   };
 
   return (
     <View style={styles.container}>
-      <TextInput style={styles.input} placeholder="Plot Name" onChangeText={setName} value={name} />
-      <TextInput style={styles.input} placeholder="Crop Type" onChangeText={setCrop} value={crop} />
-      <TextInput style={styles.input} placeholder="Location" onChangeText={setLocation} value={location} />
-      <TextInput
-        style={styles.input}
-        placeholder="Plot Size (m²)"
-        onChangeText={setSize}
-        value={size}
-        keyboardType="numeric"
-      />
-      <Button title="Add Plot" onPress={handleSubmit} />
+      <Text style={styles.title}>Add a New Plot</Text>
+      <View style={styles.formCard}>
+        <TextInput style={styles.input} placeholder="Plot Name" value={name} onChangeText={setName} />
+        <TextInput style={styles.input} placeholder="Crop Type" value={crop} onChangeText={setCrop} />
+        <TextInput style={styles.input} placeholder="ZIP Code" value={zipCode} onChangeText={setZipCode} keyboardType="numeric" />
+        <Button title="Add Plot" onPress={handleSubmit} color="#1aa179" />
+      </View>
     </View>
   );
 };
@@ -56,6 +36,24 @@ const AddPlotScreen = () => {
 export default AddPlotScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, justifyContent: 'center' },
-  input: { borderWidth: 1, borderRadius: 6, padding: 10, marginBottom: 12 },
+  container: { flex: 1, padding: 24, backgroundColor: '#f0faf5' },
+  title: { fontSize: 26, fontWeight: '700', marginBottom: 16, color: '#1aa179' },
+  formCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  input: {
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
 });
