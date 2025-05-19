@@ -1,8 +1,30 @@
 [
   {
-    "name": "Plot 1",
+    "name": "Plot 3",
+    "crop": "Toamto",
+    "zip_code": "94582",
+    "area": 100,
+    "id": "0c0fc183-5c14-4685-aec5-94ffc33219be"
+  },
+  {
+    "name": "Tomato Plot",
     "crop": "Tomato",
     "zip_code": "94582",
-    "id": "6fc284f2-aa1e-40c7-82aa-9211149bc465"
+    "area": 50,
+    "id": "114be1be-07e5-4788-a0f3-764ffb275fba"
+  },
+  {
+    "name": "Tomato Plot",
+    "crop": "Almond",
+    "zip_code": "94582",
+    "area": 50,
+    "id": "661c2bbf-2599-492d-831f-3797a0b05369"
+  },
+  {
+    "name": "Almond Plot",
+    "crop": "Almond",
+    "zip_code": "95340",
+    "area": 50,
+    "id": "e9236ce1-f449-40d8-84b4-19f2943c9424"
   }
 ]

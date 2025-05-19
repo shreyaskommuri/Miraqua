@@ -11,9 +11,16 @@ const AddPlotScreen = () => {
   const [name, setName] = useState('');
   const [crop, setCrop] = useState('');
   const [zipCode, setZipCode] = useState('');
+  const [size, setSize] = useState('');
 
   const handleSubmit = async () => {
-    const plot = { name, crop, zip_code: zipCode };
+    const plot = {
+      name,
+      crop,
+      zip_code: zipCode,
+      area: parseFloat(size),
+    };
+
     const response = await addPlot(plot);
     if (response.success) {
       navigation.navigate('Home');
@@ -24,9 +31,32 @@ const AddPlotScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Add a New Plot</Text>
       <View style={styles.formCard}>
-        <TextInput style={styles.input} placeholder="Plot Name" value={name} onChangeText={setName} />
-        <TextInput style={styles.input} placeholder="Crop Type" value={crop} onChangeText={setCrop} />
-        <TextInput style={styles.input} placeholder="ZIP Code" value={zipCode} onChangeText={setZipCode} keyboardType="numeric" />
+        <TextInput
+          style={styles.input}
+          placeholder="Plot Name"
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Crop Type"
+          value={crop}
+          onChangeText={setCrop}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="ZIP Code"
+          value={zipCode}
+          onChangeText={setZipCode}
+          keyboardType="numeric"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Plot Size (m²)"
+          value={size}
+          onChangeText={setSize}
+          keyboardType="numeric"
+        />
         <Button title="Add Plot" onPress={handleSubmit} color="#1aa179" />
       </View>
     </View>
@@ -37,7 +67,12 @@ export default AddPlotScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: '#f0faf5' },
-  title: { fontSize: 26, fontWeight: '700', marginBottom: 16, color: '#1aa179' },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 16,
+    color: '#1aa179',
+  },
   formCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,

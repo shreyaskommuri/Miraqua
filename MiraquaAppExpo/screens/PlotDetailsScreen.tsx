@@ -4,6 +4,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MYIPADRESS } from '@env';
 
 const PlotDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlotDetails'>>();
@@ -15,22 +16,43 @@ const PlotDetailsScreen = () => {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [avgMoisture, setAvgMoisture] = useState('');
+  const [avgTemp, setAvgTemp] = useState('');
+  const [avgSunlight, setAvgSunlight] = useState('');
+
   useEffect(() => {
     const fetchSchedule = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`http://192.168.1.239:5050/get_plan`, {
+        const response = await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             zip: plot.zip_code,
             crop: plot.crop.toLowerCase(),
-            area: 100,
+            area: plot.area || 100,
           }),
         });
         const json = await response.json();
         setSchedule(json.schedule || []);
         setSummary(json.summary || '');
+
+        if (json.schedule && json.schedule.length > 0) {
+          const moistures = json.schedule.map((d: any) => d.soil_moisture);
+          const temps = json.schedule.map((d: any) => d.temp);
+          const sunlights = json.schedule.map((d: any) => 57); // placeholder until backend sends actual sunlight
+
+          const avg = (arr: number[]) =>
+            arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : '--';
+
+          const avgMoistureNum = moistures.length
+            ? moistures.reduce((a, b) => a + b, 0) / moistures.length
+            : null;
+
+          setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum * 100).toFixed(1)}%` : '--');
+          setAvgTemp(`${avg(temps)}°F`);
+          setAvgSunlight(`${avg(sunlights)}%`);
+        }
       } catch (err) {
         console.error('Error fetching plan:', err);
       } finally {
@@ -68,9 +90,9 @@ const PlotDetailsScreen = () => {
 
       {tab === 'details' && (
         <View style={styles.detailGrid}>
-          <DetailRow icon={<Ionicons name="water" size={24} color="#1aa179" />} label="Moisture" value="48%" />
-          <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value="66°F" />
-          <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value="57%" />
+          <DetailRow icon={<Ionicons name="water" size={24} color="#1aa179" />} label="Moisture" value={avgMoisture} />
+          <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value={avgTemp} />
+          <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value={avgSunlight} />
           <DetailRow icon={<MaterialCommunityIcons name="test-tube" size={24} color="#1aa179" />} label="pH Level" value="6.1" />
         </View>
       )}

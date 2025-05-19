@@ -1,28 +1,37 @@
-// screens/SignInScreen.tsx
+// screens/SignUpScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { login } from '../api/api';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from 'react-native';
+import { signup } from '../api/api';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 
-const SignInScreen = () => {
+const SignUpScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async () => {
-    const res = await login(email, password);
+  const handleSignUp = async () => {
+    const res = await signup(email, password);
     if (res.success) {
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      Alert.alert('Account created!', 'You can now log in.');
+      navigation.replace('SignIn');
     } else {
-      Alert.alert('Login Failed', res.error || 'Invalid credentials');
+      Alert.alert('Signup Failed', res.error || 'Try a different email.');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Miraqua Login</Text>
+      <Text style={styles.title}>Create Account</Text>
+
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -31,6 +40,7 @@ const SignInScreen = () => {
         value={email}
         onChangeText={setEmail}
       />
+
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -38,21 +48,33 @@ const SignInScreen = () => {
         value={password}
         onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-        <Text style={styles.loginText}>Log In</Text>
+
+      <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
+        <Text style={styles.signUpText}>Sign Up</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.replace('SignUp')}>
-        <Text style={styles.link}>Don't have an account? Sign Up</Text>
+
+      <TouchableOpacity onPress={() => navigation.replace('SignIn')}>
+        <Text style={styles.link}>Already have an account? Log In</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-export default SignInScreen;
+export default SignUpScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
-  title: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 24 },
+  container: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -61,13 +83,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 16,
   },
-  loginButton: {
+  signUpButton: {
     backgroundColor: '#1aa179',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    marginBottom: 16,
   },
-  loginText: {
+  signUpText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
@@ -75,6 +98,6 @@ const styles = StyleSheet.create({
   link: {
     color: '#1aa179',
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
 });
