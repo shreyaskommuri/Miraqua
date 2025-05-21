@@ -9,10 +9,20 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from uuid import uuid4
 import json
+import sys
 import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
 
 app = Flask(__name__)
 CORS(app)
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'farmerAI')))
+from farmer_ai import ai_blueprint
+app.register_blueprint(ai_blueprint)
+
 
 # ------------------------ Weather Setup ------------------------
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)

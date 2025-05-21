@@ -1,30 +1,79 @@
-// screens/FarmerChatScreen.tsx
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
+
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
+} from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
+import { MYIPADRESS } from '@env';
+
+type Message = {
+  sender: 'user' | 'bot';
+  text: string;
+};
 
 const FarmerChatScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'FarmerChat'>>();
   const { plot } = route.params;
-  const [messages, setMessages] = useState([
-    `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!`
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const [messages, setMessages] = useState<Message[]>([
+    { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` }
   ]);
   const [input, setInput] = useState('');
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    const newMessages = [...messages, input];
-    setMessages(newMessages);
+  const sendMessage = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    const userMessage: Message = { sender: 'user', text: trimmed };
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
+
+    try {
+      const res = await fetch(`http://${MYIPADRESS}:5050/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed })
+      });
+
+      const json = await res.json();
+      const replyText = json.success ? json.reply : `🤖 Error: ${json.error}`;
+      const botMessage: Message = { sender: 'bot', text: replyText };
+      setMessages(prev => [...prev, botMessage]);
+    } catch (err) {
+      const errorMessage: Message = {
+        sender: 'bot',
+        text: '❌ Could not contact assistant. Check your connection or backend server.'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.chatBox}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.select({ ios: 'padding', android: undefined })}
+      keyboardVerticalOffset={80}
+    >
+      <ScrollView style={styles.chatBox} ref={scrollViewRef}>
         {messages.map((msg, idx) => (
-          <View key={idx} style={idx % 2 === 0 ? styles.botBubble : styles.userBubble}>
-            <Text style={styles.message}>{msg}</Text>
+          <View
+            key={idx}
+            style={msg.sender === 'user' ? styles.userBubble : styles.botBubble}
+          >
+            <Text style={styles.message}>{msg.text}</Text>
           </View>
         ))}
       </ScrollView>
@@ -37,7 +86,7 @@ const FarmerChatScreen = () => {
         />
         <Button title="Send" onPress={sendMessage} color="#1aa179" />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
