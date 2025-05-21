@@ -26,5 +26,12 @@
     "zip_code": "95340",
     "area": 50,
     "id": "e9236ce1-f449-40d8-84b4-19f2943c9424"
+  },
+  {
+    "name": "Grape Plot",
+    "crop": "Grape",
+    "zip_code": "94582",
+    "area": 934,
+    "id": "dc05cdab-9d9d-45c1-910c-339b53c82b0c"
   }
 ]

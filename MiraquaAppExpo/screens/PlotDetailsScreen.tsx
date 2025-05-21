@@ -49,7 +49,7 @@ const PlotDetailsScreen = () => {
             ? moistures.reduce((a, b) => a + b, 0) / moistures.length
             : null;
 
-          setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum * 100).toFixed(1)}%` : '--');
+          setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum ).toFixed(3)}%` : '--');
           setAvgTemp(`${avg(temps)}°F`);
           setAvgSunlight(`${avg(sunlights)}%`);
         }
@@ -121,7 +121,7 @@ const PlotDetailsScreen = () => {
 
       {summary && (
         <View style={styles.summaryBox}>
-          <Text style={styles.summaryTitle}>AI Summary</Text>
+          <Text style={styles.summaryTitle}>What To Expect</Text>
           <Text style={styles.summaryText}>{summary}</Text>
         </View>
       )}
