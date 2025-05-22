@@ -12,6 +12,7 @@ import json
 import sys
 import os
 from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
+from utils.schedule_utils import load_schedule, save_schedule
 
 
 from dotenv import load_dotenv
@@ -24,6 +25,24 @@ CORS(app)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'farmerAI')))
 from farmer_ai import ai_blueprint
 app.register_blueprint(ai_blueprint)
+
+SCHEDULES_FILE = "plot_schedules.json"
+
+def save_schedule(plot_id, schedule):
+    try:
+        if os.path.exists(SCHEDULES_FILE):
+            with open(SCHEDULES_FILE, "r") as f:
+                all_schedules = json.load(f)
+        else:
+            all_schedules = {}
+
+        all_schedules[plot_id] = schedule
+
+        with open(SCHEDULES_FILE, "w") as f:
+            json.dump(all_schedules, f, indent=2)
+    except Exception as e:
+        print("Failed to save schedule:", e)
+
 
 
 # ------------------------ Weather Setup ------------------------
@@ -58,6 +77,12 @@ def load_from_file(filename):
 PLOTS = load_from_file(PLOTS_FILE)
 
 # ------------------------ Routes ------------------------
+
+@app.route("/get_schedule/<plot_id>", methods=["GET"])
+def get_schedule(plot_id):
+    schedule = load_schedule(plot_id)
+    return jsonify({"success": True, "schedule": schedule})
+
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.get_json()
@@ -152,6 +177,11 @@ def get_plan():
             "liters": int(liters)
         })
 
+        
+    plot_id = data.get("id", "unknown_plot")
+    save_schedule(plot_id, result)
+
+
     predicted_aw = round(total_liters_used / 1233480, 2)
     avg_liters = round(total_liters_used / 5, 2)
 
@@ -168,7 +198,17 @@ def get_plan():
         "summary": summary
     })
 
+def load_schedule(plot_id):
+    if os.path.exists(SCHEDULES_FILE):
+        with open(SCHEDULES_FILE, "r") as f:
+            all_schedules = json.load(f)
+        return all_schedules.get(plot_id, [])
+    return []
+
+
 # ------------------------ Forecast Helpers ------------------------
+
+
 def get_lat_lon(zip_code):
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={zip_code}&country=US&count=1"
     res = requests.get(geo_url).json()

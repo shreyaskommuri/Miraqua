@@ -45,7 +45,8 @@ const FarmerChatScreen = () => {
           prompt: input,
           crop: plot.crop,
           zip: plot.zip_code,
-          plotName: plot.name
+          plotName: plot.name,
+          plotId: plot.id
         })
       });
 

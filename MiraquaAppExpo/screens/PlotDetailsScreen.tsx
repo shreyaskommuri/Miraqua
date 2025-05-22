@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,48 +20,45 @@ const PlotDetailsScreen = () => {
   const [avgTemp, setAvgTemp] = useState('');
   const [avgSunlight, setAvgSunlight] = useState('');
 
-  useEffect(() => {
-    const fetchSchedule = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            zip: plot.zip_code,
-            crop: plot.crop.toLowerCase(),
-            area: plot.area || 100,
-          }),
-        });
-        const json = await response.json();
-        setSchedule(json.schedule || []);
-        setSummary(json.summary || '');
+  const fetchSchedule = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
+      const json = await response.json();
+      setSchedule(json.schedule || []);
 
-        if (json.schedule && json.schedule.length > 0) {
-          const moistures = json.schedule.map((d: any) => d.soil_moisture);
-          const temps = json.schedule.map((d: any) => d.temp);
-          const sunlights = json.schedule.map((d: any) => 57); // placeholder until backend sends actual sunlight
+      if (json.schedule && json.schedule.length > 0) {
+        const moistures = json.schedule.map((d: any) => d.soil_moisture);
+        const temps = json.schedule.map((d: any) => d.temp);
+        const sunlights = json.schedule.map((d: any) => 57); // placeholder
 
-          const avg = (arr: number[]) =>
-            arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : '--';
+        const avg = (arr: number[]) =>
+          arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : '--';
 
-          const avgMoistureNum = moistures.length
-            ? moistures.reduce((a, b) => a + b, 0) / moistures.length
-            : null;
+        const avgMoistureNum = moistures.length
+          ? moistures.reduce((a, b) => a + b, 0) / moistures.length
+          : null;
 
-          setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum ).toFixed(3)}%` : '--');
-          setAvgTemp(`${avg(temps)}°F`);
-          setAvgSunlight(`${avg(sunlights)}%`);
-        }
-      } catch (err) {
-        console.error('Error fetching plan:', err);
-      } finally {
-        setLoading(false);
+        setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum).toFixed(3)}%` : '--');
+        setAvgTemp(`${avg(temps)}°F`);
+        setAvgSunlight(`${avg(sunlights)}%`);
       }
-    };
+    } catch (err) {
+      console.error('Error fetching schedule:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchSchedule();
-  }, [plot]);
+  useEffect(() => {
+    fetchSchedule(); // initial load
+  }, [plot.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSchedule(); // auto reload on screen focus
+    }, [plot.id])
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -98,28 +95,33 @@ const PlotDetailsScreen = () => {
       )}
 
       {tab === 'plants' && (
-        <View style={styles.plantBox}>
-          <Text style={styles.plantNote}>🌱 Plants section coming soon.</Text>
-        </View>
+        <>
+          <View style={styles.plantBox}>
+            <Text style={styles.plantNote}>🌱 Plants section coming soon.</Text>
+          </View>
+
+          <View style={styles.scheduleBox}>
+            <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
+            <TouchableOpacity onPress={fetchSchedule}>
+              <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
+            </TouchableOpacity>
+            {loading ? (
+              <ActivityIndicator size="small" color="#1aa179" />
+            ) : schedule.length > 0 ? (
+              schedule.map((item, index) => (
+                <View key={index} style={styles.scheduleRow}>
+                  <Text style={styles.scheduleDay}>{item.day}</Text>
+                  <Text style={styles.scheduleLiters}>{item.liters} liters</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noSchedule}>No schedule available</Text>
+            )}
+          </View>
+        </>
       )}
 
-      <View style={styles.scheduleBox}>
-        <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
-        {loading ? (
-          <ActivityIndicator size="small" color="#1aa179" />
-        ) : schedule.length > 0 ? (
-          schedule.map((item, index) => (
-            <View key={index} style={styles.scheduleRow}>
-              <Text style={styles.scheduleDay}>{item.day}</Text>
-              <Text style={styles.scheduleLiters}>{item.liters} liters</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noSchedule}>No schedule available</Text>
-        )}
-      </View>
-
-      {summary && (
+      {tab === 'details' && summary && (
         <View style={styles.summaryBox}>
           <Text style={styles.summaryTitle}>What To Expect</Text>
           <Text style={styles.summaryText}>{summary}</Text>
@@ -162,7 +164,7 @@ const styles = StyleSheet.create({
   labelText: { fontSize: 16, marginLeft: 8, color: '#333' },
   valueText: { fontSize: 16, fontWeight: '600', color: '#444' },
   scheduleBox: { backgroundColor: '#f4faf7', padding: 16, borderRadius: 12, marginBottom: 20 },
-  scheduleTitle: { fontSize: 18, fontWeight: '600', marginBottom: 10, color: '#1aa179' },
+  scheduleTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4, color: '#1aa179' },
   scheduleRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   scheduleDay: { fontSize: 15, color: '#333' },
   scheduleLiters: { fontSize: 15, fontWeight: '600', color: '#444' },
