@@ -81,6 +81,9 @@ PLOTS = load_from_file(PLOTS_FILE)
 @app.route("/get_schedule/<plot_id>", methods=["GET"])
 def get_schedule(plot_id):
     schedule = load_schedule(plot_id)
+    print("🔍 Sent schedule to frontend:")
+    import json
+    print(json.dumps(schedule, indent=2))
     return jsonify({"success": True, "schedule": schedule})
 
 @app.route("/signup", methods=["POST"])

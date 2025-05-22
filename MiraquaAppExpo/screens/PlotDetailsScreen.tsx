@@ -1,6 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  useRoute,
+  useNavigation,
+  RouteProp,
+  useFocusEffect,
+} from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,7 +42,7 @@ const PlotDetailsScreen = () => {
       if (json.schedule && json.schedule.length > 0) {
         const moistures = json.schedule.map((d: any) => d.soil_moisture);
         const temps = json.schedule.map((d: any) => d.temp);
-        const sunlights = json.schedule.map((d: any) => 57); // placeholder
+        const sunlights = json.schedule.map(() => 57);
 
         const avg = (arr: number[]) =>
           arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : '--';
@@ -39,7 +51,7 @@ const PlotDetailsScreen = () => {
           ? moistures.reduce((a, b) => a + b, 0) / moistures.length
           : null;
 
-        setAvgMoisture(avgMoistureNum !== null ? `${(avgMoistureNum).toFixed(3)}%` : '--');
+        setAvgMoisture(avgMoistureNum !== null ? `${avgMoistureNum.toFixed(3)}%` : '--');
         setAvgTemp(`${avg(temps)}°F`);
         setAvgSunlight(`${avg(sunlights)}%`);
       }
@@ -51,14 +63,38 @@ const PlotDetailsScreen = () => {
   };
 
   useEffect(() => {
-    fetchSchedule(); // initial load
+    fetchSchedule();
   }, [plot.id]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchSchedule(); // auto reload on screen focus
+      fetchSchedule();
     }, [plot.id])
   );
+
+  const renderCalendarGrid = () => {
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const cells = Array.from({ length: 14 }).map((_, i) => {
+      const day = schedule[i];
+      return (
+        <View key={i} style={styles.calendarCell}>
+          <Text style={styles.cellText}>{day?.liters ? `${day.liters}L` : ''}</Text>
+        </View>
+      );
+    });
+
+    return (
+      <View style={styles.calendarWrapper}>
+        <View style={styles.calendarRow}>
+          {daysOfWeek.map((day, idx) => (
+            <Text key={idx} style={styles.dayHeader}>{day}</Text>
+          ))}
+        </View>
+        <View style={styles.calendarRow}>{cells.slice(0, 7)}</View>
+        <View style={styles.calendarRow}>{cells.slice(7)}</View>
+      </View>
+    );
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -95,30 +131,17 @@ const PlotDetailsScreen = () => {
       )}
 
       {tab === 'plants' && (
-        <>
-          <View style={styles.plantBox}>
-            <Text style={styles.plantNote}>🌱 Plants section coming soon.</Text>
-          </View>
-
-          <View style={styles.scheduleBox}>
-            <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
-            <TouchableOpacity onPress={fetchSchedule}>
-              <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
-            </TouchableOpacity>
-            {loading ? (
-              <ActivityIndicator size="small" color="#1aa179" />
-            ) : schedule.length > 0 ? (
-              schedule.map((item, index) => (
-                <View key={index} style={styles.scheduleRow}>
-                  <Text style={styles.scheduleDay}>{item.day}</Text>
-                  <Text style={styles.scheduleLiters}>{item.liters} liters</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noSchedule}>No schedule available</Text>
-            )}
-          </View>
-        </>
+        <View style={styles.scheduleBox}>
+          <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
+          <TouchableOpacity onPress={fetchSchedule}>
+            <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
+          </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator size="small" color="#1aa179" />
+          ) : (
+            renderCalendarGrid()
+          )}
+        </View>
       )}
 
       {tab === 'details' && summary && (
@@ -128,7 +151,10 @@ const PlotDetailsScreen = () => {
         </View>
       )}
 
-      <TouchableOpacity style={styles.farmerButton} onPress={() => navigation.navigate('FarmerChat', { plot })}>
+      <TouchableOpacity
+        style={styles.farmerButton}
+        onPress={() => navigation.navigate('FarmerChat', { plot })}
+      >
         <Text style={styles.farmerText}>Farmer</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -165,10 +191,21 @@ const styles = StyleSheet.create({
   valueText: { fontSize: 16, fontWeight: '600', color: '#444' },
   scheduleBox: { backgroundColor: '#f4faf7', padding: 16, borderRadius: 12, marginBottom: 20 },
   scheduleTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4, color: '#1aa179' },
-  scheduleRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  scheduleDay: { fontSize: 15, color: '#333' },
-  scheduleLiters: { fontSize: 15, fontWeight: '600', color: '#444' },
-  noSchedule: { fontSize: 14, color: '#999' },
+  calendarWrapper: { gap: 8 },
+  calendarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#777' },
+  calendarCell: {
+    flex: 1,
+    aspectRatio: 1,
+    backgroundColor: '#fff',
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  cellText: { fontSize: 13, color: '#1aa179', textAlign: 'center' },
   summaryBox: { backgroundColor: '#f3f9f6', padding: 16, borderRadius: 12, marginBottom: 20 },
   summaryTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8, color: '#1aa179' },
   summaryText: { fontSize: 14, color: '#555' },
