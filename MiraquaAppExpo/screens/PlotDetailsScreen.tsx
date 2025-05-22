@@ -35,8 +35,25 @@ const PlotDetailsScreen = () => {
   const fetchSchedule = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
-      const json = await response.json();
+      let response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
+      let json = await response.json();
+
+      if (!json.schedule || json.schedule.length === 0) {
+        // Generate schedule if missing
+        await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: plot.id,
+            zip: plot.zip_code,
+            crop: plot.crop.toLowerCase(),
+            area: plot.area || 100,
+          }),
+        });
+        response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
+        json = await response.json();
+      }
+
       setSchedule(json.schedule || []);
 
       if (json.schedule && json.schedule.length > 0) {

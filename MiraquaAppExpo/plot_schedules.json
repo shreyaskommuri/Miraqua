@@ -206,5 +206,57 @@
       "etc": 0.53,
       "liters": 25.2
     }
+  ],
+  "bf264d72-935c-4a22-bffe-f7b04b2c343b": [
+    {
+      "day": "Thursday (May 22)",
+      "date": "5/22/2025",
+      "temp": 74.9,
+      "rain": 0.0,
+      "soil_moisture": 0.052,
+      "et0": 0.5,
+      "etc": 0.53,
+      "liters": 426
+    },
+    {
+      "day": "Friday (May 23)",
+      "date": "5/23/2025",
+      "temp": 68.1,
+      "rain": 0.0,
+      "soil_moisture": 0.055,
+      "et0": 0.5,
+      "etc": 0.53,
+      "liters": 420
+    },
+    {
+      "day": "Saturday (May 24)",
+      "date": "5/24/2025",
+      "temp": 70.0,
+      "rain": 0.0,
+      "soil_moisture": 0.055,
+      "et0": 0.5,
+      "etc": 0.53,
+      "liters": 420
+    },
+    {
+      "day": "Sunday (May 25)",
+      "date": "5/25/2025",
+      "temp": 72.0,
+      "rain": 0.0,
+      "soil_moisture": 0.053,
+      "et0": 0.5,
+      "etc": 0.53,
+      "liters": 424
+    },
+    {
+      "day": "Monday (May 26)",
+      "date": "5/26/2025",
+      "temp": 68.8,
+      "rain": 0.0,
+      "soil_moisture": 0.052,
+      "et0": 0.5,
+      "etc": 0.53,
+      "liters": 426
+    }
   ]
 }

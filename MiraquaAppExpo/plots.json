@@ -40,5 +40,12 @@
     "zip_code": "95340",
     "area": 1000,
     "id": "51edc923-adba-43bb-a1e2-081da1c442f2"
+  },
+  {
+    "name": "Chanu Plot",
+    "crop": "Almond",
+    "zip_code": "95340",
+    "area": 1000,
+    "id": "bf264d72-935c-4a22-bffe-f7b04b2c343b"
   }
 ]
