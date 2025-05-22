@@ -11,6 +11,8 @@ from uuid import uuid4
 import json
 import sys
 import os
+from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
+
 
 from dotenv import load_dotenv
 load_dotenv()

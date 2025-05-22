@@ -41,7 +41,12 @@ const FarmerChatScreen = () => {
       const res = await fetch(`http://${MYIPADRESS}:5050/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: trimmed })
+        body: JSON.stringify({
+          prompt: input,
+          crop: plot.crop,
+          zip: plot.zip_code,
+          plotName: plot.name
+        })
       });
 
       const json = await res.json();

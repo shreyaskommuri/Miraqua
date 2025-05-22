@@ -33,5 +33,12 @@
     "zip_code": "94582",
     "area": 934,
     "id": "dc05cdab-9d9d-45c1-910c-339b53c82b0c"
+  },
+  {
+    "name": "CornPlot",
+    "crop": "Corn",
+    "zip_code": "95340",
+    "area": 1000,
+    "id": "51edc923-adba-43bb-a1e2-081da1c442f2"
   }
 ]
