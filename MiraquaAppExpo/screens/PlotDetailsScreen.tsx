@@ -1,3 +1,4 @@
+// screens/PlotDetailsScreen.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -23,14 +24,14 @@ const PlotDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { plot } = route.params;
 
-  const [tab, setTab] = useState<'plants' | 'details'>('details');
+  const [tab, setTab] = useState<'schedule' | 'details'>('details');
   const [schedule, setSchedule] = useState<any[]>([]);
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [avgMoisture, setAvgMoisture] = useState('');
-  const [avgTemp, setAvgTemp] = useState('');
-  const [avgSunlight, setAvgSunlight] = useState('');
+  const [avgMoisture, setAvgMoisture] = useState('--');
+  const [avgTemp, setAvgTemp] = useState('--');
+  const [avgSunlight, setAvgSunlight] = useState('--');
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -39,7 +40,6 @@ const PlotDetailsScreen = () => {
       let json = await response.json();
 
       if (!json.schedule || json.schedule.length === 0) {
-        // Generate schedule if missing
         await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -79,8 +79,30 @@ const PlotDetailsScreen = () => {
     }
   };
 
+  const fetchSummary = async () => {
+    try {
+      const response = await fetch(`http://${MYIPADRESS}:5050/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `What should I expect this week for ${plot.crop} in ZIP ${plot.zip_code}?`,
+          crop: plot.crop,
+          zip: plot.zip_code,
+          plotName: plot.name,
+          plotId: plot.id,
+        }),
+      });
+      const json = await response.json();
+      setSummary(json.reply || 'No forecast available.');
+    } catch (err) {
+      console.error('Failed to fetch forecast summary:', err);
+      setSummary('❌ Could not load forecast.');
+    }
+  };
+
   useEffect(() => {
     fetchSchedule();
+    fetchSummary();
   }, [plot.id]);
 
   useFocusEffect(
@@ -90,11 +112,16 @@ const PlotDetailsScreen = () => {
   );
 
   const renderCalendarGrid = () => {
+    const today = new Date();
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const cells = Array.from({ length: 14 }).map((_, i) => {
       const day = schedule[i];
+      const cellDate = new Date();
+      cellDate.setDate(today.getDate() + i);
+      const dayNum = cellDate.getDate();
       return (
         <View key={i} style={styles.calendarCell}>
+          <Text style={{ fontSize: 10, alignSelf: 'flex-start', paddingLeft: 4 }}>{dayNum}</Text>
           <Text style={styles.cellText}>{day?.liters ? `${day.liters}L` : ''}</Text>
         </View>
       );
@@ -130,8 +157,8 @@ const PlotDetailsScreen = () => {
       </View>
 
       <View style={styles.tabRow}>
-        <TouchableOpacity onPress={() => setTab('plants')}>
-          <Text style={[styles.tabText, tab === 'plants' && styles.activeTab]}>Plants</Text>
+        <TouchableOpacity onPress={() => setTab('schedule')}>
+          <Text style={[styles.tabText, tab === 'schedule' && styles.activeTab]}>Schedule</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setTab('details')}>
           <Text style={[styles.tabText, tab === 'details' && styles.activeTab]}>Details</Text>
@@ -144,10 +171,15 @@ const PlotDetailsScreen = () => {
           <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value={avgTemp} />
           <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value={avgSunlight} />
           <DetailRow icon={<MaterialCommunityIcons name="test-tube" size={24} color="#1aa179" />} label="pH Level" value="6.1" />
+
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryTitle}>What To Expect</Text>
+            <Text style={styles.summaryText}>{summary || 'Loading forecast...'}</Text>
+          </View>
         </View>
       )}
 
-      {tab === 'plants' && (
+      {tab === 'schedule' && (
         <View style={styles.scheduleBox}>
           <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
           <TouchableOpacity onPress={fetchSchedule}>
@@ -158,13 +190,6 @@ const PlotDetailsScreen = () => {
           ) : (
             renderCalendarGrid()
           )}
-        </View>
-      )}
-
-      {tab === 'details' && summary && (
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryTitle}>What To Expect</Text>
-          <Text style={styles.summaryText}>{summary}</Text>
         </View>
       )}
 
@@ -208,8 +233,8 @@ const styles = StyleSheet.create({
   valueText: { fontSize: 16, fontWeight: '600', color: '#444' },
   scheduleBox: { backgroundColor: '#f4faf7', padding: 16, borderRadius: 12, marginBottom: 20 },
   scheduleTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4, color: '#1aa179' },
-  calendarWrapper: { gap: 8 },
-  calendarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  calendarWrapper: { gap: 4 },
+  calendarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#777' },
   calendarCell: {
     flex: 1,
@@ -217,10 +242,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderColor: '#ccc',
     borderWidth: 1,
-    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 2,
+    borderRightWidth: 0.5,
+    borderBottomWidth: 0.5,
   },
   cellText: { fontSize: 13, color: '#1aa179', textAlign: 'center' },
   summaryBox: { backgroundColor: '#f3f9f6', padding: 16, borderRadius: 12, marginBottom: 20 },
