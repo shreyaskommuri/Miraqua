@@ -1,7 +1,6 @@
-// screens/SignInScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { login } from '../api/api';
+import { signIn, getCurrentUser } from '../api/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -11,12 +10,22 @@ const SignInScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  useEffect(() => {
+    const checkUser = async () => {
+      const { user } = await getCurrentUser();
+      if (user) {
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      }
+    };
+    checkUser();
+  }, []);
+
   const handleLogin = async () => {
-    const res = await login(email, password);
-    if (res.success) {
+    const { data, error } = await signIn(email, password);
+    if (data?.session) {
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } else {
-      Alert.alert('Login Failed', res.error || 'Invalid credentials');
+      Alert.alert('Login Failed', error?.message || 'Invalid credentials');
     }
   };
 

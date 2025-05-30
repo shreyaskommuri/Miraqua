@@ -1,8 +1,7 @@
-// navigation/AppNavigator.tsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SignInScreen from '../screens/SignInScreen';
-import SignUpScreen from '../screens/SignUpScreen.tsx';
+import SignUpScreen from '../screens/SignUpScreen';
 import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
