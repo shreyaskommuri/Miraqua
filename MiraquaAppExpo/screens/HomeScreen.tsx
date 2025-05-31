@@ -1,4 +1,3 @@
-// screens/HomeScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -6,15 +5,23 @@ import { getPlots } from '../api/api';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../utils/supabase';
 
 const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [plots, setPlots] = useState<any[]>([]);
 
   const fetchPlots = async () => {
-    const response = await getPlots();
+    const { data: userData, error } = await supabase.auth.getUser();
+    if (error || !userData?.user?.id) return;
+
+    const response = await getPlots(userData.user.id);
+    console.log('✅ getPlots() response:', response);
+
     if (response.success) {
       setPlots(response.plots);
+    } else {
+      console.error("Failed to fetch plots:", response.error);
     }
   };
 
@@ -36,30 +43,30 @@ const HomeScreen = () => {
         <Text style={styles.mapText}>Smart Irrigation Dashboard</Text>
       </View>
 
-      {plots.map((plot, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.plotCard}
-          onPress={() => navigation.navigate('PlotDetails', { plot })}
-        >
-          <View style={styles.plotTop}>
-            <Text style={styles.plotName}>{plot.name?.trim() || 'Unnamed Plot'}</Text>
-            <Text style={styles.plotZip}>{plot.zip_code}</Text>
-          </View>
-          <View style={styles.progressRow}>
-            <View style={styles.statusBox}>
-              <Text style={styles.statusLabel}>Watering</Text>
-              <Text style={styles.statusValue}>45%</Text>
+      {plots.length > 0 ? (
+        plots.map((plot, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.plotCard}
+            onPress={() => navigation.navigate('PlotDetails', { plot })}
+          >
+            <View style={styles.plotTop}>
+              <Text style={styles.plotName}>{plot.name?.trim() || `Plot (${plot.crop})`}</Text>
+              <Text style={styles.plotZip}>{plot.zip_code}</Text>
             </View>
-            <View style={styles.statusBox}>
-              <Text style={styles.statusLabel}>Sunlight</Text>
-              <Text style={styles.statusValue}>60%</Text>
+            <View style={styles.progressRow}>
+              <View style={styles.statusBox}>
+                <Text style={styles.statusLabel}>Crop</Text>
+                <Text style={styles.statusValue}>{plot.crop}</Text>
+              </View>
+              <View style={styles.statusBox}>
+                <Text style={styles.statusLabel}>Area</Text>
+                <Text style={styles.statusValue}>{plot.area} m²</Text>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      ))}
-
-      {plots.length === 0 && (
+          </TouchableOpacity>
+        ))
+      ) : (
         <Text style={{ textAlign: 'center', marginTop: 40, color: '#999' }}>
           No plots found. Add one using the tab below.
         </Text>

@@ -29,7 +29,12 @@ export const addPlot = async (plot: any) => {
   return await response.json();
 };
 
-export const getPlots = async () => {
-  const response = await fetch(`${BASE_URL}/get_plots`);
-  return await response.json();
+export const getPlots = async (userId: string) => {
+  try {
+    const response = await fetch(`${BASE_URL}/get_plots?user_id=${userId}`);
+    const data = await response.json();
+    return { success: true, plots: data }; // ✅ wrap it
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 };

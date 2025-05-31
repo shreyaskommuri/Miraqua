@@ -36,42 +36,28 @@ const PlotDetailsScreen = () => {
   const fetchSchedule = async () => {
     setLoading(true);
     try {
-      let response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
-      let json = await response.json();
+      const response = await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plot_id: plot.id,
+          zip_code: plot.zip_code,
+          crop: plot.crop.toLowerCase(),
+          area: plot.area || 100,
+        }),
+      });
 
-      if (!json.schedule || json.schedule.length === 0) {
-        await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: plot.id,
-            zip: plot.zip_code,
-            crop: plot.crop.toLowerCase(),
-            area: plot.area || 100,
-          }),
-        });
-        response = await fetch(`http://${MYIPADRESS}:5050/get_schedule/${plot.id}`);
-        json = await response.json();
-      }
+      const json = await response.json();
+      const newSchedule = json.schedule || [];
 
-      setSchedule(json.schedule || []);
+      setSchedule(newSchedule);
+      setSummary(json.gem_summary || json.summary || 'No forecast available.');
 
-      if (json.schedule && json.schedule.length > 0) {
-        const moistures = json.schedule.map((d: any) => d.soil_moisture);
-        const temps = json.schedule.map((d: any) => d.temp);
-        const sunlights = json.schedule.map(() => 57);
+      setAvgMoisture(json.moisture ? `${json.moisture.toFixed(2)}%` : '--');
+      setAvgTemp(json.current_temp_f ? `${json.current_temp_f.toFixed(1)}°F` : '--');
+      setAvgSunlight(json.sunlight !== undefined && json.sunlight !== null ? `${json.sunlight.toFixed(0)}%` : '--');
 
-        const avg = (arr: number[]) =>
-          arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : '--';
 
-        const avgMoistureNum = moistures.length
-          ? moistures.reduce((a, b) => a + b, 0) / moistures.length
-          : null;
-
-        setAvgMoisture(avgMoistureNum !== null ? `${avgMoistureNum.toFixed(3)}%` : '--');
-        setAvgTemp(`${avg(temps)}°F`);
-        setAvgSunlight(`${avg(sunlights)}%`);
-      }
     } catch (err) {
       console.error('Error fetching schedule:', err);
     } finally {
@@ -79,30 +65,8 @@ const PlotDetailsScreen = () => {
     }
   };
 
-  const fetchSummary = async () => {
-    try {
-      const response = await fetch(`http://${MYIPADRESS}:5050/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `What should I expect this week for ${plot.crop} in ZIP ${plot.zip_code}?`,
-          crop: plot.crop,
-          zip: plot.zip_code,
-          plotName: plot.name,
-          plotId: plot.id,
-        }),
-      });
-      const json = await response.json();
-      setSummary(json.reply || 'No forecast available.');
-    } catch (err) {
-      console.error('Failed to fetch forecast summary:', err);
-      setSummary('❌ Could not load forecast.');
-    }
-  };
-
   useEffect(() => {
     fetchSchedule();
-    fetchSummary();
   }, [plot.id]);
 
   useFocusEffect(
@@ -174,7 +138,7 @@ const PlotDetailsScreen = () => {
 
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>What To Expect</Text>
-            <Text style={styles.summaryText}>{summary || 'Loading forecast...'}</Text>
+            <Text style={styles.summaryText}>{summary || 'Loading forecast summary...'}</Text>
           </View>
         </View>
       )}
@@ -214,6 +178,9 @@ const DetailRow = ({ icon, label, value }: { icon: React.ReactNode; label: strin
 );
 
 export default PlotDetailsScreen;
+
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },

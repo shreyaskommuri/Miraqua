@@ -1,3 +1,6 @@
+import os
+import sys
+import json
 import requests
 import openmeteo_requests
 import requests_cache
@@ -5,258 +8,182 @@ from retry_requests import retry
 import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from uuid import uuid4
-import json
-import sys
-import os
-from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
-from utils.schedule_utils import load_schedule, save_schedule
-
-
 from dotenv import load_dotenv
-load_dotenv()
+from supabase import create_client, Client
 
+# Load environment variables from .env
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path=env_path)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Import AI summary logic
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "farmerAI")))
+from farmer_ai import generate_summary, generate_gem_summary
 
 app = Flask(__name__)
 CORS(app)
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'farmerAI')))
-from farmer_ai import ai_blueprint
-app.register_blueprint(ai_blueprint)
-
-SCHEDULES_FILE = "plot_schedules.json"
-
-def save_schedule(plot_id, schedule):
-    try:
-        if os.path.exists(SCHEDULES_FILE):
-            with open(SCHEDULES_FILE, "r") as f:
-                all_schedules = json.load(f)
-        else:
-            all_schedules = {}
-
-        all_schedules[plot_id] = schedule
-
-        with open(SCHEDULES_FILE, "w") as f:
-            json.dump(all_schedules, f, indent=2)
-    except Exception as e:
-        print("Failed to save schedule:", e)
-
-
-
-# ------------------------ Weather Setup ------------------------
+# Weather setup
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
 openmeteo = openmeteo_requests.Client(session=retry_session)
 
+# Crop coefficients
 CROP_KC = {
-    "corn": 1.15,
-    "wheat": 1.0,
-    "alfalfa": 1.2,
-    "lettuce": 0.85,
-    "tomato": 1.05,
-    "almond": 1.05,
-    "default": 0.95
+    "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
+    "tomato": 1.05, "almond": 1.05, "default": 0.95
 }
 
-PLOTS_FILE = "plots.json"
-USERS_FILE = "users.json"
-
-# ------------------------ Utility Functions ------------------------
-def save_to_file(data, filename):
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=2)
-
-def load_from_file(filename):
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            return json.load(f)
-    return []
-
-PLOTS = load_from_file(PLOTS_FILE)
-
-# ------------------------ Routes ------------------------
-
-@app.route("/get_schedule/<plot_id>", methods=["GET"])
-def get_schedule(plot_id):
-    schedule = load_schedule(plot_id)
-    print("🔍 Sent schedule to frontend:")
-    import json
-    print(json.dumps(schedule, indent=2))
-    return jsonify({"success": True, "schedule": schedule})
-
-@app.route("/signup", methods=["POST"])
-def signup():
-    data = request.get_json()
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
-
-    users = load_from_file(USERS_FILE)
-    if any(user["email"] == email for user in users):
-        return jsonify({"success": False, "error": "Email already exists"}), 400
-
-    hashed = generate_password_hash(password)
-    users.append({"email": email, "password": hashed})
-    save_to_file(users, USERS_FILE)
-    return jsonify({"success": True})
-
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
-
-    users = load_from_file(USERS_FILE)
-    user = next((u for u in users if u["email"] == email), None)
-
-    if not user or not check_password_hash(user["password"], password):
-        return jsonify({"success": False, "error": "Invalid credentials"}), 401
-
-    return jsonify({"success": True})
-
-@app.route("/add_plot", methods=["POST"])
-def add_plot():
-    plot = request.get_json()
-    plot["name"] = plot.get("name", "").strip()
-    plot["crop"] = plot.get("crop", "").strip().capitalize()
-    plot["zip_code"] = str(plot.get("zip_code", "")).strip()
-    plot["id"] = str(uuid4())
-
-    if not plot["name"] or not plot["crop"] or not plot["zip_code"]:
-        return jsonify({"success": False, "error": "Invalid plot data"}), 400
-
-    PLOTS.append(plot)
-    save_to_file(PLOTS, PLOTS_FILE)
-    print("Plot added:", plot)
-    return jsonify({"success": True})
-
-@app.route("/get_plots", methods=["GET"])
-def get_plots():
-    return jsonify({"success": True, "plots": PLOTS})
-
-@app.route("/get_plan", methods=["POST"])
-def get_plan():
-    data = request.get_json()
-    zip_code = data.get("zip")
-    crop = data.get("crop", "default").lower()
-    area = float(data.get("area", 1))
-
-    lat, lon = get_lat_lon(zip_code)
-    if not lat:
-        return jsonify({"error": "Invalid ZIP code or location"}), 400
-
-    forecast = get_forecast(lat, lon)
-    if not forecast:
-        return jsonify({"error": "Could not fetch forecast"}), 500
-
-    result = []
-    total_liters_used = 0
-    kc = CROP_KC.get(crop, CROP_KC["default"])
-
-    for i in range(5):
-        tmax = float(forecast["tmax"][i])
-        tmin = float(forecast["tmin"][i])
-        tmean = float(forecast["tmean"][i])
-        rain = float(forecast["rain"][i])
-        soil = float(forecast["soils"][i])
-
-        temp_diff = max(5, tmax - tmin)
-        et0 = 0.0023 * (tmean + 17.8) * (temp_diff ** 0.5) * 0.408
-        et0 = max(et0, 0.5)
-        etc = round(et0 * kc, 2)
-        net_et = max(0, (etc - rain - (soil * 2)))
-        liters = round(max(0, net_et * area), 2)
-        total_liters_used += liters
-
-        result.append({
-            "day": forecast["dates"][i].strftime("%A (%b %d)"),
-            "date": forecast["dates"][i].strftime("%-m/%-d/%Y"),
-            "temp": round(tmean * 9/5 + 32, 1),
-            "rain": round(rain, 2),
-            "soil_moisture": round(soil, 3),
-            "et0": round(et0, 2),
-            "etc": round(etc, 2),
-            "liters": int(liters)
-        })
-
-        
-    plot_id = data.get("id", "unknown_plot")
-    save_schedule(plot_id, result)
-
-
-    predicted_aw = round(total_liters_used / 1233480, 2)
-    avg_liters = round(total_liters_used / 5, 2)
-
-    summary = (
-        f"\U0001F33E Based on your crop ({crop}) and ZIP code ({zip_code}), your estimated 5-day water need is "
-        f"{int(total_liters_used)} liters.\n"
-        f"\U0001F4A7 Apply about {int(avg_liters)} liters per day.\n"
-        f"\U0001F9E0 Optimized using crop type, soil moisture, and forecasted rainfall for precision irrigation."
-    )
-
-    return jsonify({
-        "predicted_aw": predicted_aw,
-        "schedule": result,
-        "summary": summary
-    })
-
-def load_schedule(plot_id):
-    if os.path.exists(SCHEDULES_FILE):
-        with open(SCHEDULES_FILE, "r") as f:
-            all_schedules = json.load(f)
-        return all_schedules.get(plot_id, [])
-    return []
-
-
-# ------------------------ Forecast Helpers ------------------------
-
-
 def get_lat_lon(zip_code):
-    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={zip_code}&country=US&count=1"
-    res = requests.get(geo_url).json()
-    if res.get("results"):
-        lat = res["results"][0]["latitude"]
-        lon = res["results"][0]["longitude"]
-        return lat, lon
-    return None, None
+    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={zip_code}&count=1&language=en&format=json"
+    response = requests.get(geo_url)
+    data = response.json()
+    if "results" in data and len(data["results"]) > 0:
+        return data["results"][0]["latitude"], data["results"][0]["longitude"]
+    else:
+        raise ValueError("Invalid zip code")
 
 def get_forecast(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
         "longitude": lon,
+        "hourly": ["temperature_2m", "soil_moisture_0_to_1cm", "evapotranspiration"],
         "daily": ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
-        "hourly": ["soil_moisture_0_to_1cm"],
-        "temperature_unit": "celsius",
-        "timezone": "auto"
+        "timezone": "auto",
     }
-    responses = openmeteo.weather_api(url, params=params)
-    response = responses[0]
+    response = openmeteo.weather_api(url, params)
+    return response
 
-    daily = response.Daily()
-    dates = pd.date_range(
-        start=pd.to_datetime(daily.Time(), unit="s", utc=True),
-        end=pd.to_datetime(daily.TimeEnd(), unit="s", utc=True),
-        freq=pd.Timedelta(seconds=daily.Interval()), inclusive="left"
-    ).date
-    tmax = daily.Variables(0).ValuesAsNumpy()
-    tmin = daily.Variables(1).ValuesAsNumpy()
-    rain = daily.Variables(2).ValuesAsNumpy()
-    tmean = [(tmax[i] + tmin[i]) / 2 for i in range(len(tmax))]
+def calculate_schedule(area, crop, weather_data):
+    kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
+    schedule = []
+    for i in range(7):
+        et0 = 5.0
+        liters = round(et0 * kc * area, 2)
+        schedule.append({"day": f"Day {i+1}", "liters": liters})
+    return schedule
+@app.route("/get_plan", methods=["POST"])
+def get_plan():
+    data = request.get_json()
+    crop = data.get("crop")
+    zip_code = data.get("zip_code")
+    area = data.get("area")
+    plot_id = data.get("plot_id")
 
-    hourly = response.Hourly()
-    soil = hourly.Variables(0).ValuesAsNumpy()
-    soil_avg_per_day = [round(float(soil[i*24:(i+1)*24].mean()), 3) for i in range(min(7, len(dates)))]
+    try:
+        lat, lon = get_lat_lon(zip_code)
+        forecasts = get_forecast(lat, lon)
+        forecast = forecasts[0]  # ✅ single forecast object
+        hourly = forecast.Hourly()
 
-    return {
-        "dates": dates,
-        "tmax": tmax,
-        "tmin": tmin,
-        "tmean": tmean,
-        "rain": rain,
-        "soils": soil_avg_per_day
-    }
+        temps_c = hourly.Variables(0).ValuesAsNumpy()
+        moistures = hourly.Variables(1).ValuesAsNumpy()
+        et0s = hourly.Variables(2).ValuesAsNumpy()
+
+        avg_temp_c = sum(temps_c[:24]) / 24
+        current_temp_f = round((avg_temp_c * 9 / 5) + 32, 1)
+        avg_moisture = round(sum(moistures[:24]) / 24 * 100, 2)
+        avg_sunlight = round(min((sum(et0s[:24]) / 5.0) * 100, 100), 1)
+
+        schedule = calculate_schedule(area, crop, forecast)
+        readable_summary = generate_summary(crop, zip_code, schedule)
+        gem_summary = generate_gem_summary(crop, zip_code, schedule, plot_id)
+
+        # Save in Supabase
+        supabase.table("plot_schedules").insert({
+            "plot_id": plot_id,
+            "schedule": schedule,
+            "summary": readable_summary,
+            "gem_summary": gem_summary
+        }).execute()
+
+        return jsonify({
+            "schedule": schedule,
+            "summary": readable_summary,
+            "gem_summary": gem_summary,
+            "current_temp_f": current_temp_f,
+            "moisture": avg_moisture,
+            "sunlight": avg_sunlight
+        })
+
+    except Exception as e:
+        print("❌ Error in /get_plan:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+
+@app.route("/add_plot", methods=["POST"])
+def add_plot():
+    data = request.get_json()
+    name = data.get("name")  # ✅ Handle plot name
+    crop = data.get("crop")
+    zip_code = data.get("zip_code")
+    area = data.get("area")
+    user_id = data.get("user_id")
+
+    try:
+        response = supabase.table("plots").insert({
+            "name": name,  # ✅ Save name
+            "crop": crop,
+            "zip_code": zip_code,
+            "area": area,
+            "user_id": user_id
+        }).execute()
+        return jsonify(response.data[0]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get_plots", methods=["GET"])
+def get_plots():
+    user_id = request.args.get("user_id")
+
+    if not user_id or user_id == "None":
+        return jsonify({"error": "Invalid user_id"}), 400
+
+    try:
+        response = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/chat", methods=["POST"])
+def chat():
+    try:
+        data = request.get_json()
+        prompt = data.get("prompt")
+        crop = data.get("crop")
+        zip_code = data.get("zip_code")
+        plot_name = data.get("plotName")
+        plot_id = data.get("plotId")
+
+        # Step 1: Fetch schedule
+        schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).execute()
+        if not schedule_res.data:
+            return jsonify({"success": False, "error": "Schedule not found."})
+
+        schedule_data = schedule_res.data[0]
+        schedule = schedule_data.get("schedule", [])
+
+        # Step 2: Ask Gemini to interpret the prompt and potentially modify the schedule
+        from farmer_ai import process_chat_command
+        updated_schedule, reply = process_chat_command(prompt, schedule, crop, zip_code, plot_name)
+
+        # Step 3: If updated, save back to Supabase
+        if updated_schedule != schedule:
+            supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
+
+        return jsonify({"success": True, "reply": reply})
+
+    except Exception as e:
+        print("❌ Error in /chat:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050)
+    app.run(debug=True, host="0.0.0.0", port=5050)
+
+

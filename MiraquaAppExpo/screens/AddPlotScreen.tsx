@@ -1,94 +1,80 @@
 // screens/AddPlotScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
+import { supabase } from '../utils/supabase';
 import { addPlot } from '../api/api';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { MainTabParamList } from '../navigation/types';
 
 const AddPlotScreen = () => {
-  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  const [name, setName] = useState('');
-  const [crop, setCrop] = useState('');
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [zipCode, setZipCode] = useState('');
-  const [size, setSize] = useState('');
+  const [crop, setCrop] = useState('');
+  const [area, setArea] = useState('');
+  const [name, setName] = useState('');
 
-  const handleSubmit = async () => {
-    const plot = {
-      name,
-      crop,
+  const handleAddPlot = async () => {
+    const { data: userData, error } = await supabase.auth.getUser();
+    if (error || !userData?.user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    const plotData = {
+      user_id: userData.user.id,
       zip_code: zipCode,
-      area: parseFloat(size),
+      crop,
+      area: parseFloat(area),
+      name,
     };
 
-    const response = await addPlot(plot);
+    const response = await addPlot(plotData);
     if (response.success) {
+      Alert.alert('Success', 'Plot added successfully!');
       navigation.navigate('Home');
+    } else {
+      Alert.alert('Error', 'Failed to add plot.');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Add a New Plot</Text>
-      <View style={styles.formCard}>
-        <TextInput
-          style={styles.input}
-          placeholder="Plot Name"
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Crop Type"
-          value={crop}
-          onChangeText={setCrop}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="ZIP Code"
-          value={zipCode}
-          onChangeText={setZipCode}
-          keyboardType="numeric"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Plot Size (m²)"
-          value={size}
-          onChangeText={setSize}
-          keyboardType="numeric"
-        />
-        <Button title="Add Plot" onPress={handleSubmit} color="#1aa179" />
-      </View>
-    </View>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.label}>Plot Name</Text>
+      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g., Front Field" />
+
+      <Text style={styles.label}>Crop Type</Text>
+      <TextInput style={styles.input} value={crop} onChangeText={setCrop} placeholder="e.g., Tomato" />
+
+      <Text style={styles.label}>ZIP Code</Text>
+      <TextInput style={styles.input} value={zipCode} onChangeText={setZipCode} placeholder="e.g., 94582" keyboardType="numeric" />
+
+      <Text style={styles.label}>Area (sq ft)</Text>
+      <TextInput style={styles.input} value={area} onChangeText={setArea} placeholder="e.g., 1000" keyboardType="numeric" />
+
+      <Button title="Add Plot" onPress={handleAddPlot} />
+    </ScrollView>
   );
 };
 
 export default AddPlotScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#f0faf5' },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    marginBottom: 16,
-    color: '#1aa179',
-  },
-  formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+  container: {
     padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingBottom: 60,
+    backgroundColor: '#fff',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
   },
   input: {
-    height: 50,
-    borderColor: '#ccc',
     borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 12,
     borderRadius: 10,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    marginTop: 8,
   },
 });

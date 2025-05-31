@@ -1,23 +1,59 @@
 import os
-import re
 import json
 from flask import Blueprint, request, jsonify
-from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
-from utils.schedule_utils import load_schedule, save_schedule
+from dotenv import load_dotenv
+from supabase import create_client
 import google.generativeai as genai
+from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
+
+
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-
-try:
-    print("🔍 Available Gemini models:")
-    for model in genai.list_models():
-        print(f"- {model.name} | methods: {model.supported_generation_methods}")
-except Exception as e:
-    print("❌ Error listing models:", e)
-
 ai_blueprint = Blueprint("ai", __name__)
 
+# ✅ BASIC WATER USAGE SUMMARY
+def generate_summary(crop, zip_code, schedule):
+    total_liters = sum(day["liters"] for day in schedule)
+    avg_liters = round(total_liters / len(schedule), 2)
+    highest_day = max(schedule, key=lambda x: x["liters"])
+    lowest_day = min(schedule, key=lambda x: x["liters"])
+
+    return (
+        f"🌾 Crop: {crop}, ZIP Code: {zip_code}\n"
+        f"💧 Total water needed over {len(schedule)} days: {total_liters} liters\n"
+        f"📈 Average per day: {avg_liters} liters\n"
+        f"🔺 Highest usage: {highest_day['liters']}L on {highest_day['day']}\n"
+        f"🔻 Lowest usage: {lowest_day['liters']}L on {lowest_day['day']}"
+    )
+
+# ✅ AI-GENERATED GEMINI SUMMARY
+def generate_gem_summary(crop, zip_code, plot_name, plot_id):
+    try:
+        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+
+        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
+        schedule = response.data[0]["schedule"] if response.data else []
+
+        lat, lon = get_lat_lon(zip_code)
+
+        context = f"You are helping a farmer named '{plot_name}' who is growing {crop} in ZIP code {zip_code}.\n"
+        context += f"They have this upcoming irrigation schedule:\n{json.dumps(schedule, indent=2)}\n"
+        context += "Give a helpful forecast-based summary with risks, recommendations, and what to expect based on soil moisture, temperature, and crop water needs."
+
+        response = model.generate_content(context)
+        return response.text.strip()
+
+    except Exception as e:
+        return f"Gemini summary generation failed: {str(e)}"
+
+
+# ✅ GEMINI CHAT ENDPOINT
 @ai_blueprint.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -25,96 +61,75 @@ def chat():
     crop = data.get("crop", "")
     zip_code = data.get("zip", "")
     plot_name = data.get("plotName", "")
-    plot_id = data.get("plotId", "unknown_plot")
-    area = 100
+    plot_id = data.get("plotId", "")
 
     if not user_prompt:
         return jsonify({"success": False, "error": "Missing prompt"}), 400
 
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+        # 🔄 Get schedule from Supabase
+        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).single().execute()
+        schedule = response.data["schedule"] if response.data else []
 
-        # 🔍 Detect if user wants to adjust schedule
-        if any(keyword in user_prompt.lower() for keyword in ["change", "modify", "reduce", "increase", "adjust", "update"]):
-            current_schedule = load_schedule(plot_id)
-            edit_prompt = f"""
-You are a JSON-only assistant for farmers. Given a 5-day irrigation schedule and the farmer's edit request, return ONLY the new updated schedule as a valid JSON array. Do not include any explanation, markdown, or formatting.
+        # 🧠 Process prompt and maybe update schedule
+        updated_schedule, reply = process_chat_command(user_prompt, schedule, crop, zip_code, plot_name)
 
-Example format:
+        # 💾 Save back to Supabase if it was changed
+        if updated_schedule != schedule:
+            supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
 
-[
-  {{
-    "day": "Monday (May 20)",
-    "date": "5/20/2025",
-    "temp": 68.2,
-    "rain": 0.0,
-    "soil_moisture": 0.29,
-    "et0": 2.5,
-    "etc": 2.63,
-    "liters": 112
-  }},
-  ...
-]
-
-Here is the current irrigation schedule:
-{json.dumps(current_schedule, indent=2)}
-
-The farmer said: "{user_prompt}"
-"""
-            response = model.generate_content(edit_prompt)
-            response_text = response.text.strip()
-
-            try:
-                cleaned = re.sub(r"^```(?:json)?|```$", "", response_text.strip(), flags=re.IGNORECASE).strip()
-                new_schedule = json.loads(cleaned)
-                save_schedule(plot_id, new_schedule)
-                return jsonify({"success": True, "reply": "Schedule updated successfully."})
-
-            except json.JSONDecodeError:
-                print("Gemini returned unparseable JSON:\n", response_text)  
-                return jsonify({"success": False, "error": "Could not parse AI output as valid JSON."})
-
-       
-        lat, lon = get_lat_lon(zip_code)
-        if not lat:
-            forecast_summary = "Weather data could not be retrieved due to an invalid ZIP code.\n"
-        else:
-            forecast = get_forecast(lat, lon)
-            kc = CROP_KC.get(crop, CROP_KC["default"])
-            total_liters = 0
-            summary_lines = []
-            for i in range(5):
-                tmax = float(forecast["tmax"][i])
-                tmin = float(forecast["tmin"][i])
-                tmean = float(forecast["tmean"][i])
-                rain = float(forecast["rain"][i])
-                soil = float(forecast["soils"][i])
-                et0 = max(0.5, 0.0023 * (tmean + 17.8) * ((tmax - tmin) ** 0.5) * 0.408)
-                etc = et0 * kc
-                net_et = max(0, etc - rain - (soil * 2))
-                liters = max(0, net_et * area)
-                total_liters += liters
-                summary_lines.append(
-                    f"Day {i+1}: Temp = {round(tmean,1)}°C, Rain = {round(rain,1)}mm, "
-                    f"Soil = {round(soil,2)}, ET₀ = {round(et0,2)}, Liters Needed ≈ {int(liters)}"
-                )
-            forecast_summary = "\n".join(summary_lines)
-            forecast_summary += f"\nTotal water needed (5-day): {int(total_liters)} liters.\n"
-
-        context = (
-            f"The user is managing a plot called '{plot_name}' growing {crop} in ZIP code {zip_code}.\n"
-            f"Here is the 5-day weather and irrigation forecast:\n{forecast_summary}"
-        )
-        system_prompt = (
-            "You are a precise and helpful assistant for farmers. "
-            "Use the weather and irrigation forecast to answer questions. "
-            "Keep responses practical and tailored to the crop.\n\n"
-            f"{context}\nUser question: {user_prompt}"
-        )
-
-        response = model.generate_content(system_prompt)
-        reply = response.text.strip()
         return jsonify({"success": True, "reply": reply})
 
     except Exception as e:
-        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)}"}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+
+
+def process_chat_command(prompt, schedule, crop, zip_code, plot_name):
+    import re
+
+    prompt_lower = prompt.lower()
+    new_schedule = schedule.copy()
+    modified = False
+    action_description = ""
+
+    # Try to extract day and liters
+    day_match = re.search(r"day\s*(\d+)", prompt_lower)
+    liters_match = re.search(r"(\d{2,5})\s*(l|liters)?", prompt_lower)
+
+    if day_match and liters_match:
+        day_index = int(day_match.group(1)) - 1
+        amount = float(liters_match.group(1))
+        if 0 <= day_index < len(schedule):
+            if "add" in prompt_lower:
+                new_schedule[day_index]["liters"] += amount
+                modified = True
+                action_description = f"✅ Added {amount} liters to Day {day_index+1}. New total: {new_schedule[day_index]['liters']} liters."
+            elif "set" in prompt_lower or "change" in prompt_lower:
+                new_schedule[day_index]["liters"] = amount
+                modified = True
+                action_description = f"✅ Set Day {day_index+1} to {amount} liters."
+    elif "today" in prompt_lower and liters_match:
+        amount = float(liters_match.group(1))
+        new_schedule[0]["liters"] += amount
+        modified = True
+        action_description = f"✅ Added {amount} liters to today (Day 1). New total: {new_schedule[0]['liters']} liters."
+
+    # Format schedule string for Gemini
+    schedule_text = "\n".join([f"{day['day']}: {day['liters']} liters" for day in new_schedule])
+
+    # Prompt for Gemini
+    system_prompt = (
+        f"You are a helpful AI assistant for a farmer growing {crop} in ZIP code {zip_code}. "
+        f"The plot is named {plot_name}. Based on the user input, here is the updated schedule:\n\n{schedule_text}\n\n"
+        "Give a friendly confirmation of the change and any helpful reminders or follow-up questions."
+    )
+
+    chat = genai.GenerativeModel("models/gemini-1.5-flash-latest").start_chat()
+    response = chat.send_message(prompt)
+
+    # Return updated schedule + assistant reply
+    final_reply = action_description if modified else response.text.strip()
+    return (new_schedule if modified else schedule), final_reply
