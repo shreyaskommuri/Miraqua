@@ -13,6 +13,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from dateutil.parser import parse
+from timezonefinder import TimezoneFinder
+from dateutil import tz
+
 
 # Load environment variables
 env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -39,6 +42,27 @@ CROP_KC = {
     "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
     "tomato": 1.05, "almond": 1.05, "default": 0.95
 }
+def get_current_temp(lat, lon):
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current_weather": True
+    }
+    try:
+        print("🌡️ Requesting current temperature...")
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        current_temp_c = response.json().get("current_weather", {}).get("temperature")
+        if current_temp_c is None:
+            raise ValueError("No temperature in response.")
+        current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
+        print("🌡️ Live temperature (F):", current_temp_f)
+        return current_temp_f
+    except Exception as e:
+        print("❌ Error fetching current temp:", e)
+        return None
+
 
 def get_lat_lon(zip_code):
     try:
@@ -145,6 +169,12 @@ def get_plan():
 
         print("🌐 Getting coordinates...")
         lat, lon = get_lat_lon(zip_code)
+        tf = TimezoneFinder()
+        timezone_str = tf.timezone_at(lat=lat, lng=lon)
+        local_zone = tz.gettz(timezone_str)
+        now_local = datetime.now(local_zone).replace(minute=0, second=0, microsecond=0)
+        print("🌍 Detected timezone:", timezone_str)
+
 
         print("📡 Requesting weather forecast...")
         forecasts = get_forecast(lat, lon)
@@ -164,20 +194,15 @@ def get_plan():
 
         # Time logic
         hourly_time_raw = hourly.Time()
-        hourly_time = [datetime.utcfromtimestamp(t) for t in to_array_safe(hourly_time_raw)]
-        print("⏰ Converted hourly time sample:", hourly_time[:5])
+        hourly_time = [datetime.fromtimestamp(t, local_zone) for t in to_array_safe(hourly_time_raw)]
+        time_diffs = [abs((t - now_local).total_seconds()) for t in hourly_time]
 
-
-        now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-        
-        print("⏰ now:", now)
-
-        time_diffs = [abs((t - now).total_seconds()) for t in hourly_time]
         index_now = time_diffs.index(min(time_diffs))
 
         # Temperature
-        current_temp_c = temps_c[index_now]
-        current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
+        current_temp_f = get_current_temp(lat, lon)
+
+        # current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
 
         # Moisture & Sunlight
         try:
@@ -197,16 +222,18 @@ def get_plan():
 
 
         if existing.data and len(existing.data) > 0:
-            print("✅ Schedule found, returning it")
+            print("✅ Schedule found, returning it with refreshed weather data")
             existing_schedule = existing.data[0]
-            return jsonify({
+            updated_response = {
                 "schedule": existing_schedule.get("schedule"),
                 "summary": existing_schedule.get("summary"),
                 "gem_summary": existing_schedule.get("gem_summary"),
                 "current_temp_f": current_temp_f,
                 "moisture": avg_moisture,
                 "sunlight": avg_sunlight
-            })
+            }
+            return jsonify(updated_response)
+
         
 
 
