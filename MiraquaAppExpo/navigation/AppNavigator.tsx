@@ -5,6 +5,7 @@ import SignUpScreen from '../screens/SignUpScreen';
 import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
+import HomeScreen from '../screens/HomeScreen';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

@@ -30,7 +30,8 @@ const AddPlotScreen = () => {
     };
 
     const response = await addPlot(plotData);
-    if (response.success) {
+    if ((response && !response.error)) {
+       
       Alert.alert('Success', 'Plot added successfully!');
       navigation.navigate('Home');
     } else {

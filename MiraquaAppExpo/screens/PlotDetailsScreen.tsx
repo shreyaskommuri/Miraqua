@@ -46,20 +46,30 @@ const PlotDetailsScreen = () => {
           area: plot.area || 100,
         }),
       });
-
+  
       const json = await response.json();
-      const newSchedule = json.schedule || [];
-
-      setSchedule(newSchedule);
+  
+      setSchedule(json.schedule || []);
       setSummary(json.gem_summary || json.summary || 'No forecast available.');
-
-      setAvgMoisture(json.moisture ? `${json.moisture.toFixed(2)}%` : '--');
-      setAvgTemp(json.current_temp_f ? `${json.current_temp_f.toFixed(1)}°F` : '--');
-      setAvgSunlight(json.sunlight !== undefined && json.sunlight !== null ? `${json.sunlight.toFixed(0)}%` : '--');
-
-
+  
+      setAvgMoisture(
+        typeof json.moisture === 'number' ? `${json.moisture.toFixed(2)}%` : '--'
+      );
+  
+      setAvgTemp(
+        typeof json.current_temp_f === 'number' ? `${json.current_temp_f.toFixed(1)}°F` : '--'
+      );
+  
+      setAvgSunlight(
+        typeof json.sunlight === 'number' ? `${json.sunlight.toFixed(0)}%` : '--'
+      );
+  
     } catch (err) {
       console.error('Error fetching schedule:', err);
+      setSummary('Failed to load schedule.');
+      setAvgMoisture('--');
+      setAvgTemp('--');
+      setAvgSunlight('--');
     } finally {
       setLoading(false);
     }
@@ -103,6 +113,16 @@ const PlotDetailsScreen = () => {
       </View>
     );
   };
+
+  // ✅ Fix: Add loading screen to prevent flicker
+  if (loading && schedule.length === 0 && summary === '') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#1aa179" />
+        <Text style={{ marginTop: 8, color: '#1aa179' }}>Loading plot data...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -178,9 +198,6 @@ const DetailRow = ({ icon, label, value }: { icon: React.ReactNode; label: strin
 );
 
 export default PlotDetailsScreen;
-
-
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
