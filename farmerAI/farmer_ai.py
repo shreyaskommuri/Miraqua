@@ -6,7 +6,6 @@ from supabase import create_client
 import google.generativeai as genai
 from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
 
-
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -52,7 +51,6 @@ def generate_gem_summary(crop, zip_code, plot_name, plot_id):
     except Exception as e:
         return f"Gemini summary generation failed: {str(e)}"
 
-
 # ✅ GEMINI CHAT ENDPOINT
 @ai_blueprint.route("/chat", methods=["POST"])
 def chat():
@@ -75,7 +73,7 @@ def chat():
         updated_schedule, reply = process_chat_command(user_prompt, schedule, crop, zip_code, plot_name)
 
         # 💾 Save back to Supabase if it was changed
-        if updated_schedule != schedule:
+        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
             supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
 
         return jsonify({"success": True, "reply": reply})
@@ -83,53 +81,42 @@ def chat():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-
-
-
+# ✅ SMART AI-DRIVEN SCHEDULE EDITING
 def process_chat_command(prompt, schedule, crop, zip_code, plot_name):
+    from copy import deepcopy
+    import json
     import re
 
-    prompt_lower = prompt.lower()
-    new_schedule = schedule.copy()
-    modified = False
-    action_description = ""
+    try:
+        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+        context = f"""
+You are a smart assistant for a farmer named '{plot_name}' who is growing {crop} in ZIP code {zip_code}.
+Here is their current 7-day irrigation schedule in JSON format:
+{json.dumps(schedule, indent=2)}
 
-    # Try to extract day and liters
-    day_match = re.search(r"day\s*(\d+)", prompt_lower)
-    liters_match = re.search(r"(\d{2,5})\s*(l|liters)?", prompt_lower)
+The farmer said: "{prompt}"
 
-    if day_match and liters_match:
-        day_index = int(day_match.group(1)) - 1
-        amount = float(liters_match.group(1))
-        if 0 <= day_index < len(schedule):
-            if "add" in prompt_lower:
-                new_schedule[day_index]["liters"] += amount
-                modified = True
-                action_description = f"✅ Added {amount} liters to Day {day_index+1}. New total: {new_schedule[day_index]['liters']} liters."
-            elif "set" in prompt_lower or "change" in prompt_lower:
-                new_schedule[day_index]["liters"] = amount
-                modified = True
-                action_description = f"✅ Set Day {day_index+1} to {amount} liters."
-    elif "today" in prompt_lower and liters_match:
-        amount = float(liters_match.group(1))
-        new_schedule[0]["liters"] += amount
-        modified = True
-        action_description = f"✅ Added {amount} liters to today (Day 1). New total: {new_schedule[0]['liters']} liters."
+Update the schedule according to their intent. Return only the updated schedule as raw JSON (no explanation, no markdown, no formatting).
+"""
 
-    # Format schedule string for Gemini
-    schedule_text = "\n".join([f"{day['day']}: {day['liters']} liters" for day in new_schedule])
+        response = model.generate_content(context)
+        raw = response.text.strip()
 
-    # Prompt for Gemini
-    system_prompt = (
-        f"You are a helpful AI assistant for a farmer growing {crop} in ZIP code {zip_code}. "
-        f"The plot is named {plot_name}. Based on the user input, here is the updated schedule:\n\n{schedule_text}\n\n"
-        "Give a friendly confirmation of the change and any helpful reminders or follow-up questions."
-    )
+        # 🧹 Strip markdown fences or stray "json" keyword
+        raw = re.sub(r"^```json|^```|```$", "", raw, flags=re.IGNORECASE).strip()
+        raw = re.sub(r"^json\s*", "", raw, flags=re.IGNORECASE).strip()
 
-    chat = genai.GenerativeModel("models/gemini-1.5-flash-latest").start_chat()
-    response = chat.send_message(prompt)
+        if not raw:
+            raise ValueError("Gemini returned empty or malformed output.")
 
-    # Return updated schedule + assistant reply
-    final_reply = action_description if modified else response.text.strip()
-    return (new_schedule if modified else schedule), final_reply
+        print("🔎 Cleaned Gemini JSON:", raw[:200])
+
+        updated_schedule = json.loads(raw)
+
+        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
+            return updated_schedule, "✅ Schedule updated based on your message."
+        else:
+            return schedule, "🟢 No changes were needed."
+
+    except Exception as e:
+        return schedule, f"❌ Could not apply your request: {e}"

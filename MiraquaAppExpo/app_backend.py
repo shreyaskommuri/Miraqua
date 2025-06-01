@@ -254,23 +254,36 @@ def chat():
         plot_name = data.get("plotName")
         plot_id = data.get("plotId")
 
+        # Step 1: Fetch schedule from Supabase
         schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
 
         if not schedule_res.data:
-            return jsonify({"success": False, "error": "Schedule not found."})
+            print("❌ Schedule not found for plot_id:", plot_id)
+            return jsonify({"success": False, "error": "Schedule not found."}), 404
 
-        schedule_data = schedule_res.data[0]
-        schedule = schedule_data.get("schedule", [])
+        schedule_row = schedule_res.data[0]
+        schedule = schedule_row.get("schedule", [])
 
+        # Step 2: Let AI process the command
         updated_schedule, reply = process_chat_command(prompt, schedule, crop, zip_code, plot_name)
 
-        if updated_schedule != schedule:
-            supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
+        # Step 3: Check if modified using JSON-safe comparison
+        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
+            print("🛠️ Schedule was modified, saving to Supabase...")
+            result = supabase.table("plot_schedules").update({
+                "schedule": updated_schedule
+            }).eq("plot_id", plot_id).execute()
+            print("✅ Supabase update result:", result)
+        else:
+            print("📭 No change detected in schedule.")
 
         return jsonify({"success": True, "reply": reply})
+    
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)

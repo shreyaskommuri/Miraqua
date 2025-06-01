@@ -96,7 +96,7 @@ const PlotDetailsScreen = () => {
       return (
         <View key={i} style={styles.calendarCell}>
           <Text style={{ fontSize: 10, alignSelf: 'flex-start', paddingLeft: 4 }}>{dayNum}</Text>
-          <Text style={styles.cellText}>{day?.liters ? `${day.liters}L` : ''}</Text>
+          <Text> {day?.liters != null ? `${day.liters}L` : ''}</Text>
         </View>
       );
     });
