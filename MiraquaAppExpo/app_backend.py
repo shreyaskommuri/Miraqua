@@ -85,11 +85,51 @@ def to_array_safe(value):
 def calculate_schedule(area, crop, weather_data):
     kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
     schedule = []
+
+    try:
+        daily = weather_data.Daily()
+        et0_values = to_array_safe(daily.Variables(2).ValuesAsNumpy())  # evapotranspiration
+        precip_values = to_array_safe(daily.Variables(0).ValuesAsNumpy())  # precipitation
+    except Exception as e:
+        print("❌ Error parsing daily forecast:", e)
+        return [{"day": f"Day {i+1}", "liters": 0} for i in range(7)]
+
+    try:
+        hourly = weather_data.Hourly()
+        moisture_values = to_array_safe(hourly.Variables(1).ValuesAsNumpy())  # hourly soil moisture
+    except Exception as e:
+        print("❌ Error parsing hourly forecast:", e)
+        moisture_values = [0.2] * 168  # fallback neutral moisture
+
+    # Fallback if ET₀ is empty or missing
+    if len(et0_values) < 7 or np.all(np.isnan(et0_values)) or np.all(et0_values == 0):
+        print("⚠️ ET₀ missing or zero — using fallback ET₀ = 5.0")
+        et0_values = np.array([5.0] * 7)
+
+    # Average soil moisture per day (24 hours each)
+    daily_moisture = []
+    for day in range(7):
+        start = day * 24
+        end = start + 24
+        if end <= len(moisture_values):
+            day_moisture = np.mean(moisture_values[start:end])
+        else:
+            day_moisture = np.mean(moisture_values[-24:])
+        daily_moisture.append(day_moisture)
+
+    print("🌿 Final ET₀ per day:", et0_values[:7])
+    print("🟫 Daily moisture averages:", daily_moisture)
+
     for i in range(7):
-        et0 = 5.0
-        liters = round(et0 * kc * area, 2)
-        schedule.append({"day": f"Day {i+1}", "liters": liters})
+        et0 = et0_values[i]
+        moisture = daily_moisture[i]
+        moisture_factor = max(0.2, 1.0 - moisture)  # Cap reduction to avoid 0
+        liters = round(et0 * kc * area * moisture_factor, 2)
+        schedule.append({"day": f"Day {i+1}", "liters": max(0, liters)})
+
+    print("📦 Final schedule:", schedule)
     return schedule
+
 
 @app.route("/get_plan", methods=["POST"])
 def get_plan():
