@@ -66,7 +66,7 @@ def get_current_temp(lat, lon):
             return current_temp_f
         except Exception as e:
             print(f"❌ Attempt {attempt + 1} failed:", e)
-            time.sleep(1)  # wait 1 second before retry
+            time.sleep(2.5)  # wait 1 second before retry
 
     print("⚠️ All attempts to fetch temperature failed.")
     return None
