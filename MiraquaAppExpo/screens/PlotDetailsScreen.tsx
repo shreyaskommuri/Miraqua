@@ -17,8 +17,14 @@ import {
 import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { MYIPADRESS } from '@env';
+import { EXPO_PUBLIC_MYIPADRESS } from '@env';
+// import { getPlan } from '../api/api.ts';
 
+const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
+console.log('🔍 Fetching from:', `${BASE_URL}/get_plan`);
+
+
+//https://miraqua.onrender.com/get_plan or http://${MYIPADRESS}:5050/get_plan depending on what environment you are in
 const PlotDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlotDetails'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -36,7 +42,7 @@ const PlotDetailsScreen = () => {
   const fetchSchedule = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://${MYIPADRESS}:5050/get_plan`, {
+      const response = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

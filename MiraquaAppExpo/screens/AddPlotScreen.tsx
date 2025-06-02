@@ -50,7 +50,7 @@ const AddPlotScreen = () => {
       <Text style={styles.label}>ZIP Code</Text>
       <TextInput style={styles.input} value={zipCode} onChangeText={setZipCode} placeholder="e.g., 94582" keyboardType="numeric" />
 
-      <Text style={styles.label}>Area (sq ft)</Text>
+      <Text style={styles.label}>Area (sq m)</Text>
       <TextInput style={styles.input} value={area} onChangeText={setArea} placeholder="e.g., 1000" keyboardType="numeric" />
 
       <Button title="Add Plot" onPress={handleAddPlot} />

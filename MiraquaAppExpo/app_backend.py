@@ -49,19 +49,25 @@ def get_current_temp(lat, lon):
         "longitude": lon,
         "current_weather": True
     }
-    try:
-        print("🌡️ Requesting current temperature...")
-        response = requests.get(url, params=params, timeout=5)
-        response.raise_for_status()
-        current_temp_c = response.json().get("current_weather", {}).get("temperature")
-        if current_temp_c is None:
-            raise ValueError("No temperature in response.")
-        current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
-        print("🌡️ Live temperature (F):", current_temp_f)
-        return current_temp_f
-    except Exception as e:
-        print("❌ Error fetching current temp:", e)
-        return None
+
+    for attempt in range(3):
+        try:
+            print(f"🌡️ Requesting current temperature (attempt {attempt + 1})...")
+            response = requests.get(url, params=params, timeout=5)
+            response.raise_for_status()
+            current_temp_c = response.json().get("current_weather", {}).get("temperature")
+            if current_temp_c is None:
+                raise ValueError("No temperature in response.")
+            current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
+            print("🌡️ Live temperature (F):", current_temp_f)
+            return current_temp_f
+        except Exception as e:
+            print(f"❌ Attempt {attempt + 1} failed:", e)
+            time.sleep(1)  # wait 1 second before retry
+
+    print("⚠️ All attempts to fetch temperature failed.")
+    return None
+
 
 
 def get_lat_lon(zip_code):
