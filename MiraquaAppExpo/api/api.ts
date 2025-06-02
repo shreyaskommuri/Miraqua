@@ -1,6 +1,6 @@
 import { MYIPADRESS } from '@env';
 
-const BASE_URL = `http://${MYIPADRESS}:5050`;
+const BASE_URL = `https://miraqua.onrender.com`;  //https://miraqua.onrender.com or http://${MYIPADRESS}:5050 depending on what environment you are in
 
 export const signup = async (email: string, password: string) => {
   const response = await fetch(`${BASE_URL}/signup`, {
