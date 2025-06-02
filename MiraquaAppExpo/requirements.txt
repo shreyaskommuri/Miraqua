@@ -1,10 +1,11 @@
-Flask
-Flask-Cors
+flask
+flask-cors
+openmeteo-requests
 requests
 requests-cache
 retry-requests
-pandas
 python-dotenv
 supabase
 google-generativeai
+pandas
 gunicorn
