@@ -1,7 +1,7 @@
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 
 // const BASE_URL = __DEV__
-//   ? `http://${process.env.EXPO_PUBLIC_MYIPADRESS}:5050`
+//   ? `http://${EXPO_PUBLIC_MYIPADRESS}:5050`
 //   : 'https://miraqua.onrender.com';
 
 const BASE_URL = 'https://miraqua.onrender.com';

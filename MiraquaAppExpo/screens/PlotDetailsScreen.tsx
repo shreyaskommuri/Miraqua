@@ -21,9 +21,9 @@ import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 // import { getPlan } from '../api/api.ts';
 
 // const BASE_URL = __DEV__
-//   ? `http://${process.env.EXPO_PUBLIC_MYIPADRESS}:5050`
+//   ? `http://${EXPO_PUBLIC_MYIPADRESS}:5050`
 //   : 'https://miraqua.onrender.com';
-const BASE_URL ='https://miraqua.onrender.com';
+const BASE_URL = 'https://miraqua.onrender.com';
 
 console.log('🔍 Fetching from:', `${BASE_URL}/get_plan`);
 
