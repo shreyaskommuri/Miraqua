@@ -165,7 +165,7 @@ const PlotDetailsScreen = () => {
 
       {tab === 'schedule' && (
         <View style={styles.scheduleBox}>
-          <Text style={styles.scheduleTitle}>💧 Irrigation Schedule</Text>
+          <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
           <TouchableOpacity onPress={fetchSchedule}>
             <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
           </TouchableOpacity>

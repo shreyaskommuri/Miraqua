@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 import google.generativeai as genai
 from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
+from datetime import datetime, timedelta
+import re
 
 load_dotenv()
 
@@ -51,6 +53,21 @@ def generate_gem_summary(crop, zip_code, plot_name, plot_id):
     except Exception as e:
         return f"Gemini summary generation failed: {str(e)}"
 
+# ✅ ATTACH DATE TO EACH DAY
+def attach_real_dates(schedule):
+    today = datetime.now()
+    new_schedule = []
+
+    for i, entry in enumerate(schedule):
+        date = (today + timedelta(days=i)).strftime("%A, %B %d")
+        new_schedule.append({
+            "day": f"Day {i + 1}",
+            "date": date,
+            "liters": entry["liters"]
+        })
+
+    return new_schedule
+
 # ✅ GEMINI CHAT ENDPOINT
 @ai_blueprint.route("/chat", methods=["POST"])
 def chat():
@@ -72,7 +89,7 @@ def chat():
         # 🧠 Process prompt and maybe update schedule
         updated_schedule, reply = process_chat_command(user_prompt, schedule, crop, zip_code, plot_name)
 
-        # 💾 Save back to Supabase if it was changed
+        # 📂 Save back to Supabase if it was changed
         if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
             supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
 
@@ -83,40 +100,57 @@ def chat():
 
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
 def process_chat_command(prompt, schedule, crop, zip_code, plot_name):
-    from copy import deepcopy
     import json
     import re
+    from datetime import datetime, timedelta
+    from copy import deepcopy
 
     try:
         model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+
+        today = datetime.now()
+        today_index = today.weekday()  # 0 = Monday, 6 = Sunday
+
+        # Add explicit context mapping index to dates
+        schedule_with_dates = []
+        for i, day in enumerate(schedule):
+            day_date = today + timedelta(days=i)
+            schedule_with_dates.append({
+                "index": i,
+                "day": day["day"],
+                "date": day_date.strftime("%Y-%m-%d"),
+                "liters": day["liters"]
+            })
+
         context = f"""
-You are a smart assistant for a farmer named '{plot_name}' who is growing {crop} in ZIP code {zip_code}.
-Here is their current 7-day irrigation schedule in JSON format:
-{json.dumps(schedule, indent=2)}
+You are FarmerBot, helping a farmer named '{plot_name}' growing {crop} in ZIP {zip_code}.
+Today is {today.strftime("%A")} ({today.strftime("%Y-%m-%d")}).
+
+Here is their current 7-day irrigation schedule:
+{json.dumps(schedule_with_dates, indent=2)}
 
 The farmer said: "{prompt}"
 
-Update the schedule according to their intent. Return only the updated schedule as raw JSON (no explanation, no markdown, no formatting).
+👉 If this is a request to change the schedule, return ONLY the modified schedule (same format), as a clean JSON array. Do not add text or explanations.
+👉 If it's just a general question, answer in natural language without any JSON.
 """
 
         response = model.generate_content(context)
-        raw = response.text.strip()
+        reply = response.text.strip()
 
-        # 🧹 Strip markdown fences or stray "json" keyword
-        raw = re.sub(r"^```json|^```|```$", "", raw, flags=re.IGNORECASE).strip()
-        raw = re.sub(r"^json\s*", "", raw, flags=re.IGNORECASE).strip()
+        is_json = reply.strip().startswith("[") or "{" in reply
+        if is_json:
+            reply_clean = re.sub(r"^```json|^```|```$", "", reply, flags=re.IGNORECASE).strip()
+            reply_clean = re.sub(r"^json\s*", "", reply_clean, flags=re.IGNORECASE).strip()
 
-        if not raw:
-            raise ValueError("Gemini returned empty or malformed output.")
+            updated_schedule = json.loads(reply_clean)
 
-        print("🔎 Cleaned Gemini JSON:", raw[:200])
-
-        updated_schedule = json.loads(raw)
-
-        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
-            return updated_schedule, "✅ Schedule updated based on your message."
+            if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
+                return updated_schedule, "✅ Schedule updated based on your message."
+            else:
+                return schedule, "🧠 Got your message! But no changes were needed in the schedule."
         else:
-            return schedule, "🟢 No changes were needed."
+            return schedule, reply  # regular answer
 
     except Exception as e:
-        return schedule, f"❌ Could not apply your request: {e}"
+        return schedule, f"❌ Error processing message: {e}"
