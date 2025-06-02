@@ -47,7 +47,7 @@ CROP_KC = {
 }
 def get_current_temp(lat, lon):
     if os.getenv("RENDER") == "true":
-        print("🌡️ Using OpenWeather (Render detected)...")
+        print("🌡️ Using OpenWeather for current temp...")
         api_key = os.getenv("OPENWEATHER_API_KEY")
         url = f"https://api.openweathermap.org/data/2.5/weather"
         params = {
@@ -61,19 +61,16 @@ def get_current_temp(lat, lon):
             try:
                 response = requests.get(url, params=params, timeout=5)
                 response.raise_for_status()
-                current_temp_f = response.json().get("main", {}).get("temp")
-                if current_temp_f is None:
-                    raise ValueError("No temperature found in OpenWeather response.")
-                print("🌡️ OpenWeather temperature (F):", current_temp_f)
-                return round(current_temp_f, 1)
+                temp_f = response.json().get("main", {}).get("temp")
+                if temp_f is not None:
+                    print("🌡️ OpenWeather temperature (F):", temp_f)
+                    return round(temp_f, 1)
             except Exception as e:
-                print(f"❌ OpenWeather attempt {attempt + 1} failed:", e)
+                print(f"❌ OpenWeather current temp attempt {attempt + 1} failed:", e)
                 time.sleep(2)
-
-        print("⚠️ All OpenWeather attempts failed.")
         return None
     else:
-        print("🌡️ Using Open-Meteo (local environment)...")
+        print("🌡️ Using Open-Meteo for current temp...")
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
             "latitude": lat,
@@ -85,19 +82,15 @@ def get_current_temp(lat, lon):
             try:
                 response = requests.get(url, params=params, timeout=5)
                 response.raise_for_status()
-                current_temp_c = response.json().get("current_weather", {}).get("temperature")
-                if current_temp_c is None:
-                    raise ValueError("No temperature in Open-Meteo response.")
-                current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
-                print("🌡️ Open-Meteo temperature (F):", current_temp_f)
-                return current_temp_f
+                temp_c = response.json().get("current_weather", {}).get("temperature")
+                if temp_c is not None:
+                    temp_f = (temp_c * 9 / 5) + 32
+                    print("🌡️ Open-Meteo temperature (F):", temp_f)
+                    return round(temp_f, 1)
             except Exception as e:
                 print(f"❌ Open-Meteo attempt {attempt + 1} failed:", e)
                 time.sleep(2)
-
-        print("⚠️ All Open-Meteo attempts failed.")
         return None
-
 
 
 
@@ -124,14 +117,14 @@ def get_forecast(lat, lon):
             "lat": lat,
             "lon": lon,
             "appid": api_key,
-            "units": "metric"  # Celsius; convert later
+            "units": "metric"
         }
 
         try:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            forecast_list = data.get("list", [])[:56]  # ~7 days, 3-hr intervals
+            forecast_list = data.get("list", [])[:56]
 
             temps_c = []
             et0s = []
@@ -139,37 +132,39 @@ def get_forecast(lat, lon):
 
             for f in forecast_list:
                 temps_c.append(f["main"]["temp"])
-                # Fake ET0 and soil moisture values (OpenWeather doesn't provide them)
-                et0s.append(3.5)  # estimated evapotranspiration
-                moisture.append(0.25)  # assume moderate moisture
+                et0s.append(3.5)     # Estimated ET₀
+                moisture.append(0.25)  # Estimated soil moisture
 
             class MockForecast:
                 def Hourly(self):
                     class MockHourly:
-                        def Variables(self, index):
+                        def Variables(inner_self, index):
                             if index == 0:
-                                return type('', (), {"ValuesAsNumpy": lambda: np.array(temps_c)})()
+                                return type('Var', (), {"ValuesAsNumpy": lambda self=None: np.array(temps_c)})()
                             elif index == 1:
-                                return type('', (), {"ValuesAsNumpy": lambda: np.array(moisture)})()
+                                return type('Var', (), {"ValuesAsNumpy": lambda self=None: np.array(moisture)})()
                             elif index == 2:
-                                return type('', (), {"ValuesAsNumpy": lambda: np.array(et0s)})()
-                        def Time(self):
-                            return [int(datetime.strptime(f["dt_txt"], "%Y-%m-%d %H:%M:%S").timestamp()) for f in forecast_list]
+                                return type('Var', (), {"ValuesAsNumpy": lambda self=None: np.array(et0s)})()
+                        def Time(inner_self):
+                            return [
+                                int(datetime.strptime(f["dt_txt"], "%Y-%m-%d %H:%M:%S").timestamp())
+                                for f in forecast_list
+                            ]
                     return MockHourly()
+
                 def Daily(self):
                     class MockDaily:
-                        def Variables(self, index):
-                            if index == 0:  # precipitation
-                                return type('', (), {"ValuesAsNumpy": lambda: np.array([0.0]*7)})()
-                            elif index == 2:  # ET0
-                                return type('', (), {"ValuesAsNumpy": lambda: np.array([3.5]*7)})()
+                        def Variables(inner_self, index):
+                            if index == 0:
+                                return type('Var', (), {"ValuesAsNumpy": lambda self=None: np.array([0.0] * 7)})()
+                            elif index == 2:
+                                return type('Var', (), {"ValuesAsNumpy": lambda self=None: np.array([3.5] * 7)})()
                     return MockDaily()
 
             return [MockForecast()]
         except Exception as e:
             print("❌ OpenWeather forecast failed:", e)
             return []
-
     else:
         print("🌤️ Using Open-Meteo for forecast...")
         url = "https://api.open-meteo.com/v1/forecast"
@@ -183,6 +178,7 @@ def get_forecast(lat, lon):
         }
         response = openmeteo.weather_api(url, params)
         return response
+
 
 
 def to_array_safe(value):
