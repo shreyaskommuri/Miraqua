@@ -1,6 +1,12 @@
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 
-const BASE_URL = `https://miraqua.onrender.com/get_plan`;  //https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
+// const BASE_URL = __DEV__
+//   ? `http://${process.env.EXPO_PUBLIC_MYIPADRESS}:5050`
+//   : 'https://miraqua.onrender.com';
+
+const BASE_URL = 'https://miraqua.onrender.com';
+
+  //https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
 
 export const signup = async (email: string, password: string) => {
   const response = await fetch(`${BASE_URL}/signup`, {
