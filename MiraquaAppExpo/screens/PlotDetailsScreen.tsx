@@ -20,11 +20,11 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 // import { getPlan } from '../api/api.ts';
 
-const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
+const BASE_URL = `https://miraqua.onrender.com`;
 console.log('🔍 Fetching from:', `${BASE_URL}/get_plan`);
 
 
-//https://miraqua.onrender.com/get_plan or http://${MYIPADRESS}:5050/get_plan depending on what environment you are in
+//https://miraqua.onrender.com or http://${MYIPADRESS}:5050 depending on what environment you are in
 const PlotDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlotDetails'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
