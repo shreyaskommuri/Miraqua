@@ -1,41 +1,25 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform
-} from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+// screens/FarmerChatScreen.tsx
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
+import { useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { MYIPADRESS } from '@env';
-
-type Message = {
-  sender: 'user' | 'bot';
-  text: string;
-};
 
 const FarmerChatScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'FarmerChat'>>();
   const { plot } = route.params;
-  const scrollViewRef = useRef<ScrollView>(null);
 
-  const [messages, setMessages] = useState<Message[]>([
-    { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` }
-  ]);
   const [input, setInput] = useState('');
+  const [messages, setMessages] = useState([
+    { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` },
+  ]);
 
-  const sendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  const handleSend = async () => {
+    if (!input.trim()) return;
 
-    const userMessage: Message = { sender: 'user', text: trimmed };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    const userMessage = { sender: 'user', text: input };
+    setMessages((prev) => [...prev, userMessage]);
 
     try {
       const res = await fetch(`http://${MYIPADRESS}:5050/chat`, {
@@ -44,40 +28,35 @@ const FarmerChatScreen = () => {
         body: JSON.stringify({
           prompt: input,
           crop: plot.crop,
-          zip: plot.zip_code,
+          zip_code: plot.zip_code,
           plotName: plot.name,
-          plotId: plot.id
-        })
+          plotId: plot.id,
+          plot: plot
+        }),
       });
 
-      const json = await res.json();
-      const replyText = json.success ? json.reply : `🤖 Error: ${json.error}`;
-      const botMessage: Message = { sender: 'bot', text: replyText };
-      setMessages(prev => [...prev, botMessage]);
+      const data = await res.json();
+      if (data.success) {
+        const botMessage = { sender: 'bot', text: data.reply };
+        setMessages((prev) => [...prev, botMessage]);
+      } else {
+        const errorMessage = { sender: 'bot', text: 'Something went wrong. Try again!' };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     } catch (err) {
-      const errorMessage: Message = {
-        sender: 'bot',
-        text: '❌ Could not contact assistant. Check your connection or backend server.'
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, { sender: 'bot', text: 'Error contacting server.' }]);
     }
+
+    setInput('');
   };
 
-  useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
-
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.select({ ios: 'padding', android: undefined })}
-      keyboardVerticalOffset={80}
-    >
-      <ScrollView style={styles.chatBox} ref={scrollViewRef}>
-        {messages.map((msg, idx) => (
+    <View style={styles.container}>
+      <ScrollView style={styles.chat} contentContainerStyle={{ paddingBottom: 20 }}>
+        {messages.map((msg, index) => (
           <View
-            key={idx}
-            style={msg.sender === 'user' ? styles.userBubble : styles.botBubble}
+            key={index}
+            style={[styles.bubble, msg.sender === 'user' ? styles.userBubble : styles.botBubble]}
           >
             <Text style={styles.message}>{msg.text}</Text>
           </View>
@@ -86,13 +65,13 @@ const FarmerChatScreen = () => {
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
-          placeholder="Ask about your plot..."
           value={input}
           onChangeText={setInput}
+          placeholder="Ask about your plot..."
         />
-        <Button title="Send" onPress={sendMessage} color="#1aa179" />
+        <Button title="Send" onPress={handleSend} />
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -101,28 +80,26 @@ export default FarmerChatScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0faf5',
+    backgroundColor: '#eef7ec',
     padding: 16,
   },
-  chatBox: {
+  chat: {
     flex: 1,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#d9f5e7',
+  bubble: {
     padding: 10,
     borderRadius: 12,
     marginBottom: 8,
     maxWidth: '80%',
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#cce5ff',
   },
   botBubble: {
     alignSelf: 'flex-start',
     backgroundColor: '#e0ecf9',
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 8,
-    maxWidth: '80%',
   },
   message: {
     fontSize: 15,

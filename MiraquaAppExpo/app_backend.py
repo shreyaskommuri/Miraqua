@@ -242,6 +242,48 @@ def calculate_schedule(area, crop, weather_data):
 
     print("📦 Final schedule:", schedule)
     return schedule
+def get_openweather_data(lat, lon):
+    if os.getenv("RENDER") == "true":
+        print("🌐 Getting full OpenWeather data...")
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        try:
+            current_url = "https://api.openweathermap.org/data/2.5/weather"
+            forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+
+            current_params = {
+                "lat": lat,
+                "lon": lon,
+                "appid": api_key,
+                "units": "imperial"
+            }
+
+            forecast_params = {
+                "lat": lat,
+                "lon": lon,
+                "appid": api_key,
+                "units": "imperial"
+            }
+
+            current_res = requests.get(current_url, params=current_params, timeout=5)
+            forecast_res = requests.get(forecast_url, params=forecast_params, timeout=5)
+
+            current_res.raise_for_status()
+            forecast_res.raise_for_status()
+
+            current_data = current_res.json()
+            forecast_data = forecast_res.json()
+
+            return {
+                "success": True,
+                "current": current_data,
+                "forecast": forecast_data
+            }
+        except Exception as e:
+            print("❌ OpenWeather fetch error:", e)
+            return { "success": False, "error": str(e) }
+    else:
+        print("⚠️ Not using OpenWeather (RENDER is false)")
+        return { "success": False, "error": "Not running on Render" }
 
 
 @app.route("/get_plan", methods=["POST"])
@@ -395,10 +437,10 @@ def chat():
         zip_code = data.get("zip_code")
         plot_name = data.get("plotName")
         plot_id = data.get("plotId")
+        plot_info = data.get("plot", {})
 
         # Step 1: Fetch schedule from Supabase
         schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
-
         if not schedule_res.data:
             print("❌ Schedule not found for plot_id:", plot_id)
             return jsonify({"success": False, "error": "Schedule not found."}), 404
@@ -406,21 +448,56 @@ def chat():
         schedule_row = schedule_res.data[0]
         schedule = schedule_row.get("schedule", [])
 
-        # Step 2: Let AI process the command
-        updated_schedule, reply = process_chat_command(prompt, schedule, crop, zip_code, plot_name)
+        # Step 2: Get OpenWeather data if on Render
+        weather = {}
+        try:
+            lat, lon = get_lat_lon(zip_code)
+            if os.getenv("RENDER") == "true":
+                print("📡 Fetching OpenWeather data for chat...")
+                weather_url = "https://api.openweathermap.org/data/2.5/weather"
+                forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+                api_key = os.getenv("OPENWEATHER_API_KEY")
 
-        # Step 3: Check if modified using JSON-safe comparison
+                weather_params = {
+                    "lat": lat,
+                    "lon": lon,
+                    "appid": api_key,
+                    "units": "imperial"
+                }
+
+                current_res = requests.get(weather_url, params=weather_params, timeout=5)
+                forecast_res = requests.get(forecast_url, params=weather_params, timeout=5)
+                current_res.raise_for_status()
+                forecast_res.raise_for_status()
+
+                weather = {
+                    "openweather_raw": {
+                        "current": current_res.json(),
+                        "forecast": forecast_res.json()
+                    }
+                }
+            else:
+                print("⚠️ Skipping OpenWeather fetch — RENDER is false")
+        except Exception as e:
+            print("❌ Failed to fetch OpenWeather data:", e)
+
+        # Step 3: Let AI process the command
+        updated_schedule, reply = process_chat_command(
+            prompt, crop, zip_code, plot_name, plot_id, weather
+        )
+
+
+        # Step 4: Save if modified
         if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
             print("🛠️ Schedule was modified, saving to Supabase...")
-            result = supabase.table("plot_schedules").update({
+            supabase.table("plot_schedules").update({
                 "schedule": updated_schedule
             }).eq("plot_id", plot_id).execute()
-            print("✅ Supabase update result:", result)
         else:
             print("📭 No change detected in schedule.")
 
         return jsonify({"success": True, "reply": reply})
-    
+
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500

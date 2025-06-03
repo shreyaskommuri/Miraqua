@@ -23,7 +23,7 @@ import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 // const BASE_URL = __DEV__
 //   ? `http://${EXPO_PUBLIC_MYIPADRESS}:5050`
 //   : 'https://miraqua.onrender.com';
-const BASE_URL = 'https://miraqua.onrender.com';
+const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
 console.log('🔍 Fetching from:', `${BASE_URL}/get_plan`);
 
@@ -187,12 +187,18 @@ const PlotDetailsScreen = () => {
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.farmerButton}
-        onPress={() => navigation.navigate('FarmerChat', { plot })}
-      >
-        <Text style={styles.farmerText}>Farmer</Text>
-      </TouchableOpacity>
+<TouchableOpacity
+  style={styles.farmerButton}
+  onPress={() => {
+    console.log("🧭 Navigating to FarmerChat with plot:", plot);
+    navigation.navigate('FarmerChat', { plot });
+  }}
+>
+  <Text style={styles.farmerText}>Farmer</Text>
+</TouchableOpacity>
+
+
+
     </ScrollView>
   );
 };
