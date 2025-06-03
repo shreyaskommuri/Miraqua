@@ -36,6 +36,8 @@ const FarmerChatScreen = () => {
       });
 
       const data = await res.json();
+      console.log('📡 Chat response:', data);
+
       if (data.success) {
         const botMessage = { sender: 'bot', text: data.reply };
         setMessages((prev) => [...prev, botMessage]);
