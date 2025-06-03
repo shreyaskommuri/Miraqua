@@ -4,7 +4,7 @@ import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 //   ? `http://${EXPO_PUBLIC_MYIPADRESS}:5050`
 //   : 'https://miraqua.onrender.com';
 
-const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
+const BASE_URL = 'https://miraqua.onrender.com';
 
   //https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
 
