@@ -1,20 +1,32 @@
 // screens/AccountScreen.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../utils/supabase';
 
 const AccountScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const fetchEmail = async () => {
+      const { data: userData, error } = await supabase.auth.getUser();
+      if (userData?.user?.email) {
+        setEmail(userData.user.email);
+      }
+    };
+    fetchEmail();
+  }, []);
 
   const handleSignOut = () => {
     navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
   };
 
   const menuItems = [
-    { icon: 'calendar-outline', label: 'Smart Schedule' },
+    // { icon: 'calendar-outline', label: 'Smart Schedule' }, // Removed as requested
     { icon: 'cloudy-outline', label: 'Weather Forecast' },
     { icon: 'notifications-outline', label: 'Notifications' },
     { icon: 'settings-outline', label: 'Settings' },
@@ -26,7 +38,7 @@ const AccountScreen = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <Ionicons name="person-circle-outline" size={72} color="#1aa179" />
-        <Text style={styles.email}>user@example.com</Text>
+        <Text style={styles.email}>{email || ' '}</Text>
       </View>
 
       <View style={styles.menuBox}>
