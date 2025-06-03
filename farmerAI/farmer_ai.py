@@ -71,12 +71,19 @@ def attach_real_dates(schedule):
 # ✅ GEMINI CHAT ENDPOINT
 @ai_blueprint.route("/chat", methods=["POST"])
 def chat():
+    
     data = request.get_json()
+   
+    print("📥 /chat received data:", data)
+
     user_prompt = data.get("prompt", "")
     crop = data.get("crop", "")
-    zip_code = data.get("zip", "")
+    plot_info = data.get("plot", {})
+    zip_code = data.get("zip_code") or plot_info.get("zip_code", "")
     plot_name = data.get("plotName", "")
     plot_id = data.get("plotId", "")
+    weather = data.get("weather", {})          # ✅ ADDED
+    plot_info = data.get("plot", {})           # ✅ ADDED
 
     if not user_prompt:
         return jsonify({"success": False, "error": "Missing prompt"}), 400
@@ -84,73 +91,90 @@ def chat():
     try:
         # 🔄 Get schedule from Supabase
         response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).single().execute()
-        schedule = response.data["schedule"] if response.data else []
+        # schedule = response.data["schedule"] if response.data else []
 
-        # 🧠 Process prompt and maybe update schedule
-        updated_schedule, reply = process_chat_command(user_prompt, schedule, crop, zip_code, plot_name)
+        # 🧠 Process prompt with weather & plot info
+        result = process_chat_command(
+            user_prompt, crop, zip_code, plot_name, plot_id, weather
+        )
 
-        # 📂 Save back to Supabase if it was changed
-        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
-            supabase.table("plot_schedules").update({"schedule": updated_schedule}).eq("plot_id", plot_id).execute()
+        if result["schedule_updated"]:
+            print("🛠️ Schedule was modified, saving to Supabase...")
 
-        return jsonify({"success": True, "reply": reply})
+        return jsonify({"success": True, "reply": result["reply"]})
+
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
-def process_chat_command(prompt, schedule, crop, zip_code, plot_name):
-    import json
-    import re
-    from datetime import datetime, timedelta
-    from copy import deepcopy
-
+def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weather):
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+        # 🔍 Try summarizing the weather data
+        if weather:
+            current = weather.get("current", {})
+            temp = current.get("temp")
+            humidity = current.get("humidity")
+            wind = current.get("wind_speed")
+            desc = current.get("weather", [{}])[0].get("description", "unknown conditions")
 
-        today = datetime.now()
-        today_index = today.weekday()  # 0 = Monday, 6 = Sunday
-
-        # Add explicit context mapping index to dates
-        schedule_with_dates = []
-        for i, day in enumerate(schedule):
-            day_date = today + timedelta(days=i)
-            schedule_with_dates.append({
-                "index": i,
-                "day": day["day"],
-                "date": day_date.strftime("%Y-%m-%d"),
-                "liters": day["liters"]
-            })
-
-        context = f"""
-You are FarmerBot, helping a farmer named '{plot_name}' growing {crop} in ZIP {zip_code}.
-Today is {today.strftime("%A")} ({today.strftime("%Y-%m-%d")}).
-
-Here is their current 7-day irrigation schedule:
-{json.dumps(schedule_with_dates, indent=2)}
-
-The farmer said: "{prompt}"
-
-👉 If this is a request to change the schedule, return ONLY the modified schedule (same format), as a clean JSON array. Do not add text or explanations.
-👉 If it's just a general question, answer in natural language without any JSON.
-"""
-
-        response = model.generate_content(context)
-        reply = response.text.strip()
-
-        is_json = reply.strip().startswith("[") or "{" in reply
-        if is_json:
-            reply_clean = re.sub(r"^```json|^```|```$", "", reply, flags=re.IGNORECASE).strip()
-            reply_clean = re.sub(r"^json\s*", "", reply_clean, flags=re.IGNORECASE).strip()
-
-            updated_schedule = json.loads(reply_clean)
-
-            if json.dumps(updated_schedule, sort_keys=True) != json.dumps(schedule, sort_keys=True):
-                return updated_schedule, "✅ Schedule updated based on your message."
-            else:
-                return schedule, "🧠 Got your message! But no changes were needed in the schedule."
+            weather_summary = (
+                f"The current temperature is {temp}°F with {desc}, "
+                f"humidity is {humidity}%, and wind speed is {wind} mph."
+            )
         else:
-            return schedule, reply  # regular answer
+            weather_summary = "Unfortunately, I don't have any weather data for your location right now."
+
+        # 📦 Prepare full prompt for Gemini
+        prompt = (
+            f"You are an AI assistant for smart farming called FarmerBot. The user is growing {crop} in ZIP code {zip_code} "
+            f"on a plot named {plot_name}.\n\n"
+            f"{weather_summary}\n\n"
+            f"The user said: \"{user_prompt}\"\n\n"
+            f"Respond naturally and help them with farming tips, irrigation changes, or anything related. "
+            f"If they ask to update the irrigation schedule, clearly say what change you are making (e.g., 'skipping Day 3', or 'increasing Day 1 to 2000L'). "
+            f"Keep responses short and helpful."
+        )
+
+        print("🧠 Gemini Prompt:\n", prompt)
+
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        chat = model.start_chat()
+        gem_response = chat.send_message(prompt)
+        ai_reply = gem_response.text.strip()
+
+        print("📬 Gemini returned:\n", ai_reply)
+
+        # Check for changes (example: user wants to skip a day)
+        updated_schedule = None
+        if "skip" in ai_reply.lower():
+            for day in range(1, 15):
+                if f"day {day}" in ai_reply.lower():
+                    existing = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
+                    if existing.data and len(existing.data) > 0:
+                        current_schedule = existing.data[0]["schedule"]
+                        current_schedule[day - 1]["liters"] = 0
+                        updated_schedule = current_schedule
+
+                        supabase.table("plot_schedules").update({
+                            "schedule": updated_schedule
+                        }).eq("plot_id", plot_id).execute()
+
+                        print(f"✅ Skipped Day {day} in schedule for plot {plot_id}")
+                    break
+        final_reply = ai_reply
+        if updated_schedule:
+            final_reply += "\n\n✅ Schedule updated."
+        return {
+            
+            updated_schedule is not None: "schedule_updated",
+            final_reply:"reply",
+        }
 
     except Exception as e:
-        return schedule, f"❌ Error processing message: {e}"
+        print(f"❌ Error in process_chat_command: {e}")
+        return {
+            "reply": "Sorry, something went wrong while processing your request.",
+            "schedule_updated": False
+        }
