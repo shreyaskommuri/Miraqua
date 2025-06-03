@@ -325,7 +325,8 @@ def get_plan():
             "plot_id": plot_id,
             "schedule": schedule,
             "summary": readable_summary,
-            "gem_summary": gem_summary
+            "gem_summary": gem_summary,
+            "og_schedule": schedule
         }, on_conflict=["plot_id"]).execute()
 
         print("✅ New schedule created and saved")
