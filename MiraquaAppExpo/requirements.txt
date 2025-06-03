@@ -11,3 +11,4 @@ supabase==1.0.3
 python-dateutil==2.9.0.post0
 timezonefinder==6.3.0
 google-generativeai==0.4.1
+gunicorn==21.2.0
