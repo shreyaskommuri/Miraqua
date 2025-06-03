@@ -264,93 +264,78 @@ def get_plan():
         now_local = datetime.now(local_zone).replace(minute=0, second=0, microsecond=0)
         print("🌍 Detected timezone:", timezone_str)
 
-
         print("📡 Requesting weather forecast...")
         forecasts = get_forecast(lat, lon)
         forecast = forecasts[0]
         hourly = forecast.Hourly()
 
-        # Safely parse forecast values
         temps_c = to_array_safe(hourly.Variables(0).ValuesAsNumpy())
         moistures = to_array_safe(hourly.Variables(1).ValuesAsNumpy())
         et0s = to_array_safe(hourly.Variables(2).ValuesAsNumpy())
 
         print("✅ Forecast arrays:", len(temps_c), len(moistures), len(et0s))
 
-        # Check length of data
         if len(moistures) < 24 or len(et0s) < 24:
             raise ValueError("Insufficient forecast data (less than 24 hourly entries)")
 
-        # Time logic
         hourly_time_raw = hourly.Time()
         hourly_time = [datetime.fromtimestamp(t, local_zone) for t in to_array_safe(hourly_time_raw)]
         time_diffs = [abs((t - now_local).total_seconds()) for t in hourly_time]
-
         index_now = time_diffs.index(min(time_diffs))
 
-        # Temperature
         current_temp_f = get_current_temp(lat, lon)
 
-        # current_temp_f = round((current_temp_c * 9 / 5) + 32, 1)
-
-        # Moisture & Sunlight
         try:
-            avg_moisture = round(np.mean(moistures[:24]) * 100, 2)
+            avg_moisture = round(float(np.mean(moistures[:24]) * 100), 2)
             print("🟦 Moisture data (first 24):", moistures[:24])
-
         except Exception as e:
             print("❌ Moisture error:", e)
             avg_moisture = None
 
         try:
-            sunlight_ratio = sum(et0s[:24]) / 5.0  # assuming 5.0 = ideal ET₀ in 24h
+            sunlight_ratio = float(sum(et0s[:24]) / 5.0)
             avg_sunlight = round(min(sunlight_ratio * 100, 100), 1)
         except Exception as e:
             print("❌ Sunlight error:", e)
             avg_sunlight = None
 
-
         if existing.data and len(existing.data) > 0:
             print("✅ Schedule found, returning it with refreshed weather data")
             existing_schedule = existing.data[0]
-            updated_response = {
+            return jsonify({
                 "schedule": existing_schedule.get("schedule"),
                 "summary": existing_schedule.get("summary"),
                 "gem_summary": existing_schedule.get("gem_summary"),
-                "current_temp_f": current_temp_f,
-                "moisture": avg_moisture,
-                "sunlight": avg_sunlight
-            }
-            return jsonify(updated_response)
+                "current_temp_f": float(current_temp_f) if current_temp_f is not None else None,
+                "moisture": float(avg_moisture) if avg_moisture is not None else None,
+                "sunlight": float(avg_sunlight) if avg_sunlight is not None else None
+            })
 
-        
-
-
-        # No existing schedule — generate new
         print("📅 Generating new schedule...")
         schedule = calculate_schedule(area, crop, forecast)
-        print("✅ Schedule type:", type(schedule))
-        print("✅ Schedule contents:", schedule)
-        print("✅ First day:", schedule[0])
+
+        # ✅ Fix: Convert NumPy float types to native float
+        for entry in schedule:
+            entry["liters"] = float(entry["liters"])
+
         readable_summary = generate_summary(crop, zip_code, schedule)
         gem_summary = generate_gem_summary(crop, zip_code, schedule, plot_id)
 
         supabase.table("plot_schedules").upsert({
-    "plot_id": plot_id,
-    "schedule": schedule,
-    "summary": readable_summary,
-    "gem_summary": gem_summary
-}, on_conflict=["plot_id"]).execute()
-
+            "plot_id": plot_id,
+            "schedule": schedule,
+            "summary": readable_summary,
+            "gem_summary": gem_summary
+        }, on_conflict=["plot_id"]).execute()
 
         print("✅ New schedule created and saved")
         return jsonify({
             "schedule": schedule,
             "summary": readable_summary,
             "gem_summary": gem_summary,
-            "current_temp_f": current_temp_f,
-            "moisture": avg_moisture,
-            "sunlight": avg_sunlight
+            "current_temp_f": float(current_temp_f) if current_temp_f is not None else None,
+            "moisture": float(avg_moisture) if avg_moisture is not None else None,
+            "sunlight": float(avg_sunlight) if avg_sunlight is not None else None
         })
 
     except Exception as e:
