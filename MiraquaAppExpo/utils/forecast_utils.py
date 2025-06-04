@@ -24,6 +24,7 @@ def get_lat_lon(zip_code):
     if res.get("results"):
         lat = res["results"][0]["latitude"]
         lon = res["results"][0]["longitude"]
+        print(f"📍 ZIP {zip_code} → lat: {lat}, lon: {lon}")
         return lat, lon
     return None, None
 
@@ -32,34 +33,22 @@ def get_forecast(lat, lon):
     params = {
         "latitude": lat,
         "longitude": lon,
-        "daily": ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
-        "hourly": ["soil_moisture_0_to_1cm"],
+        "hourly": ["temperature_2m", "soil_moisture_0_to_1cm", "evapotranspiration"],
         "temperature_unit": "celsius",
         "timezone": "auto"
     }
-    responses = openmeteo.weather_api(url, params=params)
-    response = responses[0]
-
-    daily = response.Daily()
-    dates = pd.date_range(
-        start=pd.to_datetime(daily.Time(), unit="s", utc=True),
-        end=pd.to_datetime(daily.TimeEnd(), unit="s", utc=True),
-        freq=pd.Timedelta(seconds=daily.Interval()), inclusive="left"
-    ).date
-    tmax = daily.Variables(0).ValuesAsNumpy()
-    tmin = daily.Variables(1).ValuesAsNumpy()
-    rain = daily.Variables(2).ValuesAsNumpy()
-    tmean = [(tmax[i] + tmin[i]) / 2 for i in range(len(tmax))]
-
-    hourly = response.Hourly()
-    soil = hourly.Variables(0).ValuesAsNumpy()
-    soil_avg_per_day = [round(float(soil[i*24:(i+1)*24].mean()), 3) for i in range(min(7, len(dates)))]
-
-    return {
-        "dates": dates,
-        "tmax": tmax,
-        "tmin": tmin,
-        "tmean": tmean,
-        "rain": rain,
-        "soils": soil_avg_per_day
-    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        print("✅ Forecast fetched successfully")
+        return {
+            "hourly": {
+                "temperature_2m": data.get("hourly", {}).get("temperature_2m", []),
+                "soil_moisture_0_to_1cm": data.get("hourly", {}).get("soil_moisture_0_to_1cm", []),
+                "evapotranspiration": data.get("hourly", {}).get("evapotranspiration", [])
+            }
+        }
+    except Exception as e:
+        print("❌ Forecast fetch failed:", e)
+        return {"hourly": {}}

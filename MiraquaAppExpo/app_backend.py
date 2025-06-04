@@ -157,40 +157,25 @@ def get_plan():
             avg_sunlight = round(np.mean(sunlights), 1) if sunlights else 6.0
         else:
             print("📡 Fetching weather from Open-Meteo...")
-            try:
-                from utils.forecast_utils import get_forecast
-                forecast = get_forecast(lat, lon)
-                print("✅ Forecast fetched successfully")
+            from utils.forecast_utils import get_forecast
+            forecast = get_forecast(lat, lon)
+            hourly = forecast.get("hourly", {})
 
-                hourly = forecast.get("hourly", {})
-                print("📊 Hourly data keys:", list(hourly.keys()))
+            temps = hourly.get("temperature_2m", [])[12:18]  # approx. 12 PM to 6 PM
 
-                temps = hourly.get("temperature_2m", [])
-                moistures = hourly.get("soil_moisture_0_to_1cm", [])
-                et0s = hourly.get("evapotranspiration", [])
+            moistures = hourly.get("soil_moisture_0_to_1cm", [])[:3]
+            et0s = hourly.get("evapotranspiration", [])[:3]
 
-                print(f"🌡️ Raw temps (C): {temps[:5]}")
-                print(f"🌱 Raw moistures: {moistures[:5]}")
-                print(f"☀️ Raw ET₀s: {et0s[:5]}")
+            print(f"🌡️ Raw temps (C): {temps}")
+            print(f"🌱 Raw moistures: {moistures}")
+            print(f"☀️ Raw ET₀s: {et0s}")
 
-                if not temps:
-                    print("⚠️ Temperature data missing, using default")
-                if not moistures:
-                    print("⚠️ Moisture data missing, using default")
-                if not et0s:
-                    print("⚠️ ET₀ data missing, using default")
+            current_temp_f = round(np.mean(temps) * 9/5 + 32, 1) if temps else 72.5
+            avg_moisture = round(np.mean(moistures) * 100, 2) if moistures else 0.24
+            avg_sunlight = round(np.mean(et0s) * 4, 1) if et0s else 6.0  # approximate sunlight hours
 
-                current_temp_f = round(np.mean(temps[:24]) * 9/5 + 32, 1) if temps else 72.5
-                avg_moisture = round(np.mean(moistures[:24]) * 100, 2) if moistures else 0.24
-                avg_sunlight = round(np.mean(et0s[:24]) * 4, 1) if et0s else 6.0  # Rough conversion
+            print(f"🌡️ Temp (F): {current_temp_f}, 🌱 Moisture: {avg_moisture}, ☀️ Sunlight: {avg_sunlight}")
 
-                print(f"🌡️ Temp (F): {current_temp_f}, 🌱 Moisture: {avg_moisture}, ☀️ Sunlight: {avg_sunlight}")
-            
-            except Exception as e:
-                print("❌ Error fetching or parsing Open-Meteo data:", e)
-                current_temp_f = 72.5
-                avg_moisture = 0.24
-                avg_sunlight = 6.3
 
 
 
