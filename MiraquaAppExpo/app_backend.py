@@ -8,6 +8,7 @@ from retry_requests import retry
 import pandas as pd
 import numpy as np
 from flask import Flask, request, jsonify
+from uuid import uuid4
 from flask_cors import CORS
 from datetime import datetime
 from dotenv import load_dotenv
@@ -165,6 +166,36 @@ def get_plots():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/revert_schedule", methods=["POST"])
+def revert_schedule():
+    data = request.get_json()
+    plot_id = data.get("plot_id")
+
+    try:
+        # Get the most recent original schedule from chatlog
+        logs = supabase.table("farmerAI_chatlog") \
+            .select("original_schedule") \
+            .eq("plot_id", plot_id) \
+            .order("created_at", desc=True) \
+            .limit(1).execute()
+
+        if not logs.data or not logs.data[0].get("original_schedule"):
+            return jsonify({"error": "No previous schedule found"}), 404
+
+        original = logs.data[0]["original_schedule"]
+
+        # Update plot_schedules
+        supabase.table("plot_schedules").update({
+            "schedule": original
+        }).eq("plot_id", plot_id).execute()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("❌ Error reverting:", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
@@ -183,12 +214,12 @@ def chat():
 
         schedule_row = schedule_res.data[0]
         original_schedule = schedule_row.get("schedule", [])
+        user_id = schedule_row.get("user_id")
 
         # Step 2: Run AI logic
         updated_schedule, reply = process_chat_command(
-    prompt, schedule, crop, zip_code, plot_name, forecast
-)
-
+            prompt, original_schedule, crop, zip_code, plot_name
+        )
 
         # Step 3: Compare schedules and optionally update DB
         if json.dumps(updated_schedule, sort_keys=True) != json.dumps(original_schedule, sort_keys=True):
@@ -199,18 +230,20 @@ def chat():
 
         # Step 4: Log the conversation
         supabase.table("farmerAI_chatlog").insert({
+            "id": str(uuid4()),
             "plot_id": plot_id,
+            "user_id": user_id,
             "prompt": prompt,
             "reply": reply,
+            "created_at": datetime.utcnow().isoformat(),
             "original_schedule": original_schedule,
             "modified_schedule": updated_schedule,
             "reverted": False,
-            "user_id": schedule_row.get("user_id"),
             "is_user_message": True,
             "role": "user",
             "message_index": 0,
             "context_summary": "",
-            "chat_session_id": None,
+            "chat_session_id": str(uuid4()),
             "edited": False
         }).execute()
 
@@ -219,6 +252,7 @@ def chat():
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 
 if __name__ == "__main__":
