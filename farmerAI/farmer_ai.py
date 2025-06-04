@@ -94,9 +94,18 @@ def chat():
         # schedule = response.data["schedule"] if response.data else []
 
         # 🧠 Process prompt with weather & plot info
+        # Step 2: Run AI logic
         result = process_chat_command(
-            user_prompt, crop, zip_code, plot_name, plot_id, weather
+            prompt, crop, zip_code, plot_name, plot_id, weather
         )
+        reply = result["reply"]
+        if result["schedule_updated"]:
+            # 🔄 Re-fetch updated schedule from DB
+            updated_schedule = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute().data[0]["schedule"]
+        else:
+            updated_schedule = None
+
+
 
         if result["schedule_updated"]:
             print("🛠️ Schedule was modified, saving to Supabase...")
@@ -111,13 +120,11 @@ def chat():
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
 def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weather):
     try:
-        # 🔍 Try summarizing the weather data
-        if weather:
-            current = weather.get("current", {})
-            temp = current.get("temp")
-            humidity = current.get("humidity")
-            wind = current.get("wind_speed")
-            desc = current.get("weather", [{}])[0].get("description", "unknown conditions")
+        if weather and "main" in weather and "wind" in weather:
+            temp = weather["main"].get("temp")
+            humidity = weather["main"].get("humidity")
+            wind = weather["wind"].get("speed")
+            desc = weather["weather"][0].get("description", "unknown conditions")
 
             weather_summary = (
                 f"The current temperature is {temp}°F with {desc}, "
@@ -126,7 +133,6 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
         else:
             weather_summary = "Unfortunately, I don't have any weather data for your location right now."
 
-        # 📦 Prepare full prompt for Gemini
         prompt = (
             f"You are an AI assistant for smart farming called FarmerBot. The user is growing {crop} in ZIP code {zip_code} "
             f"on a plot named {plot_name}.\n\n"
@@ -137,39 +143,35 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
             f"Keep responses short and helpful."
         )
 
-        print("🧠 Gemini Prompt:\n", prompt)
-
         model = genai.GenerativeModel("gemini-1.5-flash")
         chat = model.start_chat()
         gem_response = chat.send_message(prompt)
         ai_reply = gem_response.text.strip()
 
-        print("📬 Gemini returned:\n", ai_reply)
-
-        # Check for changes (example: user wants to skip a day)
         updated_schedule = None
         if "skip" in ai_reply.lower():
             for day in range(1, 15):
-                if f"day {day}" in ai_reply.lower():
+                if f"day {day}" in ai_reply.lower() or f"tomorrow" in ai_reply.lower():
                     existing = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
                     if existing.data and len(existing.data) > 0:
                         current_schedule = existing.data[0]["schedule"]
-                        current_schedule[day - 1]["liters"] = 0
-                        updated_schedule = current_schedule
-
-                        supabase.table("plot_schedules").update({
-                            "schedule": updated_schedule
-                        }).eq("plot_id", plot_id).execute()
-
-                        print(f"✅ Skipped Day {day} in schedule for plot {plot_id}")
+                        day_index = 1 if "tomorrow" in ai_reply.lower() else day - 1
+                        if 0 <= day_index < len(current_schedule):
+                            current_schedule[day_index]["liters"] = 0
+                            updated_schedule = current_schedule
+                            supabase.table("plot_schedules").update({
+                                "schedule": updated_schedule
+                            }).eq("plot_id", plot_id).execute()
+                            print(f"✅ Skipped Day {day_index + 1} in schedule for plot {plot_id}")
                     break
+
         final_reply = ai_reply
         if updated_schedule:
             final_reply += "\n\n✅ Schedule updated."
+
         return {
-            
-            updated_schedule is not None: "schedule_updated",
-            final_reply:"reply",
+            "schedule_updated": updated_schedule is not None,
+            "reply": final_reply
         }
 
     except Exception as e:

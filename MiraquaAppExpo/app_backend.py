@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import requests
-import openmeteo_requests
 import requests_cache
 from retry_requests import retry
 import pandas as pd
@@ -16,6 +15,11 @@ from supabase import create_client, Client
 from dateutil import tz
 from timezonefinder import TimezoneFinder
 import time
+import resource
+
+# Set higher file/socket limit
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
 
 # Load env vars
 env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -23,7 +27,9 @@ load_dotenv(dotenv_path=env_path)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+RENDER = os.getenv("RENDER", "false").lower() == "true"
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Gemini logic
@@ -52,24 +58,37 @@ def get_lat_lon(zip_code):
         print(f"❌ ZIP resolution failed: {e}")
         raise
 
-def get_et0_weatherapi(lat, lon):
+def get_et0_openweather(lat, lon):
     try:
-        print("📡 Getting ET₀ from WeatherAPI...")
-        url = "http://api.weatherapi.com/v1/forecast.json"
+        print("🌤️ Getting ET₀ from OpenWeather...")
+        url = "https://api.openweathermap.org/data/2.5/onecall"
         params = {
-            "key": WEATHERAPI_KEY,
-            "q": f"{lat},{lon}",
-            "days": 7,
-            "aqi": "no",
-            "alerts": "no"
+            "lat": lat,
+            "lon": lon,
+            "exclude": "minutely,hourly,alerts",
+            "appid": OPENWEATHER_API_KEY,
+            "units": "metric"
         }
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=10)
         data = response.json()
-        et0_list = [float(day["astro"].get("evapotranspiration_mm", 5.0)) for day in data["forecast"]["forecastday"]]
-        print("✅ ET₀ values:", et0_list)
+        et0_list = []
+        for day in data["daily"][:7]:
+            temp = day["temp"]["day"]
+            wind = day["wind_speed"]
+            humidity = day["humidity"]
+            et0 = 0.0023 * (temp + 17.8) * wind * (1 - humidity / 100)
+            et0_list.append(round(et0, 2))
+        print("✅ OpenWeather ET₀ values:", et0_list)
         return et0_list
     except Exception as e:
-        print(f"❌ WeatherAPI ET₀ error: {e}")
+        print(f"❌ OpenWeather ET₀ error: {e}")
+        return [5.0] * 7
+
+def get_et0(lat, lon):
+    if RENDER:
+        return get_et0_openweather(lat, lon)
+    else:
+        print("⚠️ Local fallback ET₀ used")
         return [5.0] * 7
 
 def calculate_schedule(area, crop, et0_list):
@@ -89,32 +108,99 @@ def get_plan():
     area = data.get("area")
     plot_id = data.get("plot_id")
 
+    if not crop or not zip_code or not area or not plot_id:
+        print("❌ Missing required input in /get_plan:", data)
+        return jsonify({"error": "Missing required data"}), 400
+
     try:
         print("🔍 Checking for existing schedule...")
-        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
+        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
 
         print("📍 Getting coordinates...")
         lat, lon = get_lat_lon(zip_code)
+
         tf = TimezoneFinder()
         timezone_str = tf.timezone_at(lat=lat, lng=lon)
         local_zone = tz.gettz(timezone_str)
         now_local = datetime.now(local_zone).replace(minute=0, second=0, microsecond=0)
         print("🌍 Detected timezone:", timezone_str)
 
-        print("📡 Getting ET₀...")
-        et0_list = get_et0_weatherapi(lat, lon)
+        print("📡 Getting ET₀ and weather...")
+        et0_list = get_et0(lat, lon)
+
+        if RENDER:
+            print("🌦️ Fetching weather data from OpenWeather...")
+            url = "https://api.openweathermap.org/data/2.5/forecast"
+            params = {
+                "lat": lat,
+                "lon": lon,
+                "appid": OPENWEATHER_API_KEY,
+                "units": "imperial"
+            }
+            res = requests.get(url, params=params)
+            forecast_data = res.json()
+
+            temps = []
+            moistures = []
+            sunlights = []
+
+            for entry in forecast_data["list"][:8]:  # First 24h = 8 x 3hr blocks
+                if "main" in entry:
+                    temps.append(entry["main"]["temp"])
+                if "pop" in entry:
+                    moistures.append(entry["pop"] * 100)
+                if "clouds" in entry:
+                    sunlights.append(100 - entry["clouds"]["all"])
+
+            current_temp_f = round(np.mean(temps), 1) if temps else 72.5
+            avg_moisture = round(np.mean(moistures), 2) if moistures else 0.24
+            avg_sunlight = round(np.mean(sunlights), 1) if sunlights else 6.0
+        else:
+            print("📡 Fetching weather from Open-Meteo...")
+            try:
+                from utils.forecast_utils import get_forecast
+                forecast = get_forecast(lat, lon)
+                print("✅ Forecast fetched successfully")
+
+                hourly = forecast.get("hourly", {})
+                print("📊 Hourly data keys:", list(hourly.keys()))
+
+                temps = hourly.get("temperature_2m", [])
+                moistures = hourly.get("soil_moisture_0_to_1cm", [])
+                et0s = hourly.get("evapotranspiration", [])
+
+                print(f"🌡️ Raw temps (C): {temps[:5]}")
+                print(f"🌱 Raw moistures: {moistures[:5]}")
+                print(f"☀️ Raw ET₀s: {et0s[:5]}")
+
+                if not temps:
+                    print("⚠️ Temperature data missing, using default")
+                if not moistures:
+                    print("⚠️ Moisture data missing, using default")
+                if not et0s:
+                    print("⚠️ ET₀ data missing, using default")
+
+                current_temp_f = round(np.mean(temps[:24]) * 9/5 + 32, 1) if temps else 72.5
+                avg_moisture = round(np.mean(moistures[:24]) * 100, 2) if moistures else 0.24
+                avg_sunlight = round(np.mean(et0s[:24]) * 4, 1) if et0s else 6.0  # Rough conversion
+
+                print(f"🌡️ Temp (F): {current_temp_f}, 🌱 Moisture: {avg_moisture}, ☀️ Sunlight: {avg_sunlight}")
+            
+            except Exception as e:
+                print("❌ Error fetching or parsing Open-Meteo data:", e)
+                current_temp_f = 72.5
+                avg_moisture = 0.24
+                avg_sunlight = 6.3
+
+
+
 
         print("📅 Generating new schedule...")
         schedule = calculate_schedule(area, crop, et0_list)
-        print("✅ Schedule generated:", schedule)
-
-        current_temp_f = None
-        avg_moisture = None
-        avg_sunlight = None
 
         if existing.data:
             print("♻️ Returning latest schedule from Supabase")
-            row = existing.data
+            row = existing.data[0]
             return jsonify({
                 "schedule": row["schedule"],
                 "summary": row["summary"],
@@ -124,8 +210,9 @@ def get_plan():
                 "sunlight": avg_sunlight
             })
 
+        print("🧠 Generating AI summaries...")
         summary = generate_summary(crop, zip_code, schedule)
-        gem_summary = generate_gem_summary(crop, zip_code, plot_name, plot_id)
+        gem_summary = generate_gem_summary(crop, zip_code, f"Plot {plot_id[:5]}", plot_id)
 
         supabase.table("plot_schedules").upsert({
             "plot_id": plot_id,
@@ -134,7 +221,6 @@ def get_plan():
             "gem_summary": gem_summary
         }, on_conflict=["plot_id"]).execute()
 
-        print("✅ New schedule saved")
         return jsonify({
             "schedule": schedule,
             "summary": summary,
@@ -171,9 +257,7 @@ def get_plots():
 def revert_schedule():
     data = request.get_json()
     plot_id = data.get("plot_id")
-
     try:
-        # Get the most recent original schedule from chatlog
         logs = supabase.table("farmerAI_chatlog") \
             .select("original_schedule") \
             .eq("plot_id", plot_id) \
@@ -185,17 +269,14 @@ def revert_schedule():
 
         original = logs.data[0]["original_schedule"]
 
-        # Update plot_schedules
         supabase.table("plot_schedules").update({
             "schedule": original
         }).eq("plot_id", plot_id).execute()
 
         return jsonify({"success": True})
-
     except Exception as e:
         print("❌ Error reverting:", e)
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -222,7 +303,6 @@ def chat():
         )
         reply = result["reply"]
 
-        # Always re-fetch latest schedule for logging
         refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
         updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
 
@@ -252,10 +332,6 @@ def chat():
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
-
-
-
-
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)

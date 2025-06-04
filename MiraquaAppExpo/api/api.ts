@@ -9,6 +9,7 @@ const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
   //https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
 
 export const signup = async (email: string, password: string) => {
+  
   const response = await fetch(`${BASE_URL}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
