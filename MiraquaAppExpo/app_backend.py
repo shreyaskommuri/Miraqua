@@ -91,7 +91,7 @@ def get_plan():
 
     try:
         print("🔍 Checking for existing schedule...")
-        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
+        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
 
         print("📍 Getting coordinates...")
         lat, lon = get_lat_lon(zip_code)
@@ -108,13 +108,13 @@ def get_plan():
         schedule = calculate_schedule(area, crop, et0_list)
         print("✅ Schedule generated:", schedule)
 
-        current_temp_f = None  # optionally implement later
+        current_temp_f = None
         avg_moisture = None
         avg_sunlight = None
 
         if existing.data:
-            print("♻️ Returning existing schedule")
-            row = existing.data[0]
+            print("♻️ Returning latest schedule from Supabase")
+            row = existing.data
             return jsonify({
                 "schedule": row["schedule"],
                 "summary": row["summary"],
@@ -125,7 +125,7 @@ def get_plan():
             })
 
         summary = generate_summary(crop, zip_code, schedule)
-        gem_summary = generate_gem_summary(crop, zip_code, schedule, plot_id)
+        gem_summary = generate_gem_summary(crop, zip_code, plot_name, plot_id)
 
         supabase.table("plot_schedules").upsert({
             "plot_id": plot_id,
@@ -147,6 +147,7 @@ def get_plan():
     except Exception as e:
         print("❌ Error in /get_plan:", e)
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/add_plot", methods=["POST"])
 def add_plot():
@@ -205,8 +206,8 @@ def chat():
         zip_code = data.get("zip_code")
         plot_name = data.get("plotName")
         plot_id = data.get("plotId")
+        weather = data.get("weather", {})
 
-        # Step 1: Fetch current schedule
         schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
         if not schedule_res.data:
             print("❌ No schedule found for plot_id:", plot_id)
@@ -216,19 +217,18 @@ def chat():
         original_schedule = schedule_row.get("schedule", [])
         user_id = schedule_row.get("user_id")
 
-        # Step 2: Run AI logic
-        updated_schedule, reply = process_chat_command(
-            prompt, original_schedule, crop, zip_code, plot_name
+        result = process_chat_command(
+            prompt, crop, zip_code, plot_name, plot_id, weather
         )
+        reply = result["reply"]
 
-        # Step 3: Compare schedules and optionally update DB
+        # Always re-fetch latest schedule for logging
+        refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
+        updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
+
         if json.dumps(updated_schedule, sort_keys=True) != json.dumps(original_schedule, sort_keys=True):
-            print("🛠️ Updating modified schedule in plot_schedules...")
-            supabase.table("plot_schedules").update({
-                "schedule": updated_schedule
-            }).eq("plot_id", plot_id).execute()
+            print("🛠️ Updated schedule stored and detected")
 
-        # Step 4: Log the conversation
         supabase.table("farmerAI_chatlog").insert({
             "id": str(uuid4()),
             "plot_id": plot_id,
@@ -252,6 +252,8 @@ def chat():
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
 
 
 

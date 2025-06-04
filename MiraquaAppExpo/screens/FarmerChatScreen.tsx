@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-nat
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { MYIPADRESS } from '@env';
+import { MYIPADRESS, OPENWEATHER_API_KEY } from '@env';
 
 const FarmerChatScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'FarmerChat'>>();
@@ -22,6 +22,13 @@ const FarmerChatScreen = () => {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
+      const openWeatherKey = OPENWEATHER_API_KEY || '';
+
+      const weatherRes = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?zip=${plot.zip_code},US&appid=${openWeatherKey}&units=imperial`
+      );
+      const weatherData = await weatherRes.json();
+
       const res = await fetch(`http://${MYIPADRESS}:5050/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -31,7 +38,8 @@ const FarmerChatScreen = () => {
           zip_code: plot.zip_code,
           plotName: plot.name,
           plotId: plot.id,
-          plot: plot
+          plot: plot,
+          weather: weatherData,
         }),
       });
 
@@ -46,6 +54,7 @@ const FarmerChatScreen = () => {
         setMessages((prev) => [...prev, errorMessage]);
       }
     } catch (err) {
+      console.error(err);
       setMessages((prev) => [...prev, { sender: 'bot', text: 'Error contacting server.' }]);
     }
 
