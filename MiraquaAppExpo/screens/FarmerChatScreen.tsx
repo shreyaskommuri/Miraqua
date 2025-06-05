@@ -1,5 +1,5 @@
 // screens/FarmerChatScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -11,9 +11,34 @@ const FarmerChatScreen = () => {
   const { plot } = route.params;
 
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
-    { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` },
-  ]);
+  const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
+
+  // ✅ Load previous messages from Supabase
+  const loadChatHistory = async () => {
+    try {
+      const res = await fetch(`http://${MYIPADRESS}:5050/get_chat_log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: plot.user_id, plot_id: plot.id }),
+      });
+
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setMessages([
+          { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` },
+          ...data
+        ]);
+      } else {
+        console.error('Failed to load chat log:', data.error);
+      }
+    } catch (err) {
+      console.error('Error fetching chat log:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadChatHistory();
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim()) return;

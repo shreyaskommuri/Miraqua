@@ -317,6 +317,37 @@ def chat():
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route("/get_chat_log", methods=["POST"])
+def get_chat_log():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    plot_id = data.get("plot_id")
+
+    if not user_id or not plot_id:
+        return jsonify({"error": "Missing user_id or plot_id"}), 400
+
+    try:
+        res = supabase.table("farmerAI_chatlog") \
+            .select("prompt, reply, created_at, is_user_message") \
+            .eq("user_id", user_id) \
+            .eq("plot_id", plot_id) \
+            .order("created_at", desc=False) \
+            .execute()
+
+        chat_history = []
+        for row in res.data:
+            if row["is_user_message"]:
+                chat_history.append({"sender": "user", "text": row["prompt"]})
+                chat_history.append({"sender": "bot", "text": row["reply"]})
+
+        return jsonify(chat_history), 200
+
+    except Exception as e:
+        print("❌ Error in /get_chat_log:", e)
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)

@@ -120,6 +120,7 @@ def chat():
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
 def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weather):
     try:
+        # 🌦️ Weather summary
         if weather and "main" in weather and "wind" in weather:
             temp = weather["main"].get("temp")
             humidity = weather["main"].get("humidity")
@@ -133,21 +134,34 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
         else:
             weather_summary = "Unfortunately, I don't have any weather data for your location right now."
 
-        prompt = (
-            f"You are an AI assistant for smart farming called FarmerBot. The user is growing {crop} in ZIP code {zip_code} "
-            f"on a plot named {plot_name}.\n\n"
-            f"{weather_summary}\n\n"
-            f"The user said: \"{user_prompt}\"\n\n"
-            f"Respond naturally and help them with farming tips, irrigation changes, or anything related. "
-            f"If they ask to update the irrigation schedule, clearly say what change you are making (e.g., 'skipping Day 3', or 'increasing Day 1 to 2000L'). "
-            f"Keep responses short and helpful."
-        )
+        # 🗂️ Get last 10 messages from chat log
+        past_res = supabase.table("farmerAI_chatlog") \
+            .select("prompt, reply, is_user_message") \
+            .eq("plot_id", plot_id) \
+            .order("created_at", desc=False) \
+            .limit(10) \
+            .execute()
 
+        history = past_res.data or []
+
+        # 🧠 Build conversation history
+        conversation = f"You are an AI assistant called FarmerBot helping a farmer growing {crop} in ZIP {zip_code} on plot '{plot_name}'.\n"
+        conversation += f"{weather_summary}\n\n"
+
+        for entry in history:
+            if entry["is_user_message"]:
+                conversation += f"👤 User: {entry['prompt']}\n"
+                conversation += f"🤖 FarmerBot: {entry['reply']}\n"
+
+        conversation += f"👤 User: {user_prompt}\n"
+        conversation += f"🤖 FarmerBot:"
+
+        # 🧠 Generate AI reply
         model = genai.GenerativeModel("gemini-1.5-flash")
-        chat = model.start_chat()
-        gem_response = chat.send_message(prompt)
-        ai_reply = gem_response.text.strip()
+        response = model.generate_content(conversation)
+        ai_reply = response.text.strip()
 
+        # 🛠️ Check for skip instruction
         updated_schedule = None
         if "skip" in ai_reply.lower():
             for day in range(1, 15):
