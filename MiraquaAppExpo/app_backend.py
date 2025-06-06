@@ -273,6 +273,7 @@ def chat():
         plot_name = data.get("plotName")
         plot_id = data.get("plotId")
         weather = data.get("weather", {})
+        chat_session_id = data.get("chat_session_id")
 
         schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
         if not schedule_res.data:
@@ -308,7 +309,7 @@ def chat():
             "role": "user",
             "message_index": 0,
             "context_summary": "",
-            "chat_session_id": str(uuid4()),
+            "chat_session_id": chat_session_id,
             "edited": False
         }).execute()
 
@@ -332,6 +333,7 @@ def get_chat_log():
             .select("prompt, reply, created_at, is_user_message") \
             .eq("user_id", user_id) \
             .eq("plot_id", plot_id) \
+            .eq("chat_session_id", data.get("chat_session_id")) \
             .order("created_at", desc=False) \
             .execute()
 

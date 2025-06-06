@@ -1,32 +1,43 @@
-// screens/FarmerChatScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { MYIPADRESS, OPENWEATHER_API_KEY } from '@env';
+import uuid from 'react-native-uuid';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FarmerChatScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'FarmerChat'>>();
   const { plot } = route.params;
+  const chatSessionId = useRef<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
 
-  // ✅ Load previous messages from Supabase
   const loadChatHistory = async () => {
+    if (!chatSessionId.current) return;
     try {
       const res = await fetch(`http://${MYIPADRESS}:5050/get_chat_log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: plot.user_id, plot_id: plot.id }),
+        body: JSON.stringify({
+          user_id: plot.user_id,
+          plot_id: plot.id,
+          chat_session_id: chatSessionId.current,
+        }),
       });
 
       const data = await res.json();
       if (Array.isArray(data)) {
+        const formatted = data.flatMap(entry => [
+          { sender: 'user', text: entry.prompt },
+          { sender: 'bot', text: entry.reply }
+        ]);
         setMessages([
           { sender: 'bot', text: `Hi! I'm your Farmer assistant for ${plot.name}. Ask me anything!` },
-          ...data
+          ...formatted
         ]);
       } else {
         console.error('Failed to load chat log:', data.error);
@@ -37,18 +48,37 @@ const FarmerChatScreen = () => {
   };
 
   useEffect(() => {
-    loadChatHistory();
-  }, []);
+    const loadOrCreateSessionId = async () => {
+      const key = `chat_session_${plot.id}`;
+      const existing = await AsyncStorage.getItem(key);
+      if (existing) {
+        chatSessionId.current = existing;
+      } else {
+        const newId = uuid.v4() as string;
+        chatSessionId.current = newId;
+        await AsyncStorage.setItem(key, newId);
+      }
+      await loadChatHistory(); // ✅ load messages after session ID is ready
+    };
+
+    loadOrCreateSessionId();
+  }, [plot.id]);
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !chatSessionId.current) {
+      console.warn("Input or chatSessionId not ready.");
+      return;
+    }
 
     const userMessage = { sender: 'user', text: input };
     setMessages((prev) => [...prev, userMessage]);
 
     try {
       const openWeatherKey = OPENWEATHER_API_KEY || '';
-
       const weatherRes = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?zip=${plot.zip_code},US&appid=${openWeatherKey}&units=imperial`
       );
@@ -65,6 +95,7 @@ const FarmerChatScreen = () => {
           plotId: plot.id,
           plot: plot,
           weather: weatherData,
+          chat_session_id: chatSessionId.current,
         }),
       });
 
@@ -88,7 +119,12 @@ const FarmerChatScreen = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.chat} contentContainerStyle={{ paddingBottom: 20 }}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.chat}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {messages.map((msg, index) => (
           <View
             key={index}
