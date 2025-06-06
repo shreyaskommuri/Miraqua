@@ -6,6 +6,7 @@ import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
 import HomeScreen from '../screens/HomeScreen';
+import WeatherForecastScreen from '../screens/WeatherForecastScreen';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -18,6 +19,7 @@ export default function AppNavigator() {
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen name="PlotDetails" component={PlotDetailsScreen} options={{ title: 'Plot Details' }} />
       <Stack.Screen name="FarmerChat" component={FarmerChatScreen} options={{ title: 'Ask Farmer' }} />
+      <Stack.Screen name="WeatherForecast" component={WeatherForecastScreen} options={{ title: 'Weather Forecast' }} />
     </Stack.Navigator>
   );
 }

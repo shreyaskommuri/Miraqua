@@ -43,7 +43,15 @@ const AccountScreen = () => {
 
       <View style={styles.menuBox}>
         {menuItems.map((item, idx) => (
-          <TouchableOpacity key={idx} style={styles.menuItem}>
+          <TouchableOpacity
+            key={idx}
+            style={styles.menuItem}
+            onPress={() => {
+              if (item.label === 'Weather Forecast') {
+                navigation.navigate('WeatherForecast');
+              }
+            }}
+          >
             <Ionicons name={item.icon as any} size={22} color="#1aa179" style={{ marginRight: 12 }} />
             <Text style={styles.menuLabel}>{item.label}</Text>
           </TouchableOpacity>

@@ -4,6 +4,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   PlotDetails: { plot: any };
   FarmerChat: { plot: any };
+  WeatherForecast: undefined;
 };
 
 export type MainTabParamList = {
