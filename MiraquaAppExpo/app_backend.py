@@ -275,6 +275,7 @@ def chat():
         weather = data.get("weather", {})
         chat_session_id = data.get("chat_session_id")
 
+        # ✅ Get original schedule
         schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
         if not schedule_res.data:
             print("❌ No schedule found for plot_id:", plot_id)
@@ -282,19 +283,26 @@ def chat():
 
         schedule_row = schedule_res.data[0]
         original_schedule = schedule_row.get("schedule", [])
-        user_id = schedule_row.get("user_id")
 
+        # ✅ Correct user_id lookup from "plots" table
+        plot_res = supabase.table("plots").select("user_id").eq("id", plot_id).limit(1).execute()
+        user_id = plot_res.data[0]["user_id"] if plot_res.data else None
+
+        # 🧠 AI process
         result = process_chat_command(
             prompt, crop, zip_code, plot_name, plot_id, weather
         )
         reply = result["reply"]
 
+        # 🔁 Re-check for modified schedule
         refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
         updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
 
+        # 🔍 Check for schedule update
         if json.dumps(updated_schedule, sort_keys=True) != json.dumps(original_schedule, sort_keys=True):
             print("🛠️ Updated schedule stored and detected")
 
+        # 💬 Insert chat log
         supabase.table("farmerAI_chatlog").insert({
             "id": str(uuid4()),
             "plot_id": plot_id,
@@ -318,6 +326,7 @@ def chat():
     except Exception as e:
         print("❌ Error in /chat:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
     
 @app.route("/get_chat_log", methods=["POST"])
 def get_chat_log():
@@ -325,29 +334,42 @@ def get_chat_log():
     user_id = data.get("user_id")
     plot_id = data.get("plot_id")
 
+    print("🧾 Incoming user_id:", user_id)
+    print("🧾 Incoming plot_id:", plot_id)
+
     if not user_id or not plot_id:
         return jsonify({"error": "Missing user_id or plot_id"}), 400
 
     try:
         res = supabase.table("farmerAI_chatlog") \
-            .select("prompt, reply, created_at, is_user_message") \
+            .select("prompt, reply, created_at") \
             .eq("user_id", user_id) \
             .eq("plot_id", plot_id) \
-            .eq("chat_session_id", data.get("chat_session_id")) \
             .order("created_at", desc=False) \
             .execute()
 
         chat_history = []
         for row in res.data:
-            if row["is_user_message"]:
-                chat_history.append({"sender": "user", "text": row["prompt"]})
-                chat_history.append({"sender": "bot", "text": row["reply"]})
+            chat_history.append({
+                "sender": "user",
+                "text": row["prompt"],
+                "timestamp": row["created_at"]
+            })
+            chat_history.append({
+                "sender": "bot",
+                "text": row["reply"],
+                "timestamp": row["created_at"]
+            })
+        print("📤 Returning chat log:", chat_history)
 
         return jsonify(chat_history), 200
 
     except Exception as e:
         print("❌ Error in /get_chat_log:", e)
         return jsonify({"error": str(e)}), 500
+
+        
+
 
 
 
