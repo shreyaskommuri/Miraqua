@@ -18,17 +18,9 @@ import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
-// import { getPlan } from '../api/api.ts';
 
-// const BASE_URL = __DEV__
-//   ? `http://${EXPO_PUBLIC_MYIPADRESS}:5050`
-//   : 'https://miraqua.onrender.com';
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
-console.log('🔍 Fetching from:', `${BASE_URL}/get_plan`);
-
-
-//https://miraqua.onrender.com or http://${MYIPADRESS}:5050 depending on what environment you are in
 const PlotDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlotDetails'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -51,29 +43,30 @@ const PlotDetailsScreen = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plot_id: plot.id,
-          zip_code: plot.zip_code,
+          lat: plot.lat,
+          lon: plot.lon,
           crop: plot.crop.toLowerCase(),
           area: plot.area || 100,
         }),
       });
-  
+
       const json = await response.json();
-  
+
       setSchedule(json.schedule || []);
       setSummary(json.gem_summary || json.summary || 'No forecast available.');
-  
+
       setAvgMoisture(
         typeof json.moisture === 'number' ? `${json.moisture.toFixed(2)}%` : '--'
       );
-  
+
       setAvgTemp(
         typeof json.current_temp_f === 'number' ? `${json.current_temp_f.toFixed(1)}°F` : '--'
       );
-  
+
       setAvgSunlight(
         typeof json.sunlight === 'number' ? `${json.sunlight.toFixed(0)}%` : '--'
       );
-  
+
     } catch (err) {
       console.error('Error fetching schedule:', err);
       setSummary('Failed to load schedule.');
@@ -124,7 +117,6 @@ const PlotDetailsScreen = () => {
     );
   };
 
-  // ✅ Fix: Add loading screen to prevent flicker
   if (loading && schedule.length === 0 && summary === '') {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -145,8 +137,10 @@ const PlotDetailsScreen = () => {
           <Text style={styles.metaValue}>{plot.crop}</Text>
         </View>
         <View style={styles.metaBox}>
-          <Text style={styles.metaText}>ZIP</Text>
-          <Text style={styles.metaValue}>{plot.zip_code}</Text>
+          <Text style={styles.metaText}>Coords</Text>
+          <Text style={styles.metaValue}>
+            {plot.lat?.toFixed(2)}, {plot.lon?.toFixed(2)}
+          </Text>
         </View>
       </View>
 
@@ -187,18 +181,15 @@ const PlotDetailsScreen = () => {
         </View>
       )}
 
-<TouchableOpacity
-  style={styles.farmerButton}
-  onPress={() => {
-    console.log("🧭 Navigating to FarmerChat with plot:", plot);
-    navigation.navigate('FarmerChat', { plot });
-  }}
->
-  <Text style={styles.farmerText}>Farmer</Text>
-</TouchableOpacity>
-
-
-
+      <TouchableOpacity
+        style={styles.farmerButton}
+        onPress={() => {
+          console.log("🧭 Navigating to FarmerChat with plot:", plot);
+          navigation.navigate('FarmerChat', { plot });
+        }}
+      >
+        <Text style={styles.farmerText}>Farmer</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };

@@ -5,8 +5,8 @@ import SignUpScreen from '../screens/SignUpScreen';
 import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
-import HomeScreen from '../screens/HomeScreen';
 import WeatherForecastScreen from '../screens/WeatherForecastScreen';
+import PickLocationScreen from '../screens/PickLocationScreen'; // ✅ new import
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -20,6 +20,7 @@ export default function AppNavigator() {
       <Stack.Screen name="PlotDetails" component={PlotDetailsScreen} options={{ title: 'Plot Details' }} />
       <Stack.Screen name="FarmerChat" component={FarmerChatScreen} options={{ title: 'Ask Farmer' }} />
       <Stack.Screen name="WeatherForecast" component={WeatherForecastScreen} options={{ title: 'Weather Forecast' }} />
+      <Stack.Screen name="PickLocation" component={PickLocationScreen} options={{ title: 'Select Plot Location' }} /> 
     </Stack.Navigator>
   );
 }

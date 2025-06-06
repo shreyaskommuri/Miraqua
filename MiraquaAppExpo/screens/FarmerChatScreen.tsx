@@ -1,9 +1,10 @@
+// screens/FarmerChatScreen.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { MYIPADRESS, OPENWEATHER_API_KEY } from '@env';
+import { EXPO_PUBLIC_MYIPADRESS, OPENWEATHER_API_KEY } from '@env';
 import uuid from 'react-native-uuid';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,22 +22,19 @@ const FarmerChatScreen = () => {
   const formatTimestamp = (iso: string) => {
     const msgDate = new Date(iso);
     const now = new Date();
-
     const isSameDay =
       msgDate.getFullYear() === now.getFullYear() &&
       msgDate.getMonth() === now.getMonth() &&
       msgDate.getDate() === now.getDate();
 
-    if (isSameDay) {
-      return msgDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    } else {
-      return `${msgDate.getMonth() + 1}/${msgDate.getDate()}/${msgDate.getFullYear()}`;
-    }
+    return isSameDay
+      ? msgDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : `${msgDate.getMonth() + 1}/${msgDate.getDate()}/${msgDate.getFullYear()}`;
   };
 
   const loadChatHistory = async () => {
     try {
-      const res = await fetch(`http://${MYIPADRESS}:5050/get_chat_log`, {
+      const res = await fetch(`http://${EXPO_PUBLIC_MYIPADRESS}:5050/get_chat_log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,20 +98,20 @@ const FarmerChatScreen = () => {
 
     try {
       const weatherRes = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?zip=${plot.zip_code},US&appid=${OPENWEATHER_API_KEY}&units=imperial`
+        `https://api.openweathermap.org/data/2.5/weather?lat=${plot.lat}&lon=${plot.lon}&appid=${OPENWEATHER_API_KEY}&units=imperial`
       );
       const weatherData = await weatherRes.json();
 
-      const res = await fetch(`http://${MYIPADRESS}:5050/chat`, {
+      const res = await fetch(`http://${EXPO_PUBLIC_MYIPADRESS}:5050/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: input,
           crop: plot.crop,
-          zip_code: plot.zip_code,
+          lat: plot.lat,
+          lon: plot.lon,
           plotName: plot.name,
           plotId: plot.id,
-          plot: plot,
           weather: weatherData,
           chat_session_id: chatSessionId.current,
         }),
@@ -130,7 +128,11 @@ const FarmerChatScreen = () => {
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [...prev, { sender: 'bot', text: 'Error contacting server.', timestamp: new Date().toISOString() }]);
+      setMessages((prev) => [...prev, {
+        sender: 'bot',
+        text: 'Error contacting server.',
+        timestamp: new Date().toISOString(),
+      }]);
     }
 
     setInput('');

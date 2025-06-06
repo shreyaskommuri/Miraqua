@@ -1,23 +1,40 @@
-// screens/AddPlotScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
+import type { MainTabParamList } from '../navigation/types';
 import { supabase } from '../utils/supabase';
 import { addPlot } from '../api/api';
 
+type AddPlotRouteProp = RouteProp<MainTabParamList, 'Add Plot'>;
+
 const AddPlotScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>(); // can use composite types if needed
+  const route = useRoute<AddPlotRouteProp>();
+
   const [zipCode, setZipCode] = useState('');
   const [crop, setCrop] = useState('');
   const [area, setArea] = useState('');
   const [name, setName] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lon, setLon] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (route.params?.lat && route.params?.lon) {
+      setLat(route.params.lat);
+      setLon(route.params.lon);
+    }
+  }, [route.params]);
 
   const handleAddPlot = async () => {
     const { data: userData, error } = await supabase.auth.getUser();
     if (error || !userData?.user?.id) {
       Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (lat === null || lon === null) {
+      Alert.alert('Missing Location', 'Please select a location on the map.');
       return;
     }
 
@@ -27,11 +44,12 @@ const AddPlotScreen = () => {
       crop,
       area: parseFloat(area),
       name,
+      lat,
+      lon,
     };
 
     const response = await addPlot(plotData);
-    if ((response && !response.error)) {
-       
+    if (response && !response.error) {
       Alert.alert('Success', 'Plot added successfully!');
       navigation.navigate('Home');
     } else {
@@ -53,7 +71,15 @@ const AddPlotScreen = () => {
       <Text style={styles.label}>Area (sq m)</Text>
       <TextInput style={styles.input} value={area} onChangeText={setArea} placeholder="e.g., 1000" keyboardType="numeric" />
 
-      <Button title="Add Plot" onPress={handleAddPlot} />
+      <Text style={styles.label}>Location</Text>
+      <Button
+        title={lat && lon ? `📍 Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}` : 'Pick Location on Map'}
+        onPress={() => navigation.navigate('PickLocation')}
+      />
+
+      <View style={{ marginTop: 30 }}>
+        <Button title="Add Plot" onPress={handleAddPlot} />
+      </View>
     </ScrollView>
   );
 };

@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from dotenv import load_dotenv
 from supabase import create_client
 import google.generativeai as genai
-from utils.forecast_utils import get_lat_lon, get_forecast, CROP_KC
+from utils.forecast_utils import get_forecast, CROP_KC
 from datetime import datetime, timedelta
 import re
 
@@ -19,14 +19,14 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 ai_blueprint = Blueprint("ai", __name__)
 
 # ✅ BASIC WATER USAGE SUMMARY
-def generate_summary(crop, zip_code, schedule):
+def generate_summary(crop, lat, lon, schedule):
     total_liters = sum(day["liters"] for day in schedule)
     avg_liters = round(total_liters / len(schedule), 2)
     highest_day = max(schedule, key=lambda x: x["liters"])
     lowest_day = min(schedule, key=lambda x: x["liters"])
 
     return (
-        f"🌾 Crop: {crop}, ZIP Code: {zip_code}\n"
+        f"🌾 Crop: {crop}, Location: ({lat:.4f}, {lon:.4f})\n"
         f"💧 Total water needed over {len(schedule)} days: {total_liters} liters\n"
         f"📈 Average per day: {avg_liters} liters\n"
         f"🔺 Highest usage: {highest_day['liters']}L on {highest_day['day']}\n"
@@ -34,16 +34,14 @@ def generate_summary(crop, zip_code, schedule):
     )
 
 # ✅ AI-GENERATED GEMINI SUMMARY
-def generate_gem_summary(crop, zip_code, plot_name, plot_id):
+def generate_gem_summary(crop, lat, lon, plot_name, plot_id):
     try:
         model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
         response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
         schedule = response.data[0]["schedule"] if response.data else []
 
-        lat, lon = get_lat_lon(zip_code)
-
-        context = f"You are helping a farmer named '{plot_name}' who is growing {crop} in ZIP code {zip_code}.\n"
+        context = f"You are helping a farmer named '{plot_name}' who is growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).\n"
         context += f"They have this upcoming irrigation schedule:\n{json.dumps(schedule, indent=2)}\n"
         context += "Give a helpful forecast-based summary with risks, recommendations, and what to expect based on soil moisture, temperature, and crop water needs."
 
@@ -71,56 +69,37 @@ def attach_real_dates(schedule):
 # ✅ GEMINI CHAT ENDPOINT
 @ai_blueprint.route("/chat", methods=["POST"])
 def chat():
-    
     data = request.get_json()
-   
     print("📥 /chat received data:", data)
 
     user_prompt = data.get("prompt", "")
     crop = data.get("crop", "")
-    plot_info = data.get("plot", {})
-    zip_code = data.get("zip_code") or plot_info.get("zip_code", "")
     plot_name = data.get("plotName", "")
     plot_id = data.get("plotId", "")
-    weather = data.get("weather", {})          # ✅ ADDED
-    plot_info = data.get("plot", {})           # ✅ ADDED
+    lat = data.get("lat")
+    lon = data.get("lon")
+    weather = data.get("weather", {})
 
     if not user_prompt:
         return jsonify({"success": False, "error": "Missing prompt"}), 400
 
     try:
-        # 🔄 Get schedule from Supabase
-        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).single().execute()
-        # schedule = response.data["schedule"] if response.data else []
-
-        # 🧠 Process prompt with weather & plot info
-        # Step 2: Run AI logic
-        result = process_chat_command(
-            prompt, crop, zip_code, plot_name, plot_id, weather
-        )
+        result = process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather)
         reply = result["reply"]
+
         if result["schedule_updated"]:
-            # 🔄 Re-fetch updated schedule from DB
             updated_schedule = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute().data[0]["schedule"]
         else:
             updated_schedule = None
 
-
-
-        if result["schedule_updated"]:
-            print("🛠️ Schedule was modified, saving to Supabase...")
-
-        return jsonify({"success": True, "reply": result["reply"]})
-
+        return jsonify({"success": True, "reply": reply})
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
-def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weather):
+def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather):
     try:
-        # 🌦️ Weather summary
         if weather and "main" in weather and "wind" in weather:
             temp = weather["main"].get("temp")
             humidity = weather["main"].get("humidity")
@@ -134,7 +113,6 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
         else:
             weather_summary = "Unfortunately, I don't have any weather data for your location right now."
 
-        # 🗂️ Get last 10 messages from chat log
         past_res = supabase.table("farmerAI_chatlog") \
             .select("prompt, reply, is_user_message") \
             .eq("plot_id", plot_id) \
@@ -144,8 +122,7 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
 
         history = past_res.data or []
 
-        # 🧠 Build conversation history
-        conversation = f"You are an AI assistant called FarmerBot helping a farmer growing {crop} in ZIP {zip_code} on plot '{plot_name}'.\n"
+        conversation = f"You are an AI assistant called FarmerBot helping a farmer growing {crop} at ({lat:.4f}, {lon:.4f}) on plot '{plot_name}'.\n"
         conversation += f"{weather_summary}\n\n"
 
         for entry in history:
@@ -156,12 +133,10 @@ def process_chat_command(user_prompt, crop, zip_code, plot_name, plot_id, weathe
         conversation += f"👤 User: {user_prompt}\n"
         conversation += f"🤖 FarmerBot:"
 
-        # 🧠 Generate AI reply
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(conversation)
         ai_reply = response.text.strip()
 
-        # 🛠️ Check for skip instruction
         updated_schedule = None
         if "skip" in ai_reply.lower():
             for day in range(1, 15):

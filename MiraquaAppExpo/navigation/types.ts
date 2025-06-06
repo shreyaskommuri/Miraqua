@@ -1,14 +1,14 @@
-// navigation/types.ts
 export type RootStackParamList = {
   SignIn: undefined;
-  MainTabs: undefined;
+  MainTabs: { screen?: keyof MainTabParamList; params?: any };
   PlotDetails: { plot: any };
   FarmerChat: { plot: any };
   WeatherForecast: undefined;
+  PickLocation: undefined; // 👈 New screen
 };
 
 export type MainTabParamList = {
   Home: undefined;
-  'Add Plot': undefined;
+  'Add Plot': { lat?: number; lon?: number }; // 👈 Add params here
   Account: undefined;
 };

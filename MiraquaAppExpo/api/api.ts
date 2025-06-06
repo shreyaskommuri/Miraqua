@@ -6,10 +6,9 @@ import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
-  //https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
+//https://miraqua.onrender.com or http://${EXPO_PUBLIC_MYIPADRESS}:5050 depending on what environment you are in
 
 export const signup = async (email: string, password: string) => {
-  
   const response = await fetch(`${BASE_URL}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -43,5 +42,24 @@ export const getPlots = async (userId: string) => {
     return { success: true, plots: data }; // ✅ wrap it
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+};
+
+export const getPlan = async (
+  crop: string,
+  area: number,
+  plot_id: string,
+  lat: number,
+  lon: number
+) => {
+  try {
+    const response = await fetch(`${BASE_URL}/get_plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crop, area, plot_id, lat, lon }),
+    });
+    return await response.json();
+  } catch (error: any) {
+    return { error: true, reason: error.message };
   }
 };
