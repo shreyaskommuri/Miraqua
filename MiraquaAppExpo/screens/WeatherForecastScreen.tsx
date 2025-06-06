@@ -127,11 +127,21 @@ const WeatherForecastScreen = () => {
   };
 
   const today = getToday();
-  const daysInMonth = getMonthDays(today.year, today.month);
-  const firstDayOfWeek = new Date(today.year, today.month, 1).getDay();
 
-  // Build calendar grid for next 7 days only
-  const calendar: (null | any)[] = forecast;
+  // Build calendar grid: Populate with forecast data sequentially
+  const calendar: (null | any)[] = Array(7).fill(null);
+  
+  // Place the first 7 forecast days directly into the calendar array in order
+  forecast.slice(0, 7).forEach((dayData, index) => {
+      calendar[index] = dayData;
+  });
+
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const currentDayIndex = new Date(today.year, today.month, today.day).getDay();
+  const reorderedDaysOfWeek = [
+    ...daysOfWeek.slice(currentDayIndex),
+    ...daysOfWeek.slice(0, currentDayIndex),
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -163,31 +173,32 @@ const WeatherForecastScreen = () => {
       )}
       <View style={styles.calendarBox}>
         <View style={styles.row}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+          {reorderedDaysOfWeek.map((d) => (
             <Text key={d} style={styles.dayHeader}>{d}</Text>
           ))}
         </View>
-        {Array.from({ length: Math.ceil(calendar.length / 7) }).map((_, weekIdx) => (
-          <View key={weekIdx} style={styles.row}>
-            {calendar.slice(weekIdx * 7, weekIdx * 7 + 7).map((day, i) => (
-              <View key={i} style={styles.cell}>
-                {day ? (
+        <View style={styles.calendarRow}>
+          {Array.from({ length: 7 }).map((_, i) => {
+            const dayData = calendar[i];
+            return (
+              <View key={i} style={styles.calendarCell}>
+                {dayData ? (
                   <>
-                    <Text style={styles.dateText}>{parseInt(day.date.split('-')[2], 10)}</Text>
-                    <Text style={styles.tempText}>{Math.round(day.tempMax)}°F</Text>
+                    <Text style={styles.dateText}>{parseInt(dayData.date.split('-')[2], 10)}</Text>
+                    <Text style={styles.tempText}>{Math.round(dayData.tempMax)}°F</Text>
                     <Ionicons
-                      name={getWeatherIcon(codeToDesc(day.code)) as any}
+                      name={getWeatherIcon(codeToDesc(dayData.code)) as any}
                       size={20}
                       color="#1aa179"
                       style={{ marginTop: 2 }}
                     />
-                    <Text style={styles.descText}>{codeToDesc(day.code)}</Text>
+                    <Text style={styles.descText}>{codeToDesc(dayData.code)}</Text>
                   </>
                 ) : null}
               </View>
-            ))}
-          </View>
-        ))}
+            );
+          })}
+        </View>
       </View>
     </ScrollView>
   );
@@ -197,10 +208,10 @@ const styles = StyleSheet.create({
   container: { padding: 16, backgroundColor: '#fff', flexGrow: 1 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#1aa179', textAlign: 'center' },
   error: { color: 'red', textAlign: 'center', marginVertical: 12 },
-  calendarBox: { backgroundColor: '#f4faf7', borderRadius: 12, padding: 12, marginTop: 12 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  dayHeader: { flex: 1, textAlign: 'center', fontWeight: '600', color: '#888', marginBottom: 6 },
-  cell: { flex: 1, alignItems: 'center', paddingVertical: 8, minHeight: 60 },
+  calendarBox: { backgroundColor: '#f4faf7', borderRadius: 12, paddingVertical: 12, marginTop: 12, marginHorizontal: 16 },
+  row: { flexDirection: 'row' },
+  dayHeader: { width: `${100 / 7}%`, textAlign: 'center', fontWeight: '600', color: '#888', marginBottom: 6 },
+  cell: { alignItems: 'center', paddingVertical: 8, minHeight: 60 },
   dateText: { fontSize: 13, color: '#333', fontWeight: '600' },
   tempText: { fontSize: 15, color: '#1aa179', fontWeight: '600', marginTop: 2 },
   descText: { fontSize: 11, color: '#555', marginTop: 2, textAlign: 'center' },
@@ -209,6 +220,13 @@ const styles = StyleSheet.create({
   zipButton: { backgroundColor: '#1aa179', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
   currentTemp: { fontSize: 18, color: '#1aa179', fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
   notice: { fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 8, marginHorizontal: 10 },
+  calendarRow: { flexDirection: 'row', width: '100%' },
+  calendarCell: {
+    width: `${100 / 7}%`,
+    alignItems: 'center',
+    paddingVertical: 8,
+    minHeight: 60,
+  },
 });
 
 export default WeatherForecastScreen; 
