@@ -21,8 +21,17 @@ const AccountScreen = () => {
     fetchEmail();
   }, []);
 
-  const handleSignOut = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // On successful sign-out, navigate back to the sign-in screen and reset navigation stack
+      navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+    } catch (error: any) {
+      console.error('Error signing out:', error.message);
+      // Optionally show an alert to the user
+      // Alert.alert('Sign Out Error', error.message);
+    }
   };
 
   const menuItems = [
