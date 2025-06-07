@@ -47,6 +47,7 @@ const PlotDetailsScreen = () => {
           lon: plot.lon,
           crop: plot.crop.toLowerCase(),
           area: plot.area || 100,
+          zip_code: plot.zip_code,
         }),
       });
 
@@ -110,7 +111,12 @@ const PlotDetailsScreen = () => {
           }
         >
           <Text style={{ fontSize: 10, alignSelf: 'flex-start', paddingLeft: 4 }}>{dayNum}</Text>
-          <Text>{day?.liters != null ? `${day.liters}L` : ''}</Text>
+          {day ? (
+            <>
+              <Text style={{ fontSize: 10 }}>{day.date}</Text>
+              <Text>{day?.liters ?? '--'}L @ {day?.optimal_time ?? '--'}</Text>
+            </>
+          ) : null}
         </TouchableOpacity>
       );
     });

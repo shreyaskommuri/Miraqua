@@ -40,6 +40,7 @@ const FarmerChatScreen = () => {
         body: JSON.stringify({
           user_id: plot.user_id,
           plot_id: plot.id,
+          chat_session_id: chatSessionId.current,
         }),
       });
 
@@ -75,9 +76,13 @@ const FarmerChatScreen = () => {
           chatSessionId.current = newId;
           await AsyncStorage.setItem(key, newId);
         }
-        await loadChatHistory();
+  
+        // ✅ Only call after chatSessionId is set
+        if (chatSessionId.current) {
+          await loadChatHistory();
+        }
       };
-
+  
       loadOrCreateSessionId();
     }, [plot.id])
   );

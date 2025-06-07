@@ -29,8 +29,8 @@ def generate_summary(crop, lat, lon, schedule):
         f"🌾 Crop: {crop}, Location: ({lat:.4f}, {lon:.4f})\n"
         f"💧 Total water needed over {len(schedule)} days: {total_liters} liters\n"
         f"📈 Average per day: {avg_liters} liters\n"
-        f"🔺 Highest usage: {highest_day['liters']}L on {highest_day['day']}\n"
-        f"🔻 Lowest usage: {lowest_day['liters']}L on {lowest_day['day']}"
+        f"🔺 Highest usage: {highest_day['liters']}L on {highest_day['date']}\n"
+        f"🔻 Lowest usage: {lowest_day['liters']}L on {lowest_day['date']}"
     )
 
 # ✅ AI-GENERATED GEMINI SUMMARY
