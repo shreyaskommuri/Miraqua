@@ -1,11 +1,18 @@
 export type RootStackParamList = {
   SignIn: undefined;
+  SignUp: undefined;
   MainTabs: { screen?: keyof MainTabParamList; params?: any };
   PlotDetails: { plot: any };
   FarmerChat: { plot: any };
   WeatherForecast: undefined;
-  PickLocation: undefined; // 👈 New screen
+  PickLocation: undefined;
+  SpecificDay: {
+    plotId: string;
+    dayData: any;
+    dayIndex: number;
+  };
 };
+
 
 export type MainTabParamList = {
   Home: undefined;

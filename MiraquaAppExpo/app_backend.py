@@ -325,7 +325,40 @@ def get_chat_log():
         print("❌ Error in /get_chat_log:", e)
         return jsonify({"error": str(e)}), 500
 
-        
+@app.route("/update_schedule_day", methods=["POST"])
+def update_schedule_day():
+    try:
+        data = request.get_json()
+        plot_id = data.get("plot_id")
+        day_index = data.get("day_index")
+        day_data = data.get("day_data")
+
+        if not plot_id or day_index is None or day_data is None:
+            return jsonify({"error": "Missing plot_id, day_index, or day_data"}), 400
+
+        # Fetch current schedule
+        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).single().execute()
+
+        if not response.data or "schedule" not in response.data:
+            return jsonify({"error": "Schedule not found for this plot"}), 404
+
+        schedule = response.data["schedule"]
+
+        if not (0 <= day_index < len(schedule)):
+            return jsonify({"error": f"Invalid day index: {day_index}"}), 400
+
+        # Merge updated values into existing day
+        schedule[day_index] = {**schedule[day_index], **day_data}
+
+        # Update the schedule in Supabase
+        supabase.table("plot_schedules").update({"schedule": schedule}).eq("plot_id", plot_id).execute()
+
+        return jsonify({"success": True, "updated_day": schedule[day_index]}), 200
+
+    except Exception as e:
+        print(f"❌ Error in /update_schedule_day: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 
 

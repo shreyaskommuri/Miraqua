@@ -96,11 +96,22 @@ const PlotDetailsScreen = () => {
       const cellDate = new Date();
       cellDate.setDate(today.getDate() + i);
       const dayNum = cellDate.getDate();
+
       return (
-        <View key={i} style={styles.calendarCell}>
+        <TouchableOpacity
+          key={i}
+          style={styles.calendarCell}
+          onPress={() =>
+            navigation.navigate('SpecificDay', {
+              plotId: plot.id,
+              dayData: day,
+              dayIndex: i,
+            })
+          }
+        >
           <Text style={{ fontSize: 10, alignSelf: 'flex-start', paddingLeft: 4 }}>{dayNum}</Text>
-          <Text> {day?.liters != null ? `${day.liters}L` : ''}</Text>
-        </View>
+          <Text>{day?.liters != null ? `${day.liters}L` : ''}</Text>
+        </TouchableOpacity>
       );
     });
 

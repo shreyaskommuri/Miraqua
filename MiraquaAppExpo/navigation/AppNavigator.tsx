@@ -1,3 +1,4 @@
+// navigation/AppNavigator.tsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SignInScreen from '../screens/SignInScreen';
@@ -6,7 +7,9 @@ import MainTabs from './MainTabs';
 import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
 import WeatherForecastScreen from '../screens/WeatherForecastScreen';
-import PickLocationScreen from '../screens/PickLocationScreen'; // ✅ new import
+import PickLocationScreen from '../screens/PickLocationScreen';
+import SpecificDayPage from '../screens/SpecificDayPage'; // ✅ NEW
+
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -20,7 +23,8 @@ export default function AppNavigator() {
       <Stack.Screen name="PlotDetails" component={PlotDetailsScreen} options={{ title: 'Plot Details' }} />
       <Stack.Screen name="FarmerChat" component={FarmerChatScreen} options={{ title: 'Ask Farmer' }} />
       <Stack.Screen name="WeatherForecast" component={WeatherForecastScreen} options={{ title: 'Weather Forecast' }} />
-      <Stack.Screen name="PickLocation" component={PickLocationScreen} options={{ title: 'Select Plot Location' }} /> 
+      <Stack.Screen name="PickLocation" component={PickLocationScreen} options={{ title: 'Select Plot Location' }} />
+      <Stack.Screen name="SpecificDay" component={SpecificDayPage} options={{ title: 'Day Details' }} /> 
     </Stack.Navigator>
   );
 }
