@@ -1,31 +1,23 @@
-import os
-import sys
-import json
-import requests
-import requests_cache
+import os, sys, json, requests, requests_cache
 from retry_requests import retry
-import pandas as pd
-import numpy as np
+import pandas as pd, numpy as np
 from flask import Flask, request, jsonify
-from uuid import uuid4
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta
+from uuid import uuid4
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from dateutil import tz
 from timezonefinder import TimezoneFinder
-import time
 import resource
-from datetime import datetime, timedelta
 
-# Set higher file/socket limit
+# Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
 
-# Load env vars
+# Env vars
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path=env_path)
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
@@ -33,91 +25,55 @@ RENDER = os.getenv("RENDER", "false").lower() == "true"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Gemini logic
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "farmerAI")))
 from farmer_ai import generate_summary, generate_gem_summary, process_chat_command
 
 app = Flask(__name__)
 CORS(app)
 
-# Crop coefficients
 CROP_KC = {
     "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
     "tomato": 1.05, "almond": 1.05, "default": 0.95
 }
 
 def get_lat_lon(zip_code):
-    try:
-        url = f"http://api.zippopotam.us/us/{zip_code}"
-        response = requests.get(url, timeout=5)
-        data = response.json()
-        lat = float(data['places'][0]['latitude'])
-        lon = float(data['places'][0]['longitude'])
-        print(f"📍 ZIP {zip_code} resolved to ({lat}, {lon})")
-        return lat, lon
-    except Exception as e:
-        print(f"❌ ZIP resolution failed: {e}")
-        raise
+    url = f"http://api.zippopotam.us/us/{zip_code}"
+    res = requests.get(url)
+    data = res.json()
+    return float(data['places'][0]['latitude']), float(data['places'][0]['longitude'])
 
-def get_et0_openweather(lat, lon):
-    try:
-        print("🌤️ Getting ET₀ from OpenWeather...")
-        url = "https://api.openweathermap.org/data/2.5/onecall"
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "exclude": "minutely,hourly,alerts",
-            "appid": OPENWEATHER_API_KEY,
-            "units": "metric"
-        }
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        et0_list = []
-        for day in data["daily"][:7]:
-            temp = day["temp"]["day"]
-            wind = day["wind_speed"]
-            humidity = day["humidity"]
-            et0 = 0.0023 * (temp + 17.8) * wind * (1 - humidity / 100)
-            et0_list.append(round(et0, 2))
-        print("✅ OpenWeather ET₀ values:", et0_list)
-        return et0_list
-    except Exception as e:
-        print(f"❌ OpenWeather ET₀ error: {e}")
-        return [5.0] * 7
+def find_optimal_time(hourly_list):
+    best_score = float("inf")
+    best_hour = 6
+    for h in hourly_list:
+        temp = h.get("main", {}).get("temp", 72)
+        wind = h.get("wind", {}).get("speed", 2)
+        clouds = h.get("clouds", {}).get("all", 40)
+        rain_chance = h.get("pop", 0)
+        hour = datetime.fromtimestamp(h["dt"]).hour
+        if rain_chance > 0.3: continue
+        sunlight = 100 - clouds
+        score = temp * 0.5 + sunlight * 0.3 + wind * 0.2
+        if 4 <= hour <= 8: score *= 0.8
+        if score < best_score:
+            best_score, best_hour = score, hour
+    return f"{best_hour:02d}:00 AM"
 
-def get_et0(lat, lon):
-    if RENDER:
-        return get_et0_openweather(lat, lon)
-    else:
-        print("⚠️ Local fallback ET₀ used")
-        return [5.0] * 7
-
-def calculate_schedule(area, crop, et0_list):
-    kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
+def calculate_schedule(area, crop, soil_forecast, hourly_blocks, root_depth_mm=300):
     today = datetime.utcnow().date()
+    threshold = 0.30  # Moisture below which watering is needed
+    target = 0.45     # Moisture we want to reach
     schedule = []
 
-    for i, et0 in enumerate(et0_list):
-        watering_date = today + timedelta(days=i)
-        date_str = watering_date.strftime("%m/%d/%y")
-        liters = round(et0 * kc * area, 2)
-
-        
-        if et0 >= 6.0:
-            optimal_time = "05:30 AM"
-        elif et0 >= 4.0:
-            optimal_time = "06:00 AM"
-        elif et0 >= 2.5:
-            optimal_time = "06:30 AM"
-        else:
-            optimal_time = "07:00 AM"  # cooler days
-
-        schedule.append({
-            "date": date_str,
-            "liters": liters,
-            "optimal_time": optimal_time
-        })
-
+    for i, soil in enumerate(soil_forecast):
+        date_str = (today + timedelta(days=i)).strftime("%m/%d/%y")
+        if soil >= threshold:
+            schedule.append({"date": date_str, "liters": 0.0, "optimal_time": "N/A"})
+            continue
+        mm_needed = (target - soil) * root_depth_mm
+        liters = round(mm_needed * area * 0.1, 2)
+        optimal_time = find_optimal_time(hourly_blocks[i]) if i < len(hourly_blocks) else "06:00 AM"
+        schedule.append({"date": date_str, "liters": liters, "optimal_time": optimal_time})
     return schedule
 
 @app.route("/get_plan", methods=["POST"])
@@ -128,251 +84,161 @@ def get_plan():
     area = data.get("area")
     plot_id = data.get("plot_id")
 
-    if not crop or not zip_code or not area or not plot_id:
-        print("❌ Missing required input in /get_plan:", data)
+    if not all([crop, zip_code, area, plot_id]):
         return jsonify({"error": "Missing required data"}), 400
 
-    try:
-        print("🔍 Checking for existing schedule...")
-        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
+    existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
+    lat, lon = get_lat_lon(zip_code)
 
-        print("📍 Getting coordinates...")
-        lat, lon = get_lat_lon(zip_code)
+    tf = TimezoneFinder()
+    timezone_str = tf.timezone_at(lat=lat, lng=lon)
+    local_zone = tz.gettz(timezone_str)
+    now_local = datetime.now(local_zone)
 
-        tf = TimezoneFinder()
-        timezone_str = tf.timezone_at(lat=lat, lng=lon)
-        local_zone = tz.gettz(timezone_str)
-        now_local = datetime.now(local_zone).replace(minute=0, second=0, microsecond=0)
-        print("🌍 Detected timezone:", timezone_str)
+    hourly_blocks = [[] for _ in range(7)]
+    soil_forecast = []
 
-        print("📡 Getting ET₀ and weather...")
-        et0_list = get_et0(lat, lon)
+    if RENDER:
+        res = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
+            "lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY, "units": "imperial"
+        })
+        forecast_data = res.json()
+        for entry in forecast_data["list"]:
+            dt = datetime.utcfromtimestamp(entry["dt"])
+            i = (dt.date() - datetime.utcnow().date()).days
+            if 0 <= i < 7:
+                hourly_blocks[i].append(entry)
 
-        if RENDER:
-            print("🌦️ Fetching weather data from OpenWeather...")
-            url = "https://api.openweathermap.org/data/2.5/forecast"
-            params = {
-                "lat": lat,
-                "lon": lon,
-                "appid": OPENWEATHER_API_KEY,
-                "units": "imperial"
-            }
-            res = requests.get(url, params=params)
-            forecast_data = res.json()
+        for i in range(7):
+            rain_probs = [e.get("pop", 0) for e in hourly_blocks[i]]
+            rain_factor = sum(rain_probs) / len(rain_probs) if rain_probs else 0
+            soil_estimate = max(0.15, min(0.45, 0.35 - (i * 0.03) + rain_factor * 0.2))
+            soil_forecast.append(round(soil_estimate, 3))
 
-            temps = []
-            moistures = []
-            sunlights = []
+        current_temp_f = round(np.mean([e["main"]["temp"] for e in forecast_data["list"][:8]]), 1)
+        avg_moisture = round(np.mean(soil_forecast) * 100, 2)
+        avg_sunlight = round(np.mean([100 - e["clouds"]["all"] for e in forecast_data["list"][:8]]), 1)
+    else:
+        soil_forecast = [0.25, 0.26, 0.27, 0.28, 0.29, 0.3, 0.3]
+        hourly_blocks = [[] for _ in range(7)]
+        current_temp_f, avg_moisture, avg_sunlight = 72.0, 25.0, 65.0
 
-            for entry in forecast_data["list"][:8]:  # First 24h = 8 x 3hr blocks
-                if "main" in entry:
-                    temps.append(entry["main"]["temp"])
-                if "pop" in entry:
-                    moistures.append(entry["pop"] * 100)
-                if "clouds" in entry:
-                    sunlights.append(100 - entry["clouds"]["all"])
+    print("📅 Creating moisture-aware schedule...")
+    schedule = calculate_schedule(area, crop, soil_forecast, hourly_blocks)
 
-            current_temp_f = round(np.mean(temps), 1) if temps else 72.5
-            avg_moisture = round(np.mean(moistures), 2) if moistures else 0.24
-            avg_sunlight = round(np.mean(sunlights), 1) if sunlights else 6.0
-        else:
-            print("📡 Fetching weather from Open-Meteo...")
-            from utils.forecast_utils import get_forecast
-            forecast = get_forecast(lat, lon)
-            hourly = forecast.get("hourly", {})
-
-            temps = hourly.get("temperature_2m", [])[12:18]  # approx. 12 PM to 6 PM
-
-            moistures = hourly.get("soil_moisture_0_to_1cm", [])[:3]
-            et0s = hourly.get("evapotranspiration", [])[:3]
-
-            print(f"🌡️ Raw temps (C): {temps}")
-            print(f"🌱 Raw moistures: {moistures}")
-            print(f"☀️ Raw ET₀s: {et0s}")
-
-            current_temp_f = round(np.mean(temps) * 9/5 + 32, 1) if temps else 72.5
-            avg_moisture = round(np.mean(moistures) * 100, 2) if moistures else 0.24
-            avg_sunlight = round(np.mean(et0s) * 4, 1) if et0s else 6.0  # approximate sunlight hours
-
-            print(f"🌡️ Temp (F): {current_temp_f}, 🌱 Moisture: {avg_moisture}, ☀️ Sunlight: {avg_sunlight}")
-
-
-
-
-
-        print("📅 Generating new schedule...")
-        schedule = calculate_schedule(area, crop, et0_list)
-
-        if existing.data:
-            print("♻️ Returning latest schedule from Supabase")
-            row = existing.data[0]
-            return jsonify({
-                "schedule": row["schedule"],
-                "summary": row["summary"],
-                "gem_summary": row["gem_summary"],
-                "current_temp_f": current_temp_f,
-                "moisture": avg_moisture,
-                "sunlight": avg_sunlight
-            })
-
-        print("🧠 Generating AI summaries...")
-        summary = generate_summary(crop, lat, lon, schedule)
-        gem_summary = generate_gem_summary(crop, lat, lon, f"Plot {plot_id[:5]}", plot_id)
-
-        supabase.table("plot_schedules").upsert({
-            "plot_id": plot_id,
-            "schedule": schedule,
-            "summary": summary,
-            "gem_summary": gem_summary
-        }, on_conflict=["plot_id"]).execute()
-
+    if existing.data:
+        row = existing.data[0]
         return jsonify({
-            "schedule": schedule,
-            "summary": summary,
-            "gem_summary": gem_summary,
+            "schedule": row["schedule"],
+            "summary": row["summary"],
+            "gem_summary": row["gem_summary"],
             "current_temp_f": current_temp_f,
             "moisture": avg_moisture,
             "sunlight": avg_sunlight
         })
 
-    except Exception as e:
-        print("❌ Error in /get_plan:", e)
-        return jsonify({"error": str(e)}), 500
+    summary = generate_summary(crop, lat, lon, schedule)
+    gem_summary = generate_gem_summary(crop, lat, lon, f"Plot {plot_id[:5]}", plot_id)
 
+    supabase.table("plot_schedules").upsert({
+        "plot_id": plot_id,
+        "schedule": schedule,
+        "summary": summary,
+        "gem_summary": gem_summary
+    }, on_conflict=["plot_id"]).execute()
+
+    return jsonify({
+        "schedule": schedule,
+        "summary": summary,
+        "gem_summary": gem_summary,
+        "current_temp_f": current_temp_f,
+        "moisture": avg_moisture,
+        "sunlight": avg_sunlight
+    })
 
 @app.route("/add_plot", methods=["POST"])
 def add_plot():
     data = request.get_json()
-    try:
-        response = supabase.table("plots").insert(data).execute()
-        return jsonify(response.data[0] if response.data else {"message": "Added"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    res = supabase.table("plots").insert(data).execute()
+    return jsonify(res.data[0] if res.data else {"message": "Added"}), 200
 
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
     user_id = request.args.get("user_id")
-    try:
-        res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
-        return jsonify(res.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+    return jsonify(res.data), 200
 
 @app.route("/revert_schedule", methods=["POST"])
 def revert_schedule():
     data = request.get_json()
     plot_id = data.get("plot_id")
-    try:
-        logs = supabase.table("farmerAI_chatlog") \
-            .select("original_schedule") \
-            .eq("plot_id", plot_id) \
-            .order("created_at", desc=True) \
-            .limit(1).execute()
-
-        if not logs.data or not logs.data[0].get("original_schedule"):
-            return jsonify({"error": "No previous schedule found"}), 404
-
-        original = logs.data[0]["original_schedule"]
-
-        supabase.table("plot_schedules").update({
-            "schedule": original
-        }).eq("plot_id", plot_id).execute()
-
-        return jsonify({"success": True})
-    except Exception as e:
-        print("❌ Error reverting:", e)
-        return jsonify({"error": str(e)}), 500
+    logs = supabase.table("farmerAI_chatlog").select("original_schedule") \
+        .eq("plot_id", plot_id).order("created_at", desc=True).limit(1).execute()
+    if not logs.data or not logs.data[0].get("original_schedule"):
+        return jsonify({"error": "No previous schedule found"}), 404
+    supabase.table("plot_schedules").update({
+        "schedule": logs.data[0]["original_schedule"]
+    }).eq("plot_id", plot_id).execute()
+    return jsonify({"success": True})
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    try:
-        data = request.get_json()
-        prompt = data.get("prompt")
-        crop = data.get("crop")
-        zip_code = data.get("zip_code")
-        plot_name = data.get("plotName")
-        plot_id = data.get("plotId")
-        weather = data.get("weather", {})
-        chat_session_id = data.get("chat_session_id")
+    data = request.get_json()
+    prompt, crop, zip_code = data.get("prompt"), data.get("crop"), data.get("zip_code")
+    plot_name, plot_id, weather = data.get("plotName"), data.get("plotId"), data.get("weather", {})
+    chat_session_id = data.get("chat_session_id")
 
-        schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
-        if not schedule_res.data:
-            print("❌ No schedule found for plot_id:", plot_id)
-            return jsonify({"success": False, "error": "No schedule to modify."}), 404
+    schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
+    if not schedule_res.data:
+        return jsonify({"success": False, "error": "No schedule to modify."}), 404
 
-        schedule_row = schedule_res.data[0]
-        original_schedule = schedule_row.get("schedule", [])
-        user_id = schedule_row.get("user_id")
+    schedule_row = schedule_res.data[0]
+    original_schedule = schedule_row.get("schedule", [])
+    user_id = schedule_row.get("user_id")
+    lat, lon = data.get("lat"), data.get("lon")
 
-        lat = data.get("lat")
-        lon = data.get("lon")
+    result = process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather)
+    reply = result["reply"]
 
-        result = process_chat_command(
-            prompt, crop, lat, lon, plot_name, plot_id, weather
-        )
-        reply = result["reply"]
+    refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
+    updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
 
-        refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
-        updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
+    supabase.table("farmerAI_chatlog").insert({
+        "id": str(uuid4()),
+        "plot_id": plot_id,
+        "user_id": user_id,
+        "prompt": prompt,
+        "reply": reply,
+        "created_at": datetime.utcnow().isoformat(),
+        "original_schedule": original_schedule,
+        "modified_schedule": updated_schedule,
+        "reverted": False,
+        "is_user_message": True,
+        "role": "user",
+        "message_index": 0,
+        "context_summary": "",
+        "chat_session_id": chat_session_id,
+        "edited": False
+    }).execute()
 
-        if json.dumps(updated_schedule, sort_keys=True) != json.dumps(original_schedule, sort_keys=True):
-            print("🛠️ Updated schedule stored and detected")
+    return jsonify({"success": True, "reply": reply})
 
-        supabase.table("farmerAI_chatlog").insert({
-            "id": str(uuid4()),
-            "plot_id": plot_id,
-            "user_id": user_id,
-            "prompt": prompt,
-            "reply": reply,
-            "created_at": datetime.utcnow().isoformat(),
-            "original_schedule": original_schedule,
-            "modified_schedule": updated_schedule,
-            "reverted": False,
-            "is_user_message": True,
-            "role": "user",
-            "message_index": 0,
-            "context_summary": "",
-            "chat_session_id": chat_session_id,
-            "edited": False
-        }).execute()
-
-        return jsonify({"success": True, "reply": reply})
-
-    except Exception as e:
-        print("❌ Error in /chat:", e)
-        return jsonify({"success": False, "error": str(e)}), 500
-    
 @app.route("/get_chat_log", methods=["POST"])
 def get_chat_log():
     data = request.get_json()
-    user_id = data.get("user_id")
-    plot_id = data.get("plot_id")
-
-    if not user_id or not plot_id:
-        return jsonify({"error": "Missing user_id or plot_id"}), 400
-
-    try:
-        res = supabase.table("farmerAI_chatlog") \
-            .select("prompt, reply, created_at, is_user_message") \
-            .eq("user_id", user_id) \
-            .eq("plot_id", plot_id) \
-            .eq("chat_session_id", data.get("chat_session_id")) \
-            .order("created_at", desc=False) \
-            .execute()
-
-        chat_history = []
-        for row in res.data:
-            if row["is_user_message"]:
-                chat_history.append({"sender": "user", "text": row["prompt"]})
-                chat_history.append({"sender": "bot", "text": row["reply"]})
-
-        return jsonify(chat_history), 200
-
-    except Exception as e:
-        print("❌ Error in /get_chat_log:", e)
-        return jsonify({"error": str(e)}), 500
-
-
+    user_id, plot_id = data.get("user_id"), data.get("plot_id")
+    res = supabase.table("farmerAI_chatlog") \
+        .select("prompt, reply, created_at, is_user_message") \
+        .eq("user_id", user_id) \
+        .eq("plot_id", plot_id) \
+        .eq("chat_session_id", data.get("chat_session_id")) \
+        .order("created_at", desc=False).execute()
+    chat_history = []
+    for row in res.data:
+        if row["is_user_message"]:
+            chat_history.append({"sender": "user", "text": row["prompt"]})
+            chat_history.append({"sender": "bot", "text": row["reply"]})
+    return jsonify(chat_history), 200
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)

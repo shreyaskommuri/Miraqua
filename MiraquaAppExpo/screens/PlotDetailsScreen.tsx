@@ -1,4 +1,3 @@
-// screens/PlotDetailsScreen.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -18,6 +17,7 @@ import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
+import { parse, format } from 'date-fns';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
@@ -90,46 +90,68 @@ const PlotDetailsScreen = () => {
   );
 
   const renderCalendarGrid = () => {
-    const today = new Date();
-    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const cells = Array.from({ length: 14 }).map((_, i) => {
-      const day = schedule[i];
-      const cellDate = new Date();
-      cellDate.setDate(today.getDate() + i);
-      const dayNum = cellDate.getDate();
+    const getDayLabel = (dateStr: string) => {
+      try {
+        const parsed = parse(dateStr, 'MM/dd/yy', new Date());
+        return format(parsed, 'EEE');
+      } catch {
+        return '--';
+      }
+    };
 
-      return (
-        <TouchableOpacity
-          key={i}
-          style={styles.calendarCell}
-          onPress={() =>
-            navigation.navigate('SpecificDay', {
-              plotId: plot.id,
-              dayData: day,
-              dayIndex: i,
-            })
-          }
-        >
-          <Text style={{ fontSize: 10, alignSelf: 'flex-start', paddingLeft: 4 }}>{dayNum}</Text>
-          {day ? (
-            <>
-              <Text style={{ fontSize: 10 }}>{day.date}</Text>
-              <Text>{day?.liters ?? '--'}L @ {day?.optimal_time ?? '--'}</Text>
-            </>
-          ) : null}
-        </TouchableOpacity>
-      );
-    });
+    const getDayNum = (dateStr: string) => {
+      try {
+        const parsed = parse(dateStr, 'MM/dd/yy', new Date());
+        return parsed.getDate();
+      } catch {
+        return '--';
+      }
+    };
+
+    const paddedSchedule = [...schedule];
+    while (paddedSchedule.length < 14) paddedSchedule.push(null);
+
+    const week1 = paddedSchedule.slice(0, 7);
+    const week2 = paddedSchedule.slice(7, 14);
+
+    const renderRow = (week: any[]) => (
+      <View style={styles.calendarRow}>
+        {week.map((day, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.calendarCell}
+            onPress={() =>
+              day &&
+              navigation.navigate('SpecificDay', {
+                plotId: plot.id,
+                dayData: day,
+                dayIndex: i,
+              })
+            }
+          >
+            <Text style={styles.cellDate}>{day ? getDayNum(day.date) : ''}</Text>
+            {day ? (
+              <>
+                <Text style={styles.cellLiters}>{day.liters}L</Text>
+                <Text style={styles.cellTime}>{day.optimal_time}</Text>
+              </>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+
+    const dayHeaders = week1.map((day, i) => (
+      <Text key={i} style={styles.dayHeader}>
+        {day ? getDayLabel(day.date) : ''}
+      </Text>
+    ));
 
     return (
       <View style={styles.calendarWrapper}>
-        <View style={styles.calendarRow}>
-          {daysOfWeek.map((day, idx) => (
-            <Text key={idx} style={styles.dayHeader}>{day}</Text>
-          ))}
-        </View>
-        <View style={styles.calendarRow}>{cells.slice(0, 7)}</View>
-        <View style={styles.calendarRow}>{cells.slice(7)}</View>
+        <View style={styles.calendarRow}>{dayHeaders}</View>
+        {renderRow(week1)}
+        {renderRow(week2)}
       </View>
     );
   };
@@ -243,7 +265,6 @@ const styles = StyleSheet.create({
   scheduleTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4, color: '#1aa179' },
   calendarWrapper: { gap: 4 },
   calendarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#777' },
   calendarCell: {
     flex: 1,
     aspectRatio: 1,
@@ -252,15 +273,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRightWidth: 0.5,
-    borderBottomWidth: 0.5,
+    position: 'relative',
   },
-  cellText: { fontSize: 13, color: '#1aa179', textAlign: 'center' },
+  dayHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#777',
+  },
+  cellDate: {
+    fontSize: 10,
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    color: '#333',
+  },
+  cellLiters: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1aa179',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  cellTime: {
+    fontSize: 12,
+    color: '#555',
+    textAlign: 'center',
+    marginTop: 2,
+  },
   summaryBox: { backgroundColor: '#f3f9f6', padding: 16, borderRadius: 12, marginBottom: 20 },
   summaryTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8, color: '#1aa179' },
   summaryText: { fontSize: 14, color: '#555' },
   farmerButton: { backgroundColor: '#1aa179', paddingVertical: 14, alignItems: 'center', borderRadius: 30, marginBottom: 40 },
   farmerText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  plantBox: { alignItems: 'center', paddingVertical: 24 },
-  plantNote: { fontSize: 14, color: '#888' },
 });
