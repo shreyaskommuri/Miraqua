@@ -9,15 +9,16 @@ import { addPlot } from '../api/api';
 type AddPlotRouteProp = RouteProp<MainTabParamList, 'Add Plot'>;
 
 const AddPlotScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<any>>(); // can use composite types if needed
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<AddPlotRouteProp>();
 
-  const [zipCode, setZipCode] = useState('');
+  const [name, setName] = useState('');
   const [crop, setCrop] = useState('');
   const [area, setArea] = useState('');
-  const [name, setName] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lon, setLon] = useState<number | null>(null);
+  const [zip, setZip] = useState('');
+  const [flexType, setFlexType] = useState<'daily' | 'monthly'>('daily');
 
   useEffect(() => {
     if (route.params?.lat && route.params?.lon) {
@@ -25,6 +26,24 @@ const AddPlotScreen = () => {
       setLon(route.params.lon);
     }
   }, [route.params]);
+
+  useEffect(() => {
+    const fetchZip = async () => {
+      if (lat !== null && lon !== null) {
+        try {
+          const res = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+          );
+          const data = await res.json();
+          const postalCode = data?.postcode || '';
+          setZip(postalCode);
+        } catch (error) {
+          console.error('Failed to fetch ZIP code:', error);
+        }
+      }
+    };
+    fetchZip();
+  }, [lat, lon]);
 
   const handleAddPlot = async () => {
     const { data: userData, error } = await supabase.auth.getUser();
@@ -40,12 +59,13 @@ const AddPlotScreen = () => {
 
     const plotData = {
       user_id: userData.user.id,
-      zip_code: zipCode,
       crop,
       area: parseFloat(area),
       name,
       lat,
       lon,
+      flex_type: flexType,
+      zip_code: zip,
     };
 
     const response = await addPlot(plotData);
@@ -65,17 +85,28 @@ const AddPlotScreen = () => {
       <Text style={styles.label}>Crop Type</Text>
       <TextInput style={styles.input} value={crop} onChangeText={setCrop} placeholder="e.g., Tomato" />
 
-      <Text style={styles.label}>ZIP Code</Text>
-      <TextInput style={styles.input} value={zipCode} onChangeText={setZipCode} placeholder="e.g., 94582" keyboardType="numeric" />
-
       <Text style={styles.label}>Area (sq m)</Text>
       <TextInput style={styles.input} value={area} onChangeText={setArea} placeholder="e.g., 1000" keyboardType="numeric" />
+
+      <Text style={styles.label}>Flex Type</Text>
+      <View style={styles.flexTypeContainer}>
+        <Button
+          title={flexType === 'daily' ? '🌿 Daily (moisture)' : '📅 Monthly (ET-based)'}
+          onPress={() => setFlexType(flexType === 'daily' ? 'monthly' : 'daily')}
+        />
+      </View>
 
       <Text style={styles.label}>Location</Text>
       <Button
         title={lat && lon ? `📍 Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}` : 'Pick Location on Map'}
         onPress={() => navigation.navigate('PickLocation')}
       />
+
+      {zip ? (
+        <Text style={styles.label}>📫 Auto ZIP: {zip}</Text>
+      ) : (
+        <Text style={styles.label}>📫 Detecting ZIP...</Text>
+      )}
 
       <View style={{ marginTop: 30 }}>
         <Button title="Add Plot" onPress={handleAddPlot} />
@@ -103,5 +134,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginTop: 8,
+  },
+  flexTypeContainer: {
+    marginTop: 8,
+    marginBottom: 8,
   },
 });

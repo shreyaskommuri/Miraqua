@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  Pressable,
+  Alert,
 } from 'react-native';
 import {
   useRoute,
@@ -18,6 +21,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 import { parse, format } from 'date-fns';
+import { waterNow } from '../api/api';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
@@ -30,10 +34,12 @@ const PlotDetailsScreen = () => {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [avgMoisture, setAvgMoisture] = useState('--');
   const [avgTemp, setAvgTemp] = useState('--');
   const [avgSunlight, setAvgSunlight] = useState('--');
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -48,6 +54,7 @@ const PlotDetailsScreen = () => {
           crop: plot.crop.toLowerCase(),
           area: plot.area || 100,
           zip_code: plot.zip_code,
+          flex_type: plot.flex_type || 'daily',
         }),
       });
 
@@ -67,7 +74,6 @@ const PlotDetailsScreen = () => {
       setAvgSunlight(
         typeof json.sunlight === 'number' ? `${json.sunlight.toFixed(0)}%` : '--'
       );
-
     } catch (err) {
       console.error('Error fetching schedule:', err);
       setSummary('Failed to load schedule.');
@@ -88,6 +94,24 @@ const PlotDetailsScreen = () => {
       fetchSchedule();
     }, [plot.id])
   );
+
+  const handleWaterNow = async () => {
+    if (!selectedDuration) return;
+    try {
+      const response = await waterNow(plot.id, selectedDuration);
+      if (response.success) {
+        Alert.alert('✅ Watering started', `${selectedDuration} minutes simulated.`);
+      } else {
+        Alert.alert('Error', response.error || 'Failed to water plot.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Something went wrong.');
+    } finally {
+      setModalVisible(false);
+      setSelectedDuration(null);
+    }
+  };
 
   const renderCalendarGrid = () => {
     const getDayLabel = (dateStr: string) => {
@@ -156,80 +180,101 @@ const PlotDetailsScreen = () => {
     );
   };
 
-  if (loading && schedule.length === 0 && summary === '') {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#1aa179" />
-        <Text style={{ marginTop: 8, color: '#1aa179' }}>Loading plot data...</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.image} />
+    <>
+      <ScrollView style={styles.container}>
+        <View style={styles.image} />
 
-      <View style={styles.headerRow}>
-        <Text style={styles.plotName}>{plot.name}</Text>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaText}>Crop</Text>
-          <Text style={styles.metaValue}>{plot.crop}</Text>
-        </View>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaText}>Coords</Text>
-          <Text style={styles.metaValue}>
-            {plot.lat?.toFixed(2)}, {plot.lon?.toFixed(2)}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.tabRow}>
-        <TouchableOpacity onPress={() => setTab('schedule')}>
-          <Text style={[styles.tabText, tab === 'schedule' && styles.activeTab]}>Schedule</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('details')}>
-          <Text style={[styles.tabText, tab === 'details' && styles.activeTab]}>Details</Text>
-        </TouchableOpacity>
-      </View>
-
-      {tab === 'details' && (
-        <View style={styles.detailGrid}>
-          <DetailRow icon={<Ionicons name="water" size={24} color="#1aa179" />} label="Moisture" value={avgMoisture} />
-          <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value={avgTemp} />
-          <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value={avgSunlight} />
-          <DetailRow icon={<MaterialCommunityIcons name="test-tube" size={24} color="#1aa179" />} label="pH Level" value="6.1" />
-
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>What To Expect</Text>
-            <Text style={styles.summaryText}>{summary || 'Loading forecast summary...'}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.plotName}>{plot.name}</Text>
+          <View style={styles.metaBox}>
+            <Text style={styles.metaText}>Crop</Text>
+            <Text style={styles.metaValue}>{plot.crop}</Text>
+          </View>
+          <View style={styles.metaBox}>
+            <Text style={styles.metaText}>Coords</Text>
+            <Text style={styles.metaValue}>
+              {plot.lat?.toFixed(2)}, {plot.lon?.toFixed(2)}
+            </Text>
           </View>
         </View>
-      )}
 
-      {tab === 'schedule' && (
-        <View style={styles.scheduleBox}>
-          <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
-          <TouchableOpacity onPress={fetchSchedule}>
-            <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
+        <View style={styles.tabRow}>
+          <TouchableOpacity onPress={() => setTab('schedule')}>
+            <Text style={[styles.tabText, tab === 'schedule' && styles.activeTab]}>Schedule</Text>
           </TouchableOpacity>
-          {loading ? (
-            <ActivityIndicator size="small" color="#1aa179" />
-          ) : (
-            renderCalendarGrid()
-          )}
+          <TouchableOpacity onPress={() => setTab('details')}>
+            <Text style={[styles.tabText, tab === 'details' && styles.activeTab]}>Details</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <TouchableOpacity
-        style={styles.farmerButton}
-        onPress={() => {
-          console.log("🧭 Navigating to FarmerChat with plot:", plot);
-          navigation.navigate('FarmerChat', { plot });
-        }}
-      >
-        <Text style={styles.farmerText}>Farmer</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {tab === 'details' && (
+          <View style={styles.detailGrid}>
+            <DetailRow icon={<Ionicons name="water" size={24} color="#1aa179" />} label="Moisture" value={avgMoisture} />
+            <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value={avgTemp} />
+            <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value={avgSunlight} />
+            <DetailRow icon={<MaterialCommunityIcons name="test-tube" size={24} color="#1aa179" />} label="pH Level" value="6.1" />
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryTitle}>What To Expect</Text>
+              <Text style={styles.summaryText}>{summary || 'Loading forecast summary...'}</Text>
+            </View>
+          </View>
+        )}
+
+        {tab === 'schedule' && (
+          <View style={styles.scheduleBox}>
+            <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
+            <TouchableOpacity onPress={fetchSchedule}>
+              <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
+            </TouchableOpacity>
+            {loading ? (
+              <ActivityIndicator size="small" color="#1aa179" />
+            ) : (
+              renderCalendarGrid()
+            )}
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.farmerButton, { marginBottom: 12 }]}
+          onPress={() => {
+            navigation.navigate('FarmerChat', { plot });
+          }}
+        >
+          <Text style={styles.farmerText}>Farmer</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.farmerButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.farmerText}>💧 Water Now</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ margin: 20, padding: 20, backgroundColor: 'white', borderRadius: 10 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>How long to water?</Text>
+            {[5, 10, 15].map((min) => (
+              <Pressable
+                key={min}
+                style={{ paddingVertical: 10 }}
+                onPress={() => {
+                  setSelectedDuration(min);
+                  handleWaterNow();
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>{min} minutes</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setModalVisible(false)} style={{ marginTop: 10 }}>
+              <Text style={{ textAlign: 'center', color: '#1aa179' }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -305,6 +350,6 @@ const styles = StyleSheet.create({
   summaryBox: { backgroundColor: '#f3f9f6', padding: 16, borderRadius: 12, marginBottom: 20 },
   summaryTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8, color: '#1aa179' },
   summaryText: { fontSize: 14, color: '#555' },
-  farmerButton: { backgroundColor: '#1aa179', paddingVertical: 14, alignItems: 'center', borderRadius: 30, marginBottom: 40 },
+  farmerButton: { backgroundColor: '#1aa179', paddingVertical: 14, alignItems: 'center', borderRadius: 30, marginBottom: 12 },
   farmerText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

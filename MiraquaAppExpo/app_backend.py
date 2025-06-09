@@ -41,6 +41,40 @@ def get_lat_lon(zip_code):
     res = requests.get(url)
     data = res.json()
     return float(data['places'][0]['latitude']), float(data['places'][0]['longitude'])
+# (Everything up to existing imports and env loading remains the same)
+
+# Add seasonal multiplier function
+def get_seasonal_multiplier(month):
+    if month in [6, 7, 8]:    # Summer
+        return 1.15
+    elif month in [12, 1, 2]: # Winter
+        return 0.85
+    else:
+        return 1.0
+
+# Add skip check per day
+def should_skip_day(hourly_data):
+    rain_chance = max([h.get("pop", 0) for h in hourly_data] or [0])
+    max_wind = max([h.get("wind", {}).get("speed", 0) for h in hourly_data] or [0])
+    min_temp = min([h.get("main", {}).get("temp", 999) for h in hourly_data] or [999])
+    return rain_chance > 0.5 or max_wind > 20 or min_temp < 37
+
+# Monthly (flat) schedule calculation
+def calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon):
+    kc = CROP_KC.get(crop.lower(), 0.95)
+    daily_et0 = 4.5  # mm/day assumed avg. Can be improved using lat/lon
+    liters_per_day = round(daily_et0 * kc * area * 0.1, 2)
+    today = datetime.utcnow().date()
+    schedule = []
+    for i in range(7):
+        date_str = (today + timedelta(days=i)).strftime("%m/%d/%y")
+        hourly_data = hourly_blocks[i] if i < len(hourly_blocks) else []
+        if should_skip_day(hourly_data):
+            schedule.append({"date": date_str, "liters": 0.0, "optimal_time": "Skipped"})
+        else:
+            optimal_time = find_optimal_time(hourly_data)
+            schedule.append({"date": date_str, "liters": liters_per_day, "optimal_time": optimal_time})
+    return schedule
 
 def find_optimal_time(hourly_list):
     best_score = float("inf")
@@ -83,6 +117,7 @@ def get_plan():
     zip_code = data.get("zip_code")
     area = data.get("area")
     plot_id = data.get("plot_id")
+    flex_type = data.get("flex_type", "daily")  # new optional field, defaults to "daily"
 
     if not all([crop, zip_code, area, plot_id]):
         return jsonify({"error": "Missing required data"}), 400
@@ -123,8 +158,19 @@ def get_plan():
         hourly_blocks = [[] for _ in range(7)]
         current_temp_f, avg_moisture, avg_sunlight = 72.0, 25.0, 65.0
 
-    print("📅 Creating moisture-aware schedule...")
-    schedule = calculate_schedule(area, crop, soil_forecast, hourly_blocks)
+    # ✳️ Choose flex mode
+    print(f"📅 Creating schedule: flex_type = {flex_type}")
+    if flex_type == "monthly":
+        schedule = calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon)
+    else:
+        raw_schedule = calculate_schedule(area, crop, soil_forecast, hourly_blocks)
+        seasonal_factor = get_seasonal_multiplier(now_local.month)
+        schedule = [
+            {
+                **day,
+                "liters": round(day["liters"] * seasonal_factor, 2) if day["liters"] > 0 else 0.0
+            } for day in raw_schedule
+        ]
 
     if existing.data:
         row = existing.data[0]
@@ -156,6 +202,7 @@ def get_plan():
         "sunlight": avg_sunlight
     })
 
+
 @app.route("/add_plot", methods=["POST"])
 def add_plot():
     data = request.get_json()
@@ -180,6 +227,31 @@ def revert_schedule():
         "schedule": logs.data[0]["original_schedule"]
     }).eq("plot_id", plot_id).execute()
     return jsonify({"success": True})
+
+@app.route("/water_now", methods=["POST"])
+def water_now():
+    data = request.get_json()
+    plot_id = data.get("plot_id")
+    duration_minutes = data.get("duration_minutes")
+
+    if not plot_id or not duration_minutes:
+        return jsonify({"success": False, "error": "Missing data"}), 400
+
+    try:
+        supabase.table("watering_log").insert({
+            "id": str(uuid4()),
+            "plot_id": plot_id,
+            "duration_minutes": duration_minutes,
+            "watered_at": datetime.utcnow().isoformat()
+        }).execute()
+
+        print(f"✅ Simulated watering plot {plot_id} for {duration_minutes} minutes.")
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print(f"❌ Failed to log watering: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
