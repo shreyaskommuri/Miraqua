@@ -39,26 +39,28 @@ export const getPlots = async (userId: string) => {
   }
 };
 
-export const getPlan = async (
-  crop: string,
-  area: number,
-  plot_id: string,
-  lat: number,
-  lon: number
-) => {
+export const getPlan = async (plot_id: string) => {
   try {
     const response = await fetch(`${BASE_URL}/get_plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ crop, area, plot_id, lat, lon }),
+      body: JSON.stringify({ plot_id }),
     });
+
+    if (!response.ok) {
+      const text = await response.text(); // This will contain HTML if it's an error
+      throw new Error(`Backend error: ${response.status} - ${text}`);
+    }
+
     return await response.json();
-  } catch (error: any) {
-    return { error: true, reason: error.message };
+  } catch (err: any) {
+    console.error("❌ Error fetching schedule:", err);
+    return { error: true, message: err.message };
   }
 };
 
-// ✅ NEW: Water Now endpoint
+
+// ✅ Water Now endpoint
 export const waterNow = async (plot_id: string, duration_minutes: number) => {
   try {
     const response = await fetch(`${BASE_URL}/water_now`, {
@@ -71,3 +73,32 @@ export const waterNow = async (plot_id: string, duration_minutes: number) => {
     return { success: false, error: error.message };
   }
 };
+
+// ✅ Update Plot Settings endpoint
+export const updatePlotSettings = async (plot_id: string, updates: any) => {
+  try {
+    const response = await fetch(`${BASE_URL}/update_plot_settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plot_id, updates }),
+    });
+    return await response.json();
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const fetchPlotById = async (plotId: string) => {
+  try {
+    console.log("🛰️ Sending request to:", `${BASE_URL}/get_plot_by_id?plot_id=${plotId}`);
+    const res = await fetch(`${BASE_URL}/get_plot_by_id?plot_id=${plotId}`);
+    const json = await res.json();
+    console.log("[✅] Plot fetched:", json);
+    return json;
+  } catch (err) {
+    console.error("❌ Failed to fetch plot", err);
+    return null;
+  }
+};
+
+

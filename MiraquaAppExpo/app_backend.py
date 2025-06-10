@@ -10,6 +10,11 @@ from supabase import create_client, Client
 from dateutil import tz
 from timezonefinder import TimezoneFinder
 import resource
+from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time
+
+
+
+
 
 # Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -60,84 +65,58 @@ def should_skip_day(hourly_data):
     return rain_chance > 0.5 or max_wind > 20 or min_temp < 37
 
 # Monthly (flat) schedule calculation
-def calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon):
-    kc = CROP_KC.get(crop.lower(), 0.95)
-    daily_et0 = 4.5  # mm/day assumed avg. Can be improved using lat/lon
-    liters_per_day = round(daily_et0 * kc * area * 0.1, 2)
-    today = datetime.utcnow().date()
-    schedule = []
-    for i in range(7):
-        date_str = (today + timedelta(days=i)).strftime("%m/%d/%y")
-        hourly_data = hourly_blocks[i] if i < len(hourly_blocks) else []
-        if should_skip_day(hourly_data):
-            schedule.append({"date": date_str, "liters": 0.0, "optimal_time": "Skipped"})
-        else:
-            optimal_time = find_optimal_time(hourly_data)
-            schedule.append({"date": date_str, "liters": liters_per_day, "optimal_time": optimal_time})
-    return schedule
 
-def find_optimal_time(hourly_list):
-    best_score = float("inf")
-    best_hour = 6
-    for h in hourly_list:
-        temp = h.get("main", {}).get("temp", 72)
-        wind = h.get("wind", {}).get("speed", 2)
-        clouds = h.get("clouds", {}).get("all", 40)
-        rain_chance = h.get("pop", 0)
-        hour = datetime.fromtimestamp(h["dt"]).hour
-        if rain_chance > 0.3: continue
-        sunlight = 100 - clouds
-        score = temp * 0.5 + sunlight * 0.3 + wind * 0.2
-        if 4 <= hour <= 8: score *= 0.8
-        if score < best_score:
-            best_score, best_hour = score, hour
-    return f"{best_hour:02d}:00 AM"
 
-def calculate_schedule(area, crop, soil_forecast, hourly_blocks, root_depth_mm=300):
-    today = datetime.utcnow().date()
-    threshold = 0.30  # Moisture below which watering is needed
-    target = 0.45     # Moisture we want to reach
-    schedule = []
 
-    for i, soil in enumerate(soil_forecast):
-        date_str = (today + timedelta(days=i)).strftime("%m/%d/%y")
-        if soil >= threshold:
-            schedule.append({"date": date_str, "liters": 0.0, "optimal_time": "N/A"})
-            continue
-        mm_needed = (target - soil) * root_depth_mm
-        liters = round(mm_needed * area * 0.1, 2)
-        optimal_time = find_optimal_time(hourly_blocks[i]) if i < len(hourly_blocks) else "06:00 AM"
-        schedule.append({"date": date_str, "liters": liters, "optimal_time": optimal_time})
-    return schedule
+@app.route("/get_plot_by_id", methods=["GET"])
+def get_plot_by_id():
+    plot_id = request.args.get("plot_id")
+    res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+    return jsonify(res.data), 200
+
+
+
 
 @app.route("/get_plan", methods=["POST"])
 def get_plan():
     data = request.get_json()
-    crop = data.get("crop")
-    zip_code = data.get("zip_code")
-    area = data.get("area")
     plot_id = data.get("plot_id")
-    flex_type = data.get("flex_type", "daily")  # new optional field, defaults to "daily"
 
-    if not all([crop, zip_code, area, plot_id]):
-        return jsonify({"error": "Missing required data"}), 400
+    if not plot_id:
+        return jsonify({"error": "Missing plot_id"}), 400
 
-    existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
-    lat, lon = get_lat_lon(zip_code)
+    # 🔁 Fetch plot
+    result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+    plot = result.data
+    if not plot:
+        return jsonify({"error": "Plot not found"}), 404
 
+    crop = plot["crop"]
+    area = plot["area"]
+    zip_code = plot["zip_code"]
+    flex_type = plot.get("flex_type", "daily")
+    age = plot.get("age_at_entry", 0)
+    lat, lon = plot["lat"], plot["lon"]
+
+    # 🌍 Get local time
     tf = TimezoneFinder()
     timezone_str = tf.timezone_at(lat=lat, lng=lon)
     local_zone = tz.gettz(timezone_str)
     now_local = datetime.now(local_zone)
 
-    hourly_blocks = [[] for _ in range(7)]
+    # 🌤 Fetch weather
     soil_forecast = []
+    hourly_blocks = [[] for _ in range(7)]
 
     if RENDER:
         res = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
-            "lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY, "units": "imperial"
+            "lat": lat,
+            "lon": lon,
+            "appid": OPENWEATHER_API_KEY,
+            "units": "imperial"
         })
         forecast_data = res.json()
+
         for entry in forecast_data["list"]:
             dt = datetime.utcfromtimestamp(entry["dt"])
             i = (dt.date() - datetime.utcnow().date()).days
@@ -158,34 +137,30 @@ def get_plan():
         hourly_blocks = [[] for _ in range(7)]
         current_temp_f, avg_moisture, avg_sunlight = 72.0, 25.0, 65.0
 
-    # ✳️ Choose flex mode
-    print(f"📅 Creating schedule: flex_type = {flex_type}")
+    # 🧠 Generate schedule — NO seasonal adjustment!
+    from utils.forecast_utils import calculate_schedule, calculate_monthly_schedule
     if flex_type == "monthly":
         schedule = calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon)
     else:
-        raw_schedule = calculate_schedule(area, crop, soil_forecast, hourly_blocks)
-        seasonal_factor = get_seasonal_multiplier(now_local.month)
-        schedule = [
-            {
-                **day,
-                "liters": round(day["liters"] * seasonal_factor, 2) if day["liters"] > 0 else 0.0
-            } for day in raw_schedule
-        ]
+        schedule = calculate_schedule(
+            crop=crop,
+            area=area,
+            age=age,
+            lat=lat,
+            lon=lon,
+            flex_type=flex_type,
+            hourly_blocks=hourly_blocks,
+            soil_forecast=soil_forecast
+        )
 
-    if existing.data:
-        row = existing.data[0]
-        return jsonify({
-            "schedule": row["schedule"],
-            "summary": row["summary"],
-            "gem_summary": row["gem_summary"],
-            "current_temp_f": current_temp_f,
-            "moisture": avg_moisture,
-            "sunlight": avg_sunlight
-        })
+    print("[DEBUG] FINAL Schedule to save:", schedule)
 
+    # 🧠 AI summaries
+    from farmer_ai import generate_summary, generate_gem_summary
     summary = generate_summary(crop, lat, lon, schedule)
     gem_summary = generate_gem_summary(crop, lat, lon, f"Plot {plot_id[:5]}", plot_id)
 
+    # 💾 Save to Supabase
     supabase.table("plot_schedules").upsert({
         "plot_id": plot_id,
         "schedule": schedule,
@@ -201,6 +176,7 @@ def get_plan():
         "moisture": avg_moisture,
         "sunlight": avg_sunlight
     })
+
 
 
 @app.route("/add_plot", methods=["POST"])
@@ -227,6 +203,89 @@ def revert_schedule():
         "schedule": logs.data[0]["original_schedule"]
     }).eq("plot_id", plot_id).execute()
     return jsonify({"success": True})
+
+@app.route('/update_plot_settings', methods=['POST'])
+def update_plot_settings():
+    data = request.get_json()
+    plot_id = data.get("plot_id")
+    updates = data.get("updates", {})
+
+    if not plot_id:
+        return jsonify({"success": False, "error": "Missing plot_id"}), 400
+
+    try:
+        # Step 1: Update the plot
+        supabase.table("plots").update(updates).eq("id", plot_id).execute()
+
+        # Step 2: Re-fetch updated plot
+        result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+        plot = result.data
+        if not plot:
+            return jsonify({"success": False, "error": "Plot not found"}), 404
+
+        crop = plot["crop"]
+        area = plot["area"]
+        age = plot["age_at_entry"]
+        lat = plot["lat"]
+        lon = plot["lon"]
+        flex_type = plot.get("flex_type", "daily")
+
+        # 🧠 Use same weather logic as /get_plan
+        soil_forecast = []
+        hourly_blocks = [[] for _ in range(7)]
+
+        if RENDER:
+            res = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
+                "lat": lat,
+                "lon": lon,
+                "appid": OPENWEATHER_API_KEY,
+                "units": "imperial"
+            })
+            forecast_data = res.json()
+
+            for entry in forecast_data["list"]:
+                dt = datetime.utcfromtimestamp(entry["dt"])
+                i = (dt.date() - datetime.utcnow().date()).days
+                if 0 <= i < 7:
+                    hourly_blocks[i].append(entry)
+
+            for i in range(7):
+                rain_probs = [e.get("pop", 0) for e in hourly_blocks[i]]
+                rain_factor = sum(rain_probs) / len(rain_probs) if rain_probs else 0
+                soil_estimate = max(0.15, min(0.45, 0.35 - (i * 0.03) + rain_factor * 0.2))
+                soil_forecast.append(round(soil_estimate, 3))
+        else:
+            return jsonify({"success": False, "error": "Weather fetch not supported outside Render"}), 500
+
+        # ✅ Call calculate_schedule with real data
+        schedule = calculate_schedule(
+            crop=crop,
+            area=area,
+            age=age,
+            lat=lat,
+            lon=lon,
+            flex_type=flex_type,
+            hourly_blocks=hourly_blocks,
+            soil_forecast=soil_forecast
+        )
+
+        # Step 4: Upsert into plot_schedules
+        existing = supabase.table("plot_schedules").select("id").eq("plot_id", plot_id).limit(1).execute()
+        row_id = existing.data[0]["id"] if existing.data else str(uuid4())
+
+        supabase.table("plot_schedules").upsert({
+            "id": row_id,
+            "plot_id": plot_id,
+            "schedule": schedule
+        }, on_conflict=["plot_id"]).execute()
+
+        return jsonify({ "success": True })
+
+    except Exception as e:
+        print(f"❌ Error in /update_plot_settings: {e}")
+        return jsonify({ "success": False, "error": str(e) }), 500
+
+
 
 @app.route("/water_now", methods=["POST"])
 def water_now():

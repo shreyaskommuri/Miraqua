@@ -6,40 +6,43 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Modal,
-  Pressable,
-  Alert,
+  Switch,
 } from 'react-native';
 import {
   useRoute,
   useNavigation,
   RouteProp,
   useFocusEffect,
+  CompositeNavigationProp,
 } from '@react-navigation/native';
-import type { RootStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
+import type { HomeStackParamList } from '../navigation/HomeStackNavigator';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
-import { parse, format } from 'date-fns';
-import { waterNow } from '../api/api';
+import { parse, format, differenceInYears } from 'date-fns';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
+type NavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<HomeStackParamList, 'PlotDetails'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
 const PlotDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlotDetails'>>();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NavigationProp>();
   const { plot } = route.params;
 
   const [tab, setTab] = useState<'schedule' | 'details'>('details');
   const [schedule, setSchedule] = useState<any[]>([]);
+  const [originalSchedule, setOriginalSchedule] = useState<any[]>([]);
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [avgMoisture, setAvgMoisture] = useState('--');
   const [avgTemp, setAvgTemp] = useState('--');
   const [avgSunlight, setAvgSunlight] = useState('--');
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
+  const [showModified, setShowModified] = useState(true);
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -60,7 +63,10 @@ const PlotDetailsScreen = () => {
 
       const json = await response.json();
 
-      setSchedule(json.schedule || []);
+      setOriginalSchedule(json.schedule || []);
+      setSchedule(json.schedule || []); 
+
+
       setSummary(json.gem_summary || json.summary || 'No forecast available.');
 
       setAvgMoisture(
@@ -95,25 +101,21 @@ const PlotDetailsScreen = () => {
     }, [plot.id])
   );
 
-  const handleWaterNow = async () => {
-    if (!selectedDuration) return;
+  const getCropAgeDisplay = () => {
+    if (!plot.planting_date || typeof plot.age_at_entry !== 'number') return '--';
     try {
-      const response = await waterNow(plot.id, selectedDuration);
-      if (response.success) {
-        Alert.alert('✅ Watering started', `${selectedDuration} minutes simulated.`);
-      } else {
-        Alert.alert('Error', response.error || 'Failed to water plot.');
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Something went wrong.');
-    } finally {
-      setModalVisible(false);
-      setSelectedDuration(null);
+      const plantingDate = parse(plot.planting_date, 'yyyy-MM-dd', new Date());
+      const yearsSince = differenceInYears(new Date(), plantingDate);
+      const totalAge = plot.age_at_entry + yearsSince;
+      return `${totalAge} years (as of ${format(plantingDate, 'MMM d, yyyy')})`;
+    } catch {
+      return '--';
     }
   };
 
   const renderCalendarGrid = () => {
+    const displaySchedule = showModified ? schedule : originalSchedule;
+
     const getDayLabel = (dateStr: string) => {
       try {
         const parsed = parse(dateStr, 'MM/dd/yy', new Date());
@@ -132,7 +134,7 @@ const PlotDetailsScreen = () => {
       }
     };
 
-    const paddedSchedule = [...schedule];
+    const paddedSchedule = [...displaySchedule];
     while (paddedSchedule.length < 14) paddedSchedule.push(null);
 
     const week1 = paddedSchedule.slice(0, 7);
@@ -187,15 +189,22 @@ const PlotDetailsScreen = () => {
 
         <View style={styles.headerRow}>
           <Text style={styles.plotName}>{plot.name}</Text>
+          <TouchableOpacity
+            style={{ marginLeft: 12 }}
+            onPress={() => navigation.navigate('PlotSettings', { plot })}
+          >
+            <Ionicons name="settings-outline" size={24} color="#1aa179" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.metaRow}>
           <View style={styles.metaBox}>
             <Text style={styles.metaText}>Crop</Text>
             <Text style={styles.metaValue}>{plot.crop}</Text>
           </View>
           <View style={styles.metaBox}>
-            <Text style={styles.metaText}>Coords</Text>
-            <Text style={styles.metaValue}>
-              {plot.lat?.toFixed(2)}, {plot.lon?.toFixed(2)}
-            </Text>
+            <Text style={styles.metaText}>ZIP</Text>
+            <Text style={styles.metaValue}>{plot.zip_code || '--'}</Text>
           </View>
         </View>
 
@@ -214,6 +223,7 @@ const PlotDetailsScreen = () => {
             <DetailRow icon={<Ionicons name="thermometer" size={24} color="#1aa179" />} label="Temperature" value={avgTemp} />
             <DetailRow icon={<Ionicons name="sunny" size={24} color="#1aa179" />} label="Sunlight" value={avgSunlight} />
             <DetailRow icon={<MaterialCommunityIcons name="test-tube" size={24} color="#1aa179" />} label="pH Level" value="6.1" />
+            <DetailRow icon={<Ionicons name="calendar" size={24} color="#1aa179" />} label="Crop Age" value={getCropAgeDisplay()} />
             <View style={styles.summaryBox}>
               <Text style={styles.summaryTitle}>What To Expect</Text>
               <Text style={styles.summaryText}>{summary || 'Loading forecast summary...'}</Text>
@@ -224,9 +234,22 @@ const PlotDetailsScreen = () => {
         {tab === 'schedule' && (
           <View style={styles.scheduleBox}>
             <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Switch
+                value={showModified}
+                onValueChange={setShowModified}
+                thumbColor="#1aa179"
+              />
+              <Text style={{ marginLeft: 8, color: '#333' }}>
+                {showModified ? 'Modified' : 'Original'} Schedule
+              </Text>
+            </View>
+
             <TouchableOpacity onPress={fetchSchedule}>
               <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
             </TouchableOpacity>
+
             {loading ? (
               <ActivityIndicator size="small" color="#1aa179" />
             ) : (
@@ -236,44 +259,14 @@ const PlotDetailsScreen = () => {
         )}
 
         <TouchableOpacity
-          style={[styles.farmerButton, { marginBottom: 12 }]}
+          style={styles.farmerButton}
           onPress={() => {
             navigation.navigate('FarmerChat', { plot });
           }}
         >
           <Text style={styles.farmerText}>Farmer</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.farmerButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.farmerText}>💧 Water Now</Text>
-        </TouchableOpacity>
       </ScrollView>
-
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ margin: 20, padding: 20, backgroundColor: 'white', borderRadius: 10 }}>
-            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>How long to water?</Text>
-            {[5, 10, 15].map((min) => (
-              <Pressable
-                key={min}
-                style={{ paddingVertical: 10 }}
-                onPress={() => {
-                  setSelectedDuration(min);
-                  handleWaterNow();
-                }}
-              >
-                <Text style={{ fontSize: 16 }}>{min} minutes</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setModalVisible(false)} style={{ marginTop: 10 }}>
-              <Text style={{ textAlign: 'center', color: '#1aa179' }}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 };
@@ -293,9 +286,10 @@ export default PlotDetailsScreen;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   image: { height: 180, backgroundColor: '#cde', borderRadius: 20, marginBottom: 16 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   plotName: { fontSize: 24, fontWeight: 'bold', flex: 1 },
-  metaBox: { alignItems: 'center', marginLeft: 16 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  metaBox: { alignItems: 'center', flex: 1 },
   metaText: { fontSize: 12, color: '#777' },
   metaValue: { fontSize: 16, fontWeight: '600', color: '#222' },
   tabRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 12 },

@@ -8,7 +8,9 @@ import PlotDetailsScreen from '../screens/PlotDetailsScreen';
 import FarmerChatScreen from '../screens/FarmerChatScreen';
 import WeatherForecastScreen from '../screens/WeatherForecastScreen';
 import PickLocationScreen from '../screens/PickLocationScreen';
-import SpecificDayPage from '../screens/SpecificDayPage'; // ✅ NEW
+import SpecificDayPage from '../screens/SpecificDayPage'; 
+import PlotSettingsScreen from '../screens/PlotSettingsScreen';
+
 
 import { RootStackParamList } from './types';
 
@@ -25,6 +27,8 @@ export default function AppNavigator() {
       <Stack.Screen name="WeatherForecast" component={WeatherForecastScreen} options={{ title: 'Weather Forecast' }} />
       <Stack.Screen name="PickLocation" component={PickLocationScreen} options={{ title: 'Select Plot Location' }} />
       <Stack.Screen name="SpecificDay" component={SpecificDayPage} options={{ title: 'Day Details' }} /> 
+      <Stack.Screen name="PlotSettings" component={PlotSettingsScreen} options={{ title: 'Plot Settings' }} />
+
     </Stack.Navigator>
   );
 }

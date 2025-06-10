@@ -11,7 +11,9 @@ export type RootStackParamList = {
     dayData: any;
     dayIndex: number;
   };
+  PlotSettings: { plot: any }; // ✅ Add this line
 };
+
 
 
 export type MainTabParamList = {
