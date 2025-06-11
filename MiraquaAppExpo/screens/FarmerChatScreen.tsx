@@ -45,6 +45,7 @@ const FarmerChatScreen = () => {
       });
 
       const data = await res.json();
+      console.log("🪵 Chat log fetch response:", data);
       if (Array.isArray(data)) {
         const formatted = data.map((entry) => ({
           sender: entry.sender,
@@ -76,6 +77,13 @@ const FarmerChatScreen = () => {
           chatSessionId.current = newId;
           await AsyncStorage.setItem(key, newId);
         }
+
+        console.log("🧠 Fetching history for", {
+          user_id: plot.user_id,
+          plot_id: plot.id,
+          chat_session_id: chatSessionId.current,
+        });
+        
   
         // ✅ Only call after chatSessionId is set
         if (chatSessionId.current) {

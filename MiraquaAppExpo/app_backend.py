@@ -325,7 +325,8 @@ def chat():
 
     schedule_row = schedule_res.data[0]
     original_schedule = schedule_row.get("schedule", [])
-    user_id = schedule_row.get("user_id")
+    plot_data = supabase.table("plots").select("user_id").eq("id", plot_id).single().execute()
+    user_id = plot_data.data.get("user_id")
     lat, lon = data.get("lat"), data.get("lon")
 
     result = process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather)
@@ -357,19 +358,50 @@ def chat():
 @app.route("/get_chat_log", methods=["POST"])
 def get_chat_log():
     data = request.get_json()
-    user_id, plot_id = data.get("user_id"), data.get("plot_id")
-    res = supabase.table("farmerAI_chatlog") \
-        .select("prompt, reply, created_at, is_user_message") \
-        .eq("user_id", user_id) \
-        .eq("plot_id", plot_id) \
-        .eq("chat_session_id", data.get("chat_session_id")) \
-        .order("created_at", desc=False).execute()
-    chat_history = []
-    for row in res.data:
-        if row["is_user_message"]:
-            chat_history.append({"sender": "user", "text": row["prompt"]})
-            chat_history.append({"sender": "bot", "text": row["reply"]})
-    return jsonify(chat_history), 200
+    user_id = data.get("user_id")
+    plot_id = data.get("plot_id")
+    chat_session_id = data.get("chat_session_id")
+
+    if not user_id or not plot_id or not chat_session_id:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        res = supabase.table("farmerAI_chatlog") \
+            .select("prompt, reply, created_at, is_user_message") \
+            .eq("user_id", user_id) \
+            .eq("plot_id", plot_id) \
+            .eq("chat_session_id", chat_session_id) \
+            .order("created_at", desc=True) \
+            .limit(5) \
+            .execute()
+
+        print(f"🔍 Retrieved {len(res.data)} chat rows for user={user_id}, plot={plot_id}, session={chat_session_id}")
+
+        chat_history = []
+        for row in reversed(res.data):  # oldest first
+            prompt_ts = datetime.fromisoformat(row["created_at"])
+            reply_ts = prompt_ts + timedelta(seconds=1)  # offset reply to avoid duplication
+
+            if row["prompt"]:
+                chat_history.append({
+                    "sender": "user",
+                    "text": row["prompt"],
+                    "timestamp": prompt_ts.isoformat()
+                })
+
+            if row["reply"]:
+                chat_history.append({
+                    "sender": "bot",
+                    "text": row["reply"],
+                    "timestamp": reply_ts.isoformat()
+                })
+
+        return jsonify(chat_history), 200
+
+    except Exception as e:
+        print("❌ Error in /get_chat_log:", e)
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)
