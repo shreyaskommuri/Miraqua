@@ -1,6 +1,6 @@
 // screens/Step3Location.tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Button, StyleSheet } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { MainTabParamList } from '../navigation/types';
@@ -24,7 +24,7 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
   const [zip, setZip] = useState(data.zip || '');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Update location when coming back from PickLocation
+  // ✅ Update lat/lon when returning from PickLocation
   useFocusEffect(
     React.useCallback(() => {
       if (route.params?.lat && route.params?.lon) {
@@ -34,7 +34,7 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
     }, [route.params?.lat, route.params?.lon])
   );
 
-  // Auto-fetch ZIP code
+  // ✅ Auto-fetch ZIP when lat/lon are set
   useEffect(() => {
     if (lat && lon && !zip) {
       fetchZipCode(lat, lon);
@@ -51,7 +51,7 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
       const postalCode = data?.postcode || '';
       setZip(postalCode);
     } catch (error) {
-      console.error('Failed to fetch ZIP code:', error);
+      console.error('ZIP fetch error:', error);
     } finally {
       setLoading(false);
     }

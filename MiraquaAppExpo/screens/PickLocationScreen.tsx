@@ -58,7 +58,7 @@ const PickLocationScreen = () => {
       return;
     }
 
-    // ✅ This preserves navigation stack and updates the AddPlotScreen route
+    // ✅ Pass selected lat/lon to AddPlotScreen
     navigation.setParams({
       lat: marker.latitude,
       lon: marker.longitude,
