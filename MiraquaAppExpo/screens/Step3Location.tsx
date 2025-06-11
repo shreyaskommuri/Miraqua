@@ -24,9 +24,10 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
   const [zip, setZip] = useState(data.zip || '');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Update lat/lon when returning from PickLocation
+  // ✅ Pull new lat/lon from route params when refocused
   useFocusEffect(
     React.useCallback(() => {
+      console.log('[Step3Location] route.params:', route.params);
       if (route.params?.lat && route.params?.lon) {
         setLat(route.params.lat);
         setLon(route.params.lon);

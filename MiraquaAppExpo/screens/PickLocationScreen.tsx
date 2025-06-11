@@ -58,13 +58,14 @@ const PickLocationScreen = () => {
       return;
     }
 
-    // ✅ Pass selected lat/lon to AddPlotScreen
-    navigation.setParams({
-      lat: marker.latitude,
-      lon: marker.longitude,
+    // ✅ Navigate back to Add Plot via MainTabs with params
+    navigation.navigate('MainTabs', {
+      screen: 'Add Plot',
+      params: {
+        lat: marker.latitude,
+        lon: marker.longitude,
+      },
     });
-
-    navigation.goBack();
   };
 
   return (
