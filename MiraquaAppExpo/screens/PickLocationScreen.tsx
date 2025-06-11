@@ -1,6 +1,14 @@
 // screens/PickLocationScreen.tsx
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  TextInput,
+  Button,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,7 +28,9 @@ const PickLocationScreen = () => {
 
   const searchAddress = async () => {
     try {
-      const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(query)}&key=${OPENCAGE_API_KEY}`;
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
+        query
+      )}&key=${OPENCAGE_API_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -47,30 +57,37 @@ const PickLocationScreen = () => {
       Alert.alert('Please select a location');
       return;
     }
-    navigation.navigate('MainTabs', {
-      screen: 'Add Plot',
-      params: { lat: marker.latitude, lon: marker.longitude },
+
+    // ✅ This preserves navigation stack and updates the AddPlotScreen route
+    navigation.setParams({
+      lat: marker.latitude,
+      lon: marker.longitude,
     });
+
+    navigation.goBack();
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <TextInput
-        style={styles.input}
-        placeholder="Search address"
-        value={query}
-        onChangeText={setQuery}
-      />
-      <Button title="Search" onPress={searchAddress} />
-      <MapView
-        style={styles.map}
-        region={region}
-        onPress={handleMapPress}
-      >
-        {marker && <Marker coordinate={marker} />}
-      </MapView>
-      <Button title="Confirm Location" onPress={confirmLocation} />
-    </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={{ flex: 1 }}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search address"
+          value={query}
+          onChangeText={setQuery}
+        />
+        <Button title="Search" onPress={searchAddress} />
+
+        <MapView style={styles.map} region={region} onPress={handleMapPress}>
+          {marker && <Marker coordinate={marker} />}
+        </MapView>
+
+        <Button title="Confirm Location" onPress={confirmLocation} />
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -79,6 +96,8 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     margin: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
   },
   map: {
     flex: 1,
