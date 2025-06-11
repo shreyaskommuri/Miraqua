@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,15 @@ const PlotDetailsScreen = () => {
   const [avgSunlight, setAvgSunlight] = useState('--');
   const [showModified, setShowModified] = useState(true);
 
-  const fetchSchedule = async () => {
+  // Ref for managing the delayed re-fetch (polling) for the summary
+  const summaryPollingRef = useRef<{
+    timeoutId: NodeJS.Timeout | null;
+    attempts: number;
+    maxAttempts: number;
+    delay: number;
+  }>({ timeoutId: null, attempts: 0, maxAttempts: 5, delay: 3000 });
+
+  const fetchSchedule = useCallback(async (retries = 3) => {
     setLoading(true);
     try {
       const response = await fetch(`${BASE_URL}/get_plan`, {
@@ -66,8 +74,7 @@ const PlotDetailsScreen = () => {
       setOriginalSchedule(json.schedule || []);
       setSchedule(json.schedule || []); 
 
-
-      setSummary(json.gem_summary || json.summary || 'No forecast available.');
+      setSummary(json.gem_summary || json.summary || 'No irrigation schedule found for this plot.');
 
       setAvgMoisture(
         typeof json.moisture === 'number' ? `${json.moisture.toFixed(2)}%` : '--'
@@ -80,8 +87,13 @@ const PlotDetailsScreen = () => {
       setAvgSunlight(
         typeof json.sunlight === 'number' ? `${json.sunlight.toFixed(0)}%` : '--'
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching schedule:', err);
+      if (retries > 0) {
+        console.log(`Retrying fetchSchedule... (${retries} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second before retrying
+        return fetchSchedule(retries - 1);
+      }
       setSummary('Failed to load schedule.');
       setAvgMoisture('--');
       setAvgTemp('--');
@@ -89,17 +101,56 @@ const PlotDetailsScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSchedule();
-  }, [plot.id]);
+  }, [plot.id, plot.lat, plot.lon, plot.crop, plot.area, plot.zip_code, plot.flex_type]);
 
   useFocusEffect(
     useCallback(() => {
+      // Reset polling attempts when the screen gains focus or plot.id changes
+      if (summaryPollingRef.current.timeoutId) {
+        clearTimeout(summaryPollingRef.current.timeoutId);
+        summaryPollingRef.current.timeoutId = null;
+      }
+      summaryPollingRef.current.attempts = 0;
+
+      // Initial fetch when the screen comes into focus or plot.id changes
       fetchSchedule();
-    }, [plot.id])
+
+      // Cleanup function for when the component unmounts or loses focus
+      return () => {
+        if (summaryPollingRef.current.timeoutId) {
+          clearTimeout(summaryPollingRef.current.timeoutId);
+          summaryPollingRef.current.timeoutId = null;
+        }
+      };
+    }, [plot.id, fetchSchedule])
   );
+
+  // useEffect for polling the summary if it's not immediately available
+  useEffect(() => {
+    const { timeoutId, attempts, maxAttempts, delay } = summaryPollingRef.current;
+
+    // If summary is not yet available, not loading, and we haven't exceeded max attempts
+    if (summary === 'No irrigation schedule found for this plot.' && !loading && plot.id && attempts < maxAttempts) {
+      if (!timeoutId) { // Only schedule if no timeout is already pending
+        console.log(`Scheduling summary re-fetch attempt ${attempts + 1}/${maxAttempts} in ${delay / 1000} seconds...`);
+        summaryPollingRef.current.timeoutId = setTimeout(() => {
+          summaryPollingRef.current.attempts++;
+          console.log(`Attempting summary re-fetch #${summaryPollingRef.current.attempts}...`);
+          fetchSchedule(0); // Trigger fetch without additional network retries for this polling attempt
+          summaryPollingRef.current.timeoutId = null; // Clear timeout ID after execution
+        }, delay);
+      }
+    } else if (summary !== 'No irrigation schedule found for this plot.' && timeoutId) {
+      // If summary becomes available, clear any pending polling
+      console.log('Summary found, clearing polling timeout.');
+      clearTimeout(timeoutId);
+      summaryPollingRef.current.timeoutId = null;
+      summaryPollingRef.current.attempts = 0; // Reset attempts
+    } else if (summary === 'No irrigation schedule found for this plot.' && attempts >= maxAttempts) {
+      // If summary is still not available after max attempts, log and stop trying
+      console.log('Max summary polling attempts reached. Summary still not available.');
+    }
+  }, [summary, loading, plot.id, fetchSchedule]);
 
   const getCropAgeDisplay = () => {
     if (!plot.planting_date || typeof plot.age_at_entry !== 'number') return '--';
@@ -246,7 +297,7 @@ const PlotDetailsScreen = () => {
               </Text>
             </View>
 
-            <TouchableOpacity onPress={fetchSchedule}>
+            <TouchableOpacity onPress={() => fetchSchedule()}>
               <Text style={{ color: '#1aa179', fontWeight: '600', marginBottom: 8 }}>↻ Refresh</Text>
             </TouchableOpacity>
 
