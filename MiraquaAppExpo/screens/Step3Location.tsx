@@ -1,9 +1,6 @@
 // screens/Step3Location.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, Button, StyleSheet } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
-import type { RouteProp } from '@react-navigation/native';
-import type { MainTabParamList } from '../navigation/types';
 
 interface Props {
   data: {
@@ -13,29 +10,21 @@ interface Props {
   };
   onNext: (updates: { lat: number; lon: number; zip: string }) => void;
   onBack: (updates?: { lat: number | null; lon: number | null; zip: string }) => void;
+  onPickLocation: () => void;
 }
 
-const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<MainTabParamList, 'Add Plot'>>();
-
+const Step3Location: React.FC<Props> = ({ data, onNext, onBack, onPickLocation }) => {
   const [lat, setLat] = useState<number | null>(data.lat);
   const [lon, setLon] = useState<number | null>(data.lon);
   const [zip, setZip] = useState(data.zip || '');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Pull new lat/lon from route params when refocused
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('[Step3Location] route.params:', route.params);
-      if (route.params?.lat && route.params?.lon) {
-        setLat(route.params.lat);
-        setLon(route.params.lon);
-      }
-    }, [route.params?.lat, route.params?.lon])
-  );
+  useEffect(() => {
+    setLat(data.lat);
+    setLon(data.lon);
+    setZip(data.zip || '');
+  }, [data.lat, data.lon, data.zip]);
 
-  // ✅ Auto-fetch ZIP when lat/lon are set
   useEffect(() => {
     if (lat && lon && !zip) {
       fetchZipCode(lat, lon);
@@ -58,10 +47,6 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
     }
   };
 
-  const handlePickLocation = () => {
-    navigation.navigate('PickLocation' as never);
-  };
-
   const handleNext = () => {
     if (lat && lon && zip) {
       onNext({ lat, lon, zip });
@@ -79,7 +64,7 @@ const Step3Location: React.FC<Props> = ({ data, onNext, onBack }) => {
       <Text style={styles.label}>Location</Text>
       <Button
         title={lat && lon ? `📍 Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}` : 'Pick Location on Map'}
-        onPress={handlePickLocation}
+        onPress={onPickLocation}
       />
 
       {loading ? (

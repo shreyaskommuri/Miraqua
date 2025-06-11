@@ -5,7 +5,10 @@ export type RootStackParamList = {
   PlotDetails: { plot: any };
   FarmerChat: { plot: any };
   WeatherForecast: undefined;
-  PickLocation: undefined;
+  PickLocation: {
+    onLocationPicked?: (lat: number, lon: number) => void;
+  };
+  
   SpecificDay: {
     plotId: string;
     dayData: any;
@@ -18,6 +21,11 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  'Add Plot': { lat?: number; lon?: number }; // 👈 Add params here
+  'Add Plot': {
+    lat?: number;
+    lon?: number;
+    resetOnFocus?: boolean; // ✅ Add this field
+  };
+  
   Account: undefined;
 };

@@ -10,13 +10,15 @@ import {
   Platform,
 } from 'react-native';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { OPENCAGE_API_KEY } from '@env';
 
 const PickLocationScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'PickLocation'>>();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState({
     latitude: 37.7749,
@@ -58,14 +60,11 @@ const PickLocationScreen = () => {
       return;
     }
 
-    // ✅ Navigate back to Add Plot via MainTabs with params
-    navigation.navigate('MainTabs', {
-      screen: 'Add Plot',
-      params: {
-        lat: marker.latitude,
-        lon: marker.longitude,
-      },
-    });
+    if (route.params?.onLocationPicked) {
+      route.params.onLocationPicked(marker.latitude, marker.longitude);
+    }
+
+    navigation.goBack();
   };
 
   return (

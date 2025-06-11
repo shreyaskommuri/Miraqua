@@ -1,5 +1,5 @@
 // screens/AddPlotScreen.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,7 +14,7 @@ import Step3Location from './Step3Location';
 import Step4Review from './Step4Review';
 import ProgressHeader from './ProgressHeader';
 import { addPlot } from '../api/api';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../utils/supabase';
 
@@ -34,16 +34,6 @@ const AddPlotScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
-
-  // ✅ Only reset if truly returning to the start
-  useFocusEffect(
-    useCallback(() => {
-      if (step === 0) {
-        setStep(0);
-        setFormData(initialFormData);
-      }
-    }, [step])
-  );
 
   const handleNext = (updates: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -85,15 +75,9 @@ const AddPlotScreen = () => {
 
       if (res && !res.error) {
         Alert.alert('✅ Plot Added', 'Your plot was successfully added.');
-
-        // ✅ Reset onboarding state immediately
-        setStep(0);
         setFormData(initialFormData);
-
-        // Optional: slight delay before leaving
-        setTimeout(() => {
-          navigation.navigate('Home');
-        }, 250);
+        setStep(0);
+        navigation.navigate('Home');
       } else {
         throw new Error(res.message || 'Failed to add plot.');
       }
@@ -109,7 +93,20 @@ const AddPlotScreen = () => {
       case 1:
         return <Step2Details data={formData} onNext={handleNext} onBack={handleBack} />;
       case 2:
-        return <Step3Location data={formData} onNext={handleNext} onBack={handleBack} />;
+        return (
+          <Step3Location
+            data={formData}
+            onNext={handleNext}
+            onBack={handleBack}
+            onPickLocation={() =>
+              navigation.navigate('PickLocation', {
+                onLocationPicked: (lat: number, lon: number) => {
+                  setFormData((prev) => ({ ...prev, lat, lon, zip: '' }));
+                },
+              })
+            }
+          />
+        );
       case 3:
         return <Step4Review data={formData} onBack={handleBack} onSubmit={handleSubmit} />;
       default:
