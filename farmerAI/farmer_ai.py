@@ -7,6 +7,9 @@ import google.generativeai as genai
 from utils.forecast_utils import get_forecast, CROP_KC
 from datetime import datetime, timedelta
 import re
+from dateutil import parser as date_parser
+
+
 
 load_dotenv()
 
@@ -38,18 +41,34 @@ def generate_gem_summary(crop, lat, lon, plot_name, plot_id):
     try:
         model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
+        # Get schedule
         response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
         schedule = response.data[0]["schedule"] if response.data else []
 
-        context = f"You are helping a farmer named '{plot_name}' who is growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).\n"
-        context += f"They have this upcoming irrigation schedule:\n{json.dumps(schedule, indent=2)}\n"
-        context += "Give a helpful forecast-based summary with risks, recommendations, and what to expect based on soil moisture, temperature, and crop water needs."
+        if not schedule:
+            return "No irrigation schedule found for this plot."
 
-        response = model.generate_content(context)
+        # Convert schedule to short summary
+        schedule_lines = "\n".join(
+            f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
+            for day in schedule
+        )
+
+        prompt = f"""
+You are helping a farmer with a plot called '{plot_name}' growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).
+
+Here is the upcoming irrigation schedule:
+{schedule_lines}
+
+Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather, season, bugs(if theres any in that area, that is what YOU are for), and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
+"""
+
+        response = model.generate_content(prompt)
         return response.text.strip()
 
     except Exception as e:
         return f"Gemini summary generation failed: {str(e)}"
+
 
 # ✅ ATTACH DATE TO EACH DAY
 def attach_real_dates(schedule):
@@ -100,6 +119,7 @@ def chat():
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
 def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather):
     try:
+        # ✅ Build weather summary
         if weather and "main" in weather and "wind" in weather:
             temp = weather["main"].get("temp")
             humidity = weather["main"].get("humidity")
@@ -111,56 +131,100 @@ def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weathe
                 f"humidity is {humidity}%, and wind speed is {wind} mph."
             )
         else:
-            weather_summary = "Unfortunately, I don't have any weather data for your location right now."
+            weather_summary = "Unfortunately, I don't have any weather data for this location right now."
 
+        # ✅ Get current schedule
+        schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
+        schedule = schedule_res.data[0]["schedule"] if schedule_res.data else []
+
+        # ✅ Get past chat history
         past_res = supabase.table("farmerAI_chatlog") \
             .select("prompt, reply, is_user_message") \
             .eq("plot_id", plot_id) \
             .order("created_at", desc=False) \
             .limit(10) \
             .execute()
-
         history = past_res.data or []
 
-        conversation = f"You are an AI assistant called FarmerBot helping a farmer growing {crop} at ({lat:.4f}, {lon:.4f}) on plot '{plot_name}'.\n"
-        conversation += f"{weather_summary}\n\n"
-
+        # ✅ Build conversation prompt
+        conversation = f"You are an AI assistant named FarmerBot helping a farmer grow {crop} at ({lat:.4f}, {lon:.4f}) on plot '{plot_name}'.\n"
+        conversation += f"{weather_summary}\n"
+        if schedule:
+            conversation += "\nCurrent irrigation schedule:\n"
+            for i, day in enumerate(schedule):
+                conversation += f"- Day {i + 1} ({day['date']}): {round(day['liters'])}L at {day.get('optimal_time', 'N/A')}\n"
+        conversation += "\nChat history:\n"
         for entry in history:
             if entry["is_user_message"]:
                 conversation += f"👤 User: {entry['prompt']}\n"
                 conversation += f"🤖 FarmerBot: {entry['reply']}\n"
-
         conversation += f"👤 User: {user_prompt}\n"
         conversation += f"🤖 FarmerBot:"
 
+        # ✅ Get AI reply
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(conversation)
         ai_reply = response.text.strip()
 
+        # ✅ Look for structured SKIP commands
+        skip_matches = re.findall(r"✅\s*SKIP:\s*(.*?)\n?", ai_reply, re.IGNORECASE)
         updated_schedule = None
-        if "skip" in ai_reply.lower():
-            for day in range(1, 15):
-                if f"day {day}" in ai_reply.lower() or f"tomorrow" in ai_reply.lower():
-                    existing = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
-                    if existing.data and len(existing.data) > 0:
-                        current_schedule = existing.data[0]["schedule"]
-                        day_index = 1 if "tomorrow" in ai_reply.lower() else day - 1
-                        if 0 <= day_index < len(current_schedule):
-                            current_schedule[day_index]["liters"] = 0
-                            updated_schedule = current_schedule
-                            supabase.table("plot_schedules").update({
-                                "schedule": updated_schedule
-                            }).eq("plot_id", plot_id).execute()
-                            print(f"✅ Skipped Day {day_index + 1} in schedule for plot {plot_id}")
-                    break
+        skipped_days = []
 
-        final_reply = ai_reply
+        if skip_matches:
+            for match in skip_matches:
+                days_to_skip = []
+
+                # Match "Day 3", "Day 1 and Day 2", "Monday", "June 12"
+                if "day" in match.lower():
+                    numbers = re.findall(r'\d+', match)
+                    days_to_skip += [int(n) - 1 for n in numbers if 0 < int(n) <= len(schedule)]
+                else:
+                    for i, day in enumerate(schedule):
+                        date_str = day["date"].lower()
+                        if match.lower() in date_str:
+                            days_to_skip.append(i)
+                            break
+                        try:
+                            parsed = date_parser.parse(match)
+                            sched_date = date_parser.parse(day["date"])
+                            if parsed.date() == sched_date.date():
+                                days_to_skip.append(i)
+                                break
+                        except:
+                            continue
+
+                # Apply valid skip changes
+                if days_to_skip:
+                    updated_schedule = [day.copy() for day in schedule]  # deep copy
+                    for idx in days_to_skip:
+                        updated_schedule[idx]["liters"] = 0
+                        skipped_days.append(idx + 1)
+
+        # ✅ Save change if something was updated
         if updated_schedule:
-            final_reply += "\n\n✅ Schedule updated."
+            timestamp = datetime.utcnow().isoformat()
+
+            # Backup to schedule_changes table
+            supabase.table("schedule_changes").insert({
+                "plot_id": plot_id,
+                "timestamp": timestamp,
+                "old_schedule": schedule,
+                "new_schedule": updated_schedule,
+                "reason": f"Skipped days {', '.join(str(d) for d in skipped_days)} via AI chat"
+            }).execute()
+
+            # Update plot_schedules
+            supabase.table("plot_schedules").update({
+                "schedule": updated_schedule
+            }).eq("plot_id", plot_id).execute()
+
+            print(f"✅ Skipped Days: {skipped_days}")
+            ai_reply += f"\n\n✅ Schedule updated. Skipped days: {', '.join(['Day ' + str(d) for d in skipped_days])}"
 
         return {
             "schedule_updated": updated_schedule is not None,
-            "reply": final_reply
+            "reply": ai_reply
         }
 
     except Exception as e:

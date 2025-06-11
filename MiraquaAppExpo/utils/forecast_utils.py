@@ -124,6 +124,7 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
     if not hourly_blocks:
         hourly_blocks = [[] for _ in range(7)]
     if not soil_forecast:
+        print("no soil forecast provided, using default values")
         soil_forecast = [0.25] * 7
 
     # Crop coefficient (Kc)
