@@ -44,7 +44,9 @@ const Step2Details: React.FC<Props> = ({ data, onNext, onBack }) => {
   }, [area, ageInput]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowPicker(false);
+    if (Platform.OS !== 'ios') {
+      setShowPicker(false);
+    }
     if (selectedDate) {
       const today = new Date();
       if (selectedDate > today) {
@@ -101,11 +103,32 @@ const Step2Details: React.FC<Props> = ({ data, onNext, onBack }) => {
           title={`📆 ${plantingDate.toDateString()}`}
           onPress={() => setShowPicker(true)}
         />
-        {showPicker && (
+
+        {Platform.OS === 'ios' && showPicker && (
+          <View style={styles.iosPickerContainer}>
+            <DateTimePicker
+              value={plantingDate}
+              mode="date"
+              display="spinner"
+              maximumDate={new Date()}
+              onChange={(event, selectedDate) => {
+                if (selectedDate) {
+                  setPlantingDate(selectedDate);
+                }
+              }}
+            />
+            <View style={styles.iosPickerButtons}>
+              <Button title="Cancel" onPress={() => setShowPicker(false)} />
+              <Button title="Done" onPress={() => setShowPicker(false)} />
+            </View>
+          </View>
+        )}
+
+        {Platform.OS !== 'ios' && showPicker && (
           <DateTimePicker
             value={plantingDate}
             mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            display="default"
             maximumDate={new Date()}
             onChange={handleDateChange}
           />
@@ -152,6 +175,22 @@ const styles = StyleSheet.create({
   plantingDateSection: {
     marginTop: 20,
     gap: 10,
+  },
+  iosPickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginTop: 10,
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  iosPickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   note: {
     fontSize: 13,

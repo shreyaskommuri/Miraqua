@@ -19,6 +19,7 @@ CROP_KC = {
     "lettuce": 0.85,
     "tomato": 1.05,
     "almond": 1.05,
+    "grass": 1.1,  # Moderate to high water needs for healthy growth
     "default": 0.95
 }
 
@@ -130,7 +131,7 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
     # Crop coefficient (Kc)
     CROP_KC = {
         "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
-        "tomato": 1.05, "almond": 1.05, "default": 0.95
+        "tomato": 1.05, "almond": 1.05, "grass": 1.1, "default": 0.95
     }
     kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
     if isinstance(age, (int, float)) and age > 0:
