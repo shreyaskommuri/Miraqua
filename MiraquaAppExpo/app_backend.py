@@ -12,10 +12,6 @@ from timezonefinder import TimezoneFinder
 import resource
 from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time
 
-
-
-
-
 # Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
@@ -50,42 +46,17 @@ def get_total_crop_age(planting_date: str, age_at_entry: float) -> float:
         print(f"⚠️ Error calculating total crop age: {e}")
         return age_at_entry or 0.0
 
-
 def get_lat_lon(zip_code):
     url = f"http://api.zippopotam.us/us/{zip_code}"
     res = requests.get(url)
     data = res.json()
     return float(data['places'][0]['latitude']), float(data['places'][0]['longitude'])
-# (Everything up to existing imports and env loading remains the same)
-
-# Add seasonal multiplier function
-def get_seasonal_multiplier(month):
-    if month in [6, 7, 8]:    # Summer
-        return 1.15
-    elif month in [12, 1, 2]: # Winter
-        return 0.85
-    else:
-        return 1.0
-
-# Add skip check per day
-def should_skip_day(hourly_data):
-    rain_chance = max([h.get("pop", 0) for h in hourly_data] or [0])
-    max_wind = max([h.get("wind", {}).get("speed", 0) for h in hourly_data] or [0])
-    min_temp = min([h.get("main", {}).get("temp", 999) for h in hourly_data] or [999])
-    return rain_chance > 0.5 or max_wind > 20 or min_temp < 37
-
-# Monthly (flat) schedule calculation
-
-
 
 @app.route("/get_plot_by_id", methods=["GET"])
 def get_plot_by_id():
     plot_id = request.args.get("plot_id")
     res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
     return jsonify(res.data), 200
-
-
-
 
 @app.route("/get_plan", methods=["POST"])
 def get_plan():
@@ -95,7 +66,6 @@ def get_plan():
     if not plot_id:
         return jsonify({"error": "Missing plot_id"}), 400
 
-    # 🔁 Fetch plot
     result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
     plot = result.data
     if not plot:
@@ -109,53 +79,55 @@ def get_plan():
     age_at_entry = plot.get("age_at_entry", 0.0)
     lat, lon = plot["lat"], plot["lon"]
 
-    # 🧮 Get true age
-    def get_total_crop_age(planting_date: str, age_at_entry: float) -> float:
-        try:
-            planted = datetime.fromisoformat(planting_date)
-            months_since = (datetime.utcnow() - planted).days / 30.44
-            return round(age_at_entry + months_since, 1)
-        except Exception as e:
-            print(f"⚠️ Error calculating total crop age: {e}")
-            return age_at_entry or 0.0
-
     age = get_total_crop_age(planting_date, age_at_entry)
 
-    # 🌤 Fetch weather
     forecast = get_forecast(lat, lon)
-    daily_forecast = forecast.get("daily", [])
     hourly_forecast = forecast.get("hourly", {})
 
-    # 💧 Get recent watering logs
-    logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
-    logs = logs_res.data or []
+    temp = hourly_forecast.get("temperature_2m", [])
+    soil = hourly_forecast.get("soil_moisture_0_to_1cm", [])
 
-    # 🧠 Generate AI schedule
-    from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
-    schedule = generate_ai_schedule(plot, daily_forecast, hourly_forecast, logs)
+    hourly_blocks = [[] for _ in range(7)]
+    now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    for i in range(len(temp)):
+        dt = now + timedelta(hours=i)
+        day_idx = (dt.date() - now.date()).days
+        if 0 <= day_idx < 7:
+            entry = {
+                "dt": int(dt.timestamp()),
+                "main": {"temp": temp[i] if i < len(temp) else 20},
+                "pop": 0.0,
+                "wind": {"speed": 1.5},
+                "clouds": 50
+            }
+            hourly_blocks[day_idx].append(entry)
 
-    # 🐛 DEBUG: Print raw AI output
-    print("⚠️ AI Schedule Output:", schedule)
+    soil_forecast = []
+    for i in range(7):
+        chunk = soil[i * 24:(i + 1) * 24]
+        avg = sum(chunk) / len(chunk) if chunk else 0.25
+        soil_forecast.append(round(avg, 3))
 
-    # ✅ Validate schedule format
-    if not isinstance(schedule, list) or not all(isinstance(day, dict) and "liters" in day for day in schedule):
-        print("❌ Invalid schedule returned from AI:", schedule)
-        return jsonify({"error": "AI schedule generation failed"}), 500
+    schedule = calculate_schedule(
+        crop=crop,
+        area=area,
+        age=age,
+        lat=lat,
+        lon=lon,
+        flex_type=flex_type,
+        hourly_blocks=hourly_blocks,
+        soil_forecast=soil_forecast
+    )
 
-    # 🔎 Calculate frontend metrics
-    first_24_temps = hourly_forecast.get("temperature_2m", [])[:24]
-    current_temp_f = round(np.mean(first_24_temps), 1) if first_24_temps else 72.0
+    first_24_temps = temp[:24]
+    current_temp_f = round(np.mean(first_24_temps) * 9 / 5 + 32, 1) if first_24_temps else 72.0
+    avg_moisture = round(np.mean(soil_forecast) * 100, 2) if soil_forecast else 28.0
+    avg_sunlight = 70.0  # static fallback
 
-    first_24_clouds = [100 - c for c in hourly_forecast.get("clouds", [50] * 24)[:24]]
-    avg_sunlight = round(np.mean(first_24_clouds), 1) if first_24_clouds else 65.0
-
-    avg_moisture = round(np.mean([d.get("soil_moisture", 0.3) for d in daily_forecast]) * 100, 2) if daily_forecast else 28.0
-
-    # 📝 Summaries
+    plot_name = plot.get("name", f"Plot {plot_id[:5]}")
     summary = generate_summary(crop, lat, lon, schedule)
-    gem_summary = generate_gem_summary(crop, lat, lon, f"Plot {plot_id[:5]}", plot_id)
+    gem_summary = generate_gem_summary(crop, lat, lon, plot_name, plot_id)
 
-    # 💾 Save to Supabase
     supabase.table("plot_schedules").upsert({
         "plot_id": plot_id,
         "schedule": schedule,
@@ -163,7 +135,10 @@ def get_plan():
         "gem_summary": gem_summary
     }, on_conflict=["plot_id"]).execute()
 
+    print("📤 Saved to Supabase:", schedule)
+
     return jsonify({
+        "plot_name": plot_name,
         "schedule": schedule,
         "summary": summary,
         "gem_summary": gem_summary,
@@ -172,7 +147,6 @@ def get_plan():
         "sunlight": avg_sunlight,
         "total_crop_age": age
     })
-
 
 @app.route("/add_plot", methods=["POST"])
 def add_plot():

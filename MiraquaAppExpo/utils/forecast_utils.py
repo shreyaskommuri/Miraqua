@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 import numpy as np
 from datetime import datetime, timedelta
 
-
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
 openmeteo = openmeteo_requests.Client(session=retry_session)
@@ -58,13 +57,9 @@ def get_forecast(lat, lon):
         print("❌ Forecast fetch failed:", e)
         return {"hourly": {}}
 
-from datetime import datetime
 from utils.schedule_utils import cap_liters
 
 def calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon):
-    
-    
-
     kc_values = {
         "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2,
         "lettuce": 0.85, "tomato": 1.05, "almond": 1.05,
@@ -93,7 +88,6 @@ def find_optimal_time(hourly_day):
     best_hour = 6  # fallback
 
     for h in hourly_day:
-        # 🛠 Extract values safely from nested dicts
         temp = h.get("main", {}).get("temp", 20)
         wind = h.get("wind", {}).get("speed", 1.5)
         clouds_raw = h.get("clouds", 50)
@@ -119,23 +113,16 @@ def find_optimal_time(hourly_day):
     hour_12 = best_hour % 12 or 12
     return f"{hour_12:02d}:00 {am_pm}"
 
-
 def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_blocks=None, soil_forecast=None):
-    # Fallbacks for testing
     if not hourly_blocks:
         hourly_blocks = [[] for _ in range(7)]
     if not soil_forecast:
         print("no soil forecast provided, using default values")
         soil_forecast = [0.25] * 7
 
-    # Crop coefficient (Kc)
-    CROP_KC = {
-        "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
-        "tomato": 1.05, "almond": 1.05, "grass": 1.1, "default": 0.95
-    }
     kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
     if isinstance(age, (int, float)) and age > 0:
-        kc *= min(1 + 0.04 * age, 1.5)  # Max 50% boost
+        kc *= min(1 + 0.04 * age, 1.5)
 
     today = datetime.utcnow()
     root_depth_mm = 300
@@ -148,22 +135,17 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         hourly_day = hourly_blocks[day_index] if day_index < len(hourly_blocks) else []
         avg_moisture = soil_forecast[day_index] if day_index < len(soil_forecast) else 0.25
         temps = [h.get("main", {}).get("temp", 20) for h in hourly_day]
-    
         hours = [h.get("hour", i % 24) for i, h in enumerate(hourly_day)]
 
         avg_temp_c = sum(temps) / len(temps) if temps else 20.0
 
-        # Estimate ET₀ if temperatures available
         if len(temps) >= 12:
-            avg_temp_c = sum(temps) / len(temps)
             et0 = 0.0023 * ((avg_temp_c + 17.8) * np.sqrt(avg_temp_c - 10)) * 0.408 if avg_temp_c > 10 else 0.15
             print(f"[DEBUG] Day {day_index + 1}: avg_temp_c={avg_temp_c:.2f} ET₀={et0:.3f}, Moisture={avg_moisture:.3f}")
         else:
             et0 = 0.15
             print(f"[DEBUG] Day {day_index + 1}: ET₀={et0:.3f}, Moisture={avg_moisture:.3f} (avg_temp_c not available)")
 
-
-        # 🪵 DEBUG LOG
         print(f"[DEBUG] Day {day_index + 1}: avg_temp_c={avg_temp_c:.2f} ET₀={et0:.3f}, Moisture={avg_moisture:.3f}")
 
         if avg_moisture > moisture_threshold:
@@ -174,8 +156,6 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
             base_liters = mm_needed * area * 0.1
             liters = round(base_liters * kc * et0 / 0.15, 2)
             print(f"[DEBUG] Day {day_index + 1}: mm_needed={mm_needed:.2f}, Kc={kc:.2f}, base_liters={base_liters:.2f}, FINAL={liters}L")
-            # liters = cap_liters(crop, liters, area)
-
             optimal_time = find_optimal_time(hourly_day)
 
         date_obj = today + timedelta(days=day_index)
