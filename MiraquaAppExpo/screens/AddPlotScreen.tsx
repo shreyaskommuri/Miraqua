@@ -1,4 +1,3 @@
-// screens/AddPlotScreen.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -28,6 +27,8 @@ const initialFormData = {
   lat: null as number | null,
   lon: null as number | null,
   zip: '',
+  planting_date: '',
+  age_at_entry: 0,
 };
 
 const AddPlotScreen = () => {
@@ -52,9 +53,9 @@ const AddPlotScreen = () => {
       return;
     }
 
-    const { name, crop, area, flexType, lat, lon, zip } = formData;
+    const { name, crop, area, flexType, lat, lon, zip, planting_date, age_at_entry } = formData;
 
-    if (!name || !crop || !area || !lat || !lon || !zip) {
+    if (!name || !crop || !area || !lat || !lon || !zip || !planting_date || isNaN(age_at_entry)) {
       Alert.alert('Missing Info', 'Please complete all fields before submitting.');
       return;
     }
@@ -68,6 +69,8 @@ const AddPlotScreen = () => {
       lat,
       lon,
       zip_code: zip,
+      planting_date,
+      age_at_entry,
     };
 
     try {

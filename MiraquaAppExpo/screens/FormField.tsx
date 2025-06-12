@@ -1,4 +1,3 @@
-// components/FormField.tsx
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
 
@@ -25,6 +24,9 @@ const FormField: React.FC<FormFieldProps> = ({
         onChangeText={onChangeText}
         placeholder={placeholder}
         keyboardType={keyboardType}
+        placeholderTextColor="#999"
+        autoCapitalize="none"
+        autoCorrect={false}
         {...rest}
       />
     </View>
@@ -35,20 +37,21 @@ export default FormField;
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: 22,
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 6,
-    color: '#333',
+    color: '#222',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#d0d0d0',
     borderRadius: 10,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#fff',
   },
 });

@@ -8,7 +8,9 @@ import {
   Alert,
   ScrollView,
   Switch,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { updatePlotSettings, fetchPlotById } from '../api/api';
@@ -20,31 +22,42 @@ const PlotSettingsScreen = () => {
 
   const [crop, setCrop] = useState('');
   const [area, setArea] = useState('');
-  const [plantingDate, setPlantingDate] = useState('');
+  const [plantingDate, setPlantingDate] = useState<Date>(new Date());
   const [ageAtEntry, setAgeAtEntry] = useState('');
   const [flexType, setFlexType] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
-  // 🔄 Load updated plot on screen open
   useEffect(() => {
     const loadPlot = async () => {
       const updated = await fetchPlotById(plotId);
       if (updated) {
         setCrop(updated.crop || '');
         setArea(String(updated.area || ''));
-        setPlantingDate(updated.planting_date || '');
         setAgeAtEntry(String(updated.age_at_entry || ''));
         setFlexType(updated.flex_type === 'monthly');
+
+        if (updated.planting_date) {
+          setPlantingDate(new Date(updated.planting_date));
+        }
       }
     };
     loadPlot();
   }, [plotId]);
 
   const handleSave = async () => {
+    const parsedArea = parseFloat(area);
+    const parsedAge = parseFloat(ageAtEntry);
+
+    if (!crop || isNaN(parsedArea) || isNaN(parsedAge)) {
+      Alert.alert('❌ Missing or invalid input', 'Please fill out all fields correctly.');
+      return;
+    }
+
     const updates = {
       crop,
-      area: parseFloat(area),
-      planting_date: plantingDate,
-      age_at_entry: parseFloat(ageAtEntry),
+      area: parsedArea,
+      planting_date: plantingDate.toISOString().split('T')[0],
+      age_at_entry: parseFloat(parsedAge.toFixed(1)),
       flex_type: flexType ? 'monthly' : 'daily',
     };
 
@@ -54,6 +67,17 @@ const PlotSettingsScreen = () => {
       navigation.goBack();
     } else {
       Alert.alert('❌ Error', result.error || 'Failed to update settings.');
+    }
+  };
+
+  const handleDateChange = (_: any, selectedDate?: Date) => {
+    setShowPicker(false);
+    if (selectedDate) {
+      if (selectedDate > new Date()) {
+        Alert.alert('Invalid date', 'Planted date cannot be in the future.');
+        return;
+      }
+      setPlantingDate(selectedDate);
     }
   };
 
@@ -72,19 +96,24 @@ const PlotSettingsScreen = () => {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Planting Date (YYYY-MM-DD)</Text>
-      <TextInput
-        value={plantingDate}
-        onChangeText={setPlantingDate}
-        placeholder="e.g., 2022-03-15"
-        style={styles.input}
-      />
+      <Text style={styles.label}>Planted Date</Text>
+      <Button title={`📆 ${plantingDate.toDateString()}`} onPress={() => setShowPicker(true)} />
+      {showPicker && (
+        <DateTimePicker
+          value={plantingDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          maximumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
 
-      <Text style={styles.label}>Age at Entry (years)</Text>
+      <Text style={styles.label}>Crop age at time of planting (in months)</Text>
       <TextInput
         value={ageAtEntry}
         onChangeText={setAgeAtEntry}
         keyboardType="numeric"
+        placeholder="e.g., 2.5"
         style={styles.input}
       />
 
@@ -118,7 +147,7 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: '600',
     fontSize: 16,
-    marginTop: 16,
+    marginTop: 20,
   },
   input: {
     borderBottomWidth: 1,

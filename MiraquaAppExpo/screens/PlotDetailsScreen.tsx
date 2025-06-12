@@ -156,13 +156,20 @@ const PlotDetailsScreen = () => {
     if (!plot.planting_date || typeof plot.age_at_entry !== 'number') return '--';
     try {
       const plantingDate = parse(plot.planting_date, 'yyyy-MM-dd', new Date());
-      const yearsSince = differenceInYears(new Date(), plantingDate);
-      const totalAge = plot.age_at_entry + yearsSince;
-      return `${totalAge} years (as of ${format(plantingDate, 'MMM d, yyyy')})`;
+      const now = new Date();
+  
+      const monthsSince = Math.floor((now.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+      const totalMonths = Math.floor(plot.age_at_entry + monthsSince);
+      const totalYears = Math.floor(totalMonths / 12);
+      const remainingMonths = totalMonths % 12;
+  
+      return `${totalYears}y ${remainingMonths}m (as of ${format(plantingDate, 'MMM d, yyyy')})`;
     } catch {
       return '--';
     }
   };
+  
+  
 
   const renderCalendarGrid = () => {
     const displaySchedule = showModified ? schedule : originalSchedule;
