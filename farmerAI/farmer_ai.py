@@ -8,6 +8,9 @@ from utils.forecast_utils import get_forecast, CROP_KC
 from datetime import datetime, timedelta
 import re
 from dateutil import parser as date_parser
+from datetime import datetime
+import re, json
+
 
 
 
@@ -232,4 +235,83 @@ def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weathe
         return {
             "reply": "Sorry, something went wrong while processing your request.",
             "schedule_updated": False
+        }
+def generate_ai_schedule(plot, daily, hourly, logs):
+    import google.generativeai as genai
+    from datetime import datetime, timedelta
+    import json, re
+
+    crop = plot["crop"]
+    area = plot.get("area", 1.0)
+    zip_code = plot.get("zip_code", "00000")
+    planting_date = plot.get("planting_date", "unknown")
+    flex_type = plot.get("flex_type", "daily")
+    age = plot.get("age_at_entry", 0.0)
+    today = datetime.utcnow().date().isoformat()
+
+    prompt = f"""
+You are Miraqua, a smart irrigation assistant focused on saving as much water as possible.
+Today is {today}.
+
+Use weather, crop data, and watering logs to generate a 7-day irrigation schedule starting from today.
+
+Plot info:
+- Crop: {crop}
+- Area: {area} m²
+- Flex type: {flex_type}
+- Zip code: {zip_code}
+- Crop age: {age} months
+- Planting date: {planting_date}
+
+Weather forecast (daily):
+{json.dumps(daily, indent=2)}
+
+Weather forecast (hourly):
+{json.dumps(hourly, indent=2)}
+
+Recent watering logs:
+{json.dumps(logs, indent=2)}
+
+Rules:
+- Format output as a JSON array with 7 objects (one per day)
+- Each object must include these fields:
+  • "day" (e.g. "Monday")
+  • "date" (format: YYYY-MM-DD)
+  • "liters"
+  • "time"
+- Optimize for minimal water usage using techniques like the Hargreaves equation
+- Avoid watering if rain or high soil moisture is expected
+- Do NOT wrap output in markdown or explanations
+- Return only valid JSON
+"""
+
+    try:
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
+        text = response.text.strip()
+
+        # ✅ Strip triple backticks if present
+        clean_text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE)
+
+        # ✅ Parse JSON
+        schedule = json.loads(clean_text)
+
+        # ✅ Enforce correct dates & day names
+        for i in range(7):
+            date_obj = datetime.utcnow().date() + timedelta(days=i)
+            schedule[i]["date"] = date_obj.isoformat()
+            schedule[i]["day"] = date_obj.strftime("%A")
+
+        print("✅ AI schedule parsed and fixed successfully")
+        return schedule
+
+    except Exception as e:
+        print("⚠️ AI Schedule Output:", {
+            "error": "Could not parse response",
+            "raw": text if 'text' in locals() else "no response",
+            "exception": str(e)
+        })
+        return {
+            "error": "Could not parse response",
+            "raw": text if 'text' in locals() else "no response",
+            "exception": str(e)
         }

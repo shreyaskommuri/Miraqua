@@ -110,67 +110,48 @@ def get_plan():
     lat, lon = plot["lat"], plot["lon"]
 
     # 🧮 Get true age
+    def get_total_crop_age(planting_date: str, age_at_entry: float) -> float:
+        try:
+            planted = datetime.fromisoformat(planting_date)
+            months_since = (datetime.utcnow() - planted).days / 30.44
+            return round(age_at_entry + months_since, 1)
+        except Exception as e:
+            print(f"⚠️ Error calculating total crop age: {e}")
+            return age_at_entry or 0.0
+
     age = get_total_crop_age(planting_date, age_at_entry)
 
-    # 🌍 Get local time
-    tf = TimezoneFinder()
-    timezone_str = tf.timezone_at(lat=lat, lng=lon)
-    local_zone = tz.gettz(timezone_str)
-    now_local = datetime.now(local_zone)
-
     # 🌤 Fetch weather
-    soil_forecast = []
-    hourly_blocks = [[] for _ in range(7)]
+    forecast = get_forecast(lat, lon)
+    daily_forecast = forecast.get("daily", [])
+    hourly_forecast = forecast.get("hourly", {})
 
-    if RENDER:
-        res = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
-            "lat": lat,
-            "lon": lon,
-            "appid": OPENWEATHER_API_KEY,
-            "units": "imperial"
-        })
-        forecast_data = res.json()
+    # 💧 Get recent watering logs
+    logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
+    logs = logs_res.data or []
 
-        for entry in forecast_data["list"]:
-            dt = datetime.utcfromtimestamp(entry["dt"])
-            i = (dt.date() - datetime.utcnow().date()).days
-            if 0 <= i < 7:
-                hourly_blocks[i].append(entry)
+    # 🧠 Generate AI schedule
+    from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
+    schedule = generate_ai_schedule(plot, daily_forecast, hourly_forecast, logs)
 
-        for i in range(7):
-            rain_probs = [e.get("pop", 0) for e in hourly_blocks[i]]
-            rain_factor = sum(rain_probs) / len(rain_probs) if rain_probs else 0
-            soil_estimate = max(0.15, min(0.45, 0.35 - (i * 0.03) + rain_factor * 0.2))
-            soil_forecast.append(round(soil_estimate, 3))
+    # 🐛 DEBUG: Print raw AI output
+    print("⚠️ AI Schedule Output:", schedule)
 
-        current_temp_f = round(np.mean([e["main"]["temp"] for e in forecast_data["list"][:8]]), 1)
-        avg_moisture = round(np.mean(soil_forecast) * 100, 2)
-        avg_sunlight = round(np.mean([100 - e["clouds"]["all"] for e in forecast_data["list"][:8]]), 1)
-    else:
-        soil_forecast = [0.25, 0.26, 0.27, 0.28, 0.29, 0.3, 0.3]
-        hourly_blocks = [[] for _ in range(7)]
-        current_temp_f, avg_moisture, avg_sunlight = 72.0, 25.0, 65.0
+    # ✅ Validate schedule format
+    if not isinstance(schedule, list) or not all(isinstance(day, dict) and "liters" in day for day in schedule):
+        print("❌ Invalid schedule returned from AI:", schedule)
+        return jsonify({"error": "AI schedule generation failed"}), 500
 
-    # 🧠 Generate schedule — NO seasonal adjustment!
-    from utils.forecast_utils import calculate_schedule, calculate_monthly_schedule
-    if flex_type == "monthly":
-        schedule = calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon)
-    else:
-        schedule = calculate_schedule(
-            crop=crop,
-            area=area,
-            age=age,
-            lat=lat,
-            lon=lon,
-            flex_type=flex_type,
-            hourly_blocks=hourly_blocks,
-            soil_forecast=soil_forecast
-        )
+    # 🔎 Calculate frontend metrics
+    first_24_temps = hourly_forecast.get("temperature_2m", [])[:24]
+    current_temp_f = round(np.mean(first_24_temps), 1) if first_24_temps else 72.0
 
-    print("[DEBUG] FINAL Schedule to save:", schedule)
+    first_24_clouds = [100 - c for c in hourly_forecast.get("clouds", [50] * 24)[:24]]
+    avg_sunlight = round(np.mean(first_24_clouds), 1) if first_24_clouds else 65.0
 
-    # 🧠 AI summaries
-    from farmer_ai import generate_summary, generate_gem_summary
+    avg_moisture = round(np.mean([d.get("soil_moisture", 0.3) for d in daily_forecast]) * 100, 2) if daily_forecast else 28.0
+
+    # 📝 Summaries
     summary = generate_summary(crop, lat, lon, schedule)
     gem_summary = generate_gem_summary(crop, lat, lon, f"Plot {plot_id[:5]}", plot_id)
 
@@ -319,6 +300,48 @@ def update_plot_settings():
     except Exception as e:
         print(f"❌ Error in /update_plot_settings: {e}")
         return jsonify({ "success": False, "error": str(e) }), 500
+    
+@app.route("/generate_ai_schedule", methods=["POST"])
+def generate_ai_schedule_route():
+    data = request.get_json()
+    plot_id = data.get("plot_id")
+    if not plot_id:
+        return jsonify({"error": "Missing plot_id"}), 400
+
+    # 🧠 Get plot
+    plot_res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+    plot = plot_res.data
+    if not plot:
+        return jsonify({"error": "Plot not found"}), 404
+
+    # 📦 Weather
+    lat, lon = plot["lat"], plot["lon"]
+    forecast = get_forecast(lat, lon)
+    daily = forecast.get("daily", [])
+    hourly = forecast.get("hourly", [])
+
+    # 💧 Logs
+    logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
+    logs = logs_res.data or []
+
+    # 🤖 AI schedule
+    from farmer_ai import generate_ai_schedule, generate_summary
+    schedule = generate_ai_schedule(plot, daily, hourly, logs)
+
+    if "error" in schedule:
+        return jsonify(schedule), 500
+
+    # 📄 Save to Supabase
+    summary = generate_summary(plot["crop"], lat, lon, schedule)
+
+    supabase.table("plot_schedules").upsert({
+        "plot_id": plot_id,
+        "schedule": schedule,
+        "summary": summary
+    }, on_conflict=["plot_id"]).execute()
+
+    return jsonify({ "success": True, "schedule": schedule, "summary": summary })
+
 
 
 

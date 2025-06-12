@@ -21,6 +21,7 @@ import type { HomeStackParamList } from '../navigation/HomeStackNavigator';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 import { parse, format, differenceInYears } from 'date-fns';
+import { parseISO } from 'date-fns';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
@@ -176,21 +177,22 @@ const PlotDetailsScreen = () => {
 
     const getDayLabel = (dateStr: string) => {
       try {
-        const parsed = parse(dateStr, 'MM/dd/yy', new Date());
+        const parsed = parseISO(dateStr);
         return format(parsed, 'EEE');
       } catch {
         return '--';
       }
     };
-
+    
     const getDayNum = (dateStr: string) => {
       try {
-        const parsed = parse(dateStr, 'MM/dd/yy', new Date());
+        const parsed = parseISO(dateStr);
         return parsed.getDate();
       } catch {
         return '--';
       }
     };
+    
 
     const paddedSchedule = [...displaySchedule];
     while (paddedSchedule.length < 14) paddedSchedule.push(null);
