@@ -117,6 +117,8 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         soil_forecast = [0.25] * 7
 
     kc = dynamic_kc(crop, age)
+    print(f"[Kc DEBUG] crop={crop}, age={age:.1f} months → kc={kc}")
+
     today = datetime.utcnow()
     root_depth_mm = 300
     moisture_threshold = 0.28
