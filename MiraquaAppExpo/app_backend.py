@@ -10,7 +10,7 @@ from supabase import create_client, Client
 from dateutil import tz
 from timezonefinder import TimezoneFinder
 import resource
-from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time
+from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time, dynamic_kc
 
 # Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -45,6 +45,17 @@ def get_total_crop_age(planting_date: str, age_at_entry: float) -> float:
     except Exception as e:
         print(f"⚠️ Error calculating total crop age: {e}")
         return age_at_entry or 0.0
+
+def get_crop_stage(crop, age_months):
+    if age_months <= 1:
+        return "Initial Stage"
+    elif age_months <= 3:
+        return "Development Stage"
+    elif age_months <= 6:
+        return "Mid-season Stage"
+    else:
+        return "Late-season Stage"
+
 
 def get_lat_lon(zip_code):
     url = f"http://api.zippopotam.us/us/{zip_code}"
@@ -108,7 +119,8 @@ def get_plan():
         avg = sum(chunk) / len(chunk) if chunk else 0.25
         soil_forecast.append(round(avg, 3))
 
-    schedule = calculate_schedule(
+    # ✅ Get schedule AND kc_used
+    schedule, kc_used = calculate_schedule(
         crop=crop,
         area=area,
         age=age,
@@ -119,6 +131,10 @@ def get_plan():
         soil_forecast=soil_forecast
     )
 
+    # ✅ Get growth stage label
+    crop_stage = get_crop_stage(crop, age)
+
+    # 💧 Additional data
     first_24_temps = temp[:24]
     current_temp_f = round(np.mean(first_24_temps) * 9 / 5 + 32, 1) if first_24_temps else 72.0
     avg_moisture = round(np.mean(soil_forecast) * 100, 2) if soil_forecast else 28.0
@@ -128,6 +144,7 @@ def get_plan():
     summary = generate_summary(crop, lat, lon, schedule)
     gem_summary = generate_gem_summary(crop, lat, lon, plot_name, plot_id)
 
+    # ✅ Save schedule
     supabase.table("plot_schedules").upsert({
         "plot_id": plot_id,
         "schedule": schedule,
@@ -137,6 +154,7 @@ def get_plan():
 
     print("📤 Saved to Supabase:", schedule)
 
+    # ✅ Final response
     return jsonify({
         "plot_name": plot_name,
         "schedule": schedule,
@@ -145,8 +163,11 @@ def get_plan():
         "current_temp_f": current_temp_f,
         "moisture": avg_moisture,
         "sunlight": avg_sunlight,
-        "total_crop_age": age
+        "total_crop_age": age,
+        "kc_used": kc_used,
+        "crop_stage": crop_stage
     })
+
 
 @app.route("/add_plot", methods=["POST"])
 def add_plot():

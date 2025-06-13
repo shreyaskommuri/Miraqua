@@ -5,7 +5,7 @@ import requests_cache
 from retry_requests import retry
 from datetime import datetime, timedelta
 import numpy as np
-from datetime import datetime, timedelta
+from utils.schedule_utils import cap_liters
 
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
@@ -18,7 +18,7 @@ CROP_KC = {
     "lettuce": 0.85,
     "tomato": 1.05,
     "almond": 1.05,
-    "grass": 1.1,  # Moderate to high water needs for healthy growth
+    "grass": 1.1,
     "default": 0.95
 }
 
@@ -57,31 +57,27 @@ def get_forecast(lat, lon):
         print("❌ Forecast fetch failed:", e)
         return {"hourly": {}}
 
-from utils.schedule_utils import cap_liters
-
-def calculate_monthly_schedule(area, crop, hourly_blocks, lat, lon):
-    kc_values = {
-        "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2,
-        "lettuce": 0.85, "tomato": 1.05, "almond": 1.05,
-        "default": 0.95
+def dynamic_kc(crop, age_months):
+    crop = crop.lower()
+    stages = {
+        "tomato": [0.6, 0.95, 1.15, 0.8],
+        "corn": [0.4, 0.9, 1.15, 0.75],
+        "wheat": [0.3, 0.8, 1.0, 0.4],
+        "alfalfa": [0.7, 1.0, 1.2, 0.9],
+        "lettuce": [0.6, 0.85, 1.0, 0.8],
+        "almond": [0.4, 0.85, 1.05, 0.85],
+        "grass": [0.5, 0.95, 1.1, 0.8],
+        "default": [0.5, 0.85, 1.05, 0.8]
     }
-
-    kc = kc_values.get(crop.lower(), kc_values["default"])
-    daily_et0 = 4.5  # mm/day estimate
-    liters_per_day = round(daily_et0 * kc * area * 0.1, 2)
-
-    today = datetime.utcnow().date()
-    schedule = []
-
-    for i in range(7):
-        date_str = (today + timedelta(days=i)).strftime("%m/%d/%y")
-        hourly_data = hourly_blocks[i] if i < len(hourly_blocks) else []
-        if any(h.get("pop", 0) > 0.5 or h.get("wind", {}).get("speed", 0) > 20 or h.get("main", {}).get("temp", 999) < 37 for h in hourly_data):
-            schedule.append({"date": date_str, "liters": 0.0, "optimal_time": "Skipped"})
-        else:
-            best_time = find_optimal_time(hourly_data)
-            schedule.append({"date": date_str, "liters": liters_per_day, "optimal_time": best_time})
-    return schedule
+    kc_stages = stages.get(crop, stages["default"])
+    if age_months <= 1:
+        return kc_stages[0]
+    elif age_months <= 3:
+        return kc_stages[1]
+    elif age_months <= 6:
+        return kc_stages[2]
+    else:
+        return kc_stages[3]
 
 def find_optimal_time(hourly_day):
     best_score = float("inf")
@@ -120,10 +116,7 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         print("no soil forecast provided, using default values")
         soil_forecast = [0.25] * 7
 
-    kc = CROP_KC.get(crop.lower(), CROP_KC["default"])
-    if isinstance(age, (int, float)) and age > 0:
-        kc *= min(1 + 0.04 * age, 1.5)
-
+    kc = dynamic_kc(crop, age)
     today = datetime.utcnow()
     root_depth_mm = 300
     moisture_threshold = 0.28
@@ -135,7 +128,6 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         hourly_day = hourly_blocks[day_index] if day_index < len(hourly_blocks) else []
         avg_moisture = soil_forecast[day_index] if day_index < len(soil_forecast) else 0.25
         temps = [h.get("main", {}).get("temp", 20) for h in hourly_day]
-        hours = [h.get("hour", i % 24) for i, h in enumerate(hourly_day)]
 
         avg_temp_c = sum(temps) / len(temps) if temps else 20.0
 
@@ -145,8 +137,6 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         else:
             et0 = 0.15
             print(f"[DEBUG] Day {day_index + 1}: ET₀={et0:.3f}, Moisture={avg_moisture:.3f} (avg_temp_c not available)")
-
-        print(f"[DEBUG] Day {day_index + 1}: avg_temp_c={avg_temp_c:.2f} ET₀={et0:.3f}, Moisture={avg_moisture:.3f}")
 
         if avg_moisture > moisture_threshold:
             liters = 0.0
@@ -165,4 +155,4 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
             "liters": liters,
             "optimal_time": optimal_time
         })
-    return schedule
+    return schedule, kc
