@@ -368,26 +368,69 @@ def water_now():
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    prompt, crop, zip_code = data.get("prompt"), data.get("crop"), data.get("zip_code")
-    plot_name, plot_id, weather = data.get("plotName"), data.get("plotId"), data.get("weather", {})
+    prompt = data.get("prompt")
+    plot_id = data.get("plotId")
     chat_session_id = data.get("chat_session_id")
 
-    schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).limit(1).execute()
-    if not schedule_res.data:
-        return jsonify({"success": False, "error": "No schedule to modify."}), 404
+    if not prompt or not plot_id:
+        return jsonify({"success": False, "error": "Missing required fields"}), 400
 
-    schedule_row = schedule_res.data[0]
-    original_schedule = schedule_row.get("schedule", [])
-    plot_data = supabase.table("plots").select("user_id").eq("id", plot_id).single().execute()
-    user_id = plot_data.data.get("user_id")
-    lat, lon = data.get("lat"), data.get("lon")
+    # 🔍 Fetch plot
+    plot_res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+    plot = plot_res.data
+    if not plot:
+        return jsonify({"success": False, "error": "Plot not found"}), 404
 
-    result = process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather)
+    # 📌 Extract plot details
+    user_id = plot.get("user_id")
+    crop = plot.get("crop")
+    area = plot.get("area", 1.0)
+    flex_type = plot.get("flex_type", "daily")
+    zip_code = plot.get("zip_code", "00000")
+    planting_date = plot.get("planting_date")
+    age_at_entry = plot.get("age_at_entry", 0.0)
+    lat, lon = plot.get("lat"), plot.get("lon")
+    plot_name = plot.get("name", f"Plot {plot_id[:5]}")
+    age = get_total_crop_age(planting_date, age_at_entry)
+
+    # 📦 Weather forecast (Open-Meteo)
+    forecast = get_forecast(lat, lon)
+    daily = forecast.get("daily", [])
+    hourly = forecast.get("hourly", [])
+    current_weather = forecast.get("current", {})
+
+    # 💧 Watering logs
+    logs_res = supabase.table("watering_log") \
+        .select("*").eq("plot_id", plot_id) \
+        .order("watered_at", desc=True).limit(7).execute()
+    logs = logs_res.data or []
+
+    # 📥 Call AI chat processor
+    result = process_chat_command(
+        prompt=prompt,
+        crop=crop,
+        lat=lat,
+        lon=lon,
+        plot_name=plot_name,
+        plot_id=plot_id,
+        weather=current_weather,
+        plot=plot,
+        daily=daily,
+        hourly=hourly,
+        logs=logs,
+        age=age  # ✅ passed in
+    )
     reply = result["reply"]
 
+    # 🔁 Get updated schedule (if changed)
     refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
-    updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else original_schedule
+    updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
 
+    # 🗓️ Get original schedule for log
+    schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
+    original_schedule = schedule_res.data[0]["schedule"] if schedule_res.data else []
+
+    # 📝 Save chat history
     supabase.table("farmerAI_chatlog").insert({
         "id": str(uuid4()),
         "plot_id": plot_id,
@@ -407,6 +450,8 @@ def chat():
     }).execute()
 
     return jsonify({"success": True, "reply": reply})
+
+
 
 @app.route("/get_chat_log", methods=["POST"])
 def get_chat_log():

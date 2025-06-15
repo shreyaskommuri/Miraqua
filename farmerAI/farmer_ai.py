@@ -14,6 +14,7 @@ import re, json
 
 
 
+
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -120,56 +121,70 @@ def chat():
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
-def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather):
+def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, plot, daily, hourly, logs, age):
     try:
-        # ✅ Build weather summary
-        if weather and "main" in weather and "wind" in weather:
-            temp = weather["main"].get("temp")
-            humidity = weather["main"].get("humidity")
-            wind = weather["wind"].get("speed")
-            desc = weather["weather"][0].get("description", "unknown conditions")
+        # ✅ Extract plot metadata
+        area = plot.get("area", 1.0)
+        flex_type = plot.get("flex_type", "daily")
+        zip_code = plot.get("zip_code", "00000")
+        planting_date = plot.get("planting_date", "unknown")
+        user_id = plot.get("user_id", "unknown")
+        ph_level = plot.get("ph_level", "N/A")
+        custom_constraints = plot.get("custom_constraints", "")
+        plot_name = plot.get("name", f"Plot {plot_id[:5]}")
 
-            weather_summary = (
-                f"The current temperature is {temp}°F with {desc}, "
-                f"humidity is {humidity}%, and wind speed is {wind} mph."
-            )
-        else:
-            weather_summary = "Unfortunately, I don't have any weather data for this location right now."
-
-        # ✅ Get current schedule
+        # 📅 Fetch existing schedule
         schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
         schedule = schedule_res.data[0]["schedule"] if schedule_res.data else []
 
-        # ✅ Get past chat history
-        past_res = supabase.table("farmerAI_chatlog") \
+        # 💬 Fetch recent chat history
+        history_res = supabase.table("farmerAI_chatlog") \
             .select("prompt, reply, is_user_message") \
-            .eq("plot_id", plot_id) \
-            .order("created_at", desc=False) \
-            .limit(10) \
-            .execute()
-        history = past_res.data or []
+            .eq("plot_id", plot_id).order("created_at", desc=False).limit(10).execute()
+        history = history_res.data or []
 
-        # ✅ Build conversation prompt
-        conversation = f"You are an AI assistant named FarmerBot helping a farmer grow {crop} at ({lat:.4f}, {lon:.4f}) on plot '{plot_name}'.\n"
-        conversation += f"{weather_summary}\n"
-        if schedule:
-            conversation += "\nCurrent irrigation schedule:\n"
-            for i, day in enumerate(schedule):
-                conversation += f"- Day {i + 1} ({day['date']}): {round(day['liters'])}L at {day.get('optimal_time', 'N/A')}\n"
-        conversation += "\nChat history:\n"
-        for entry in history:
-            if entry["is_user_message"]:
-                conversation += f"👤 User: {entry['prompt']}\n"
-                conversation += f"🤖 FarmerBot: {entry['reply']}\n"
-        conversation += f"👤 User: {user_prompt}\n"
-        conversation += f"🤖 FarmerBot:"
+        # 🧾 Format schedule
+        schedule_lines = "\n".join(
+            f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
+            for day in schedule
+        )
 
-        # ✅ Get AI reply
+        # ✅ Build Gemini prompt (no slicing issues)
+        prompt_template = f"""
+Plot Summary:
+You are helping a farmer with a plot named "{plot_name}" located in ZIP code {zip_code} at coordinates ({lat:.4f}, {lon:.4f}). The plot area is {area} square meters and the crop being grown is {crop}. It was planted on {planting_date} and is currently {age} months old. The preferred irrigation schedule is '{flex_type}', and the soil pH is {ph_level}. Custom constraints are: {custom_constraints or 'none provided'}.
+
+Here is the upcoming irrigation schedule:
+{schedule_lines}
+
+Weather forecast (daily):
+{json.dumps(daily, indent=2)}
+
+Weather forecast (hourly):
+{json.dumps(hourly, indent=2)}
+
+Recent watering logs:
+{json.dumps(logs, indent=2)}
+
+Instructions:
+- You are a smart irrigation assistant named FarmerBot.
+- If the user asks “what do you know about my plot,” summarize the full plot information above in natural language. DO NOT ask them to rephrase — respond confidently.
+- If the user asks about temperature, return the forecasted value (e.g., "The current forecast shows 82°F at 2 PM today").
+- Use hourly and daily data for questions about watering, soil, pests, and evapotranspiration (ET).
+- Do not assume data is missing unless it’s clearly empty.
+- Avoid vague phrases like “I’m ready to assist” or “Ask me anything.” Give real answers using the data provided.
+- Use a friendly, helpful tone like a confident field advisor — not like a weather bot.
+
+Generate a concise, relevant response to the user's specific question or command.
+
+"""
+
+        # 💬 Generate Gemini response
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(conversation)
+        response = model.generate_content(prompt_template)
         ai_reply = response.text.strip()
 
-        # ✅ Look for structured SKIP commands
+        # ✅ Detect SKIP commands
         skip_matches = re.findall(r"✅\s*SKIP:\s*(.*?)\n?", ai_reply, re.IGNORECASE)
         updated_schedule = None
         skipped_days = []
@@ -178,52 +193,46 @@ def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weathe
             for match in skip_matches:
                 days_to_skip = []
 
-                # Match "Day 3", "Day 1 and Day 2", "Monday", "June 12"
-                if "day" in match.lower():
-                    numbers = re.findall(r'\d+', match)
-                    days_to_skip += [int(n) - 1 for n in numbers if 0 < int(n) <= len(schedule)]
-                else:
-                    for i, day in enumerate(schedule):
-                        date_str = day["date"].lower()
-                        if match.lower() in date_str:
-                            days_to_skip.append(i)
-                            break
-                        try:
-                            parsed = date_parser.parse(match)
-                            sched_date = date_parser.parse(day["date"])
-                            if parsed.date() == sched_date.date():
-                                days_to_skip.append(i)
-                                break
-                        except:
-                            continue
+                for i, day in enumerate(schedule):
+                    date_str = day["date"].lower()
+                    if match.lower() in date_str or match.lower() in day["day"].lower():
+                        days_to_skip.append(i)
 
-                # Apply valid skip changes
+                    try:
+                        parsed = date_parser.parse(match)
+                        sched_date = date_parser.parse(day["date"])
+                        if parsed.date() == sched_date.date():
+                            days_to_skip.append(i)
+                    except:
+                        continue
+
+                    if "day" in match.lower():
+                        numbers = re.findall(r'\d+', match)
+                        days_to_skip += [int(n) - 1 for n in numbers if 0 < int(n) <= len(schedule)]
+
                 if days_to_skip:
-                    updated_schedule = [day.copy() for day in schedule]  # deep copy
-                    for idx in days_to_skip:
+                    updated_schedule = [d.copy() for d in schedule]
+                    for idx in set(days_to_skip):
                         updated_schedule[idx]["liters"] = 0
                         skipped_days.append(idx + 1)
 
-        # ✅ Save change if something was updated
+        # 💾 Save updated schedule
         if updated_schedule:
             timestamp = datetime.utcnow().isoformat()
 
-            # Backup to schedule_changes table
             supabase.table("schedule_changes").insert({
                 "plot_id": plot_id,
                 "timestamp": timestamp,
                 "old_schedule": schedule,
                 "new_schedule": updated_schedule,
-                "reason": f"Skipped days {', '.join(str(d) for d in skipped_days)} via AI chat"
+                "reason": f"Skipped days: {', '.join(['Day ' + str(i) for i in skipped_days])} via AI chat"
             }).execute()
 
-            # Update plot_schedules
             supabase.table("plot_schedules").update({
                 "schedule": updated_schedule
             }).eq("plot_id", plot_id).execute()
 
-            print(f"✅ Skipped Days: {skipped_days}")
-            ai_reply += f"\n\n✅ Schedule updated. Skipped days: {', '.join(['Day ' + str(d) for d in skipped_days])}"
+            ai_reply += f"\n\n✅ Schedule updated. Skipped: {', '.join(['Day ' + str(i) for i in skipped_days])}"
 
         return {
             "schedule_updated": updated_schedule is not None,
@@ -233,9 +242,11 @@ def process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weathe
     except Exception as e:
         print(f"❌ Error in process_chat_command: {e}")
         return {
-            "reply": "Sorry, something went wrong while processing your request.",
-            "schedule_updated": False
+            "schedule_updated": False,
+            "reply": "Sorry, something went wrong while processing your request."
         }
+
+
 def generate_ai_schedule(plot, daily, hourly, logs):
     import google.generativeai as genai
     from datetime import datetime, timedelta
