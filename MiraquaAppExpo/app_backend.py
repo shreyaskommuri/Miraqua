@@ -79,7 +79,7 @@ def get_plan():
     if not plot_id:
         return jsonify({"error": "Missing plot_id"}), 400
 
-    # Get plot
+    # 🌱 Get plot
     plot_result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
     plot = plot_result.data
     if not plot:
@@ -89,6 +89,7 @@ def get_plan():
     lon = plot.get("lon")
     age = get_total_crop_age(plot.get("planting_date"), plot.get("age_at_entry", 0.0))
 
+    # 🌦️ Forecast & logs
     forecast = get_forecast(lat, lon)
     daily = forecast.get("daily", [])
     hourly = forecast.get("hourly", [])
@@ -96,15 +97,16 @@ def get_plan():
 
     logs = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute().data or []
 
-    schedule_data = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute().data or {}
+    # 📦 Try loading existing schedule
+    result = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute()
+    schedule_data = result.data if result and result.data else {}
 
-    # 🌱 Metric Extraction with fallback
+    # 🌡️ Pull temp, moisture, sunlight
     try:
         temp_values = [h.get("main", {}).get("temp") for h in hourly[:24] if h.get("main", {}).get("temp") is not None]
         current_temp_f = round(np.mean(temp_values), 1) if temp_values else 72.0
     except:
         current_temp_f = 72.0
-
 
     try:
         moisture_values = [d.get("soil_moisture") for d in daily[:1] if d.get("soil_moisture") is not None]
@@ -115,10 +117,10 @@ def get_plan():
     try:
         clouds = [h.get("clouds", {}).get("all") for h in hourly[:24] if "clouds" in h]
         sunlight = round(100 - np.mean(clouds), 0) if clouds else 70.0
-
     except:
         sunlight = 70.0
 
+    # 🔁 Roll forward any saved schedule
     def roll_schedule_forward(saved_schedule):
         today = datetime.utcnow().date()
         rolled = []
@@ -130,7 +132,7 @@ def get_plan():
             except:
                 continue
 
-        # Refill up to 7 days
+        # 🧠 Fill in missing days if needed
         if len(rolled) < 7:
             from farmer_ai import generate_ai_schedule
             new_schedule = generate_ai_schedule(plot, daily, hourly, logs)
@@ -145,7 +147,7 @@ def get_plan():
                     continue
         return rolled
 
-    # ✅ Use saved schedule unless forcing refresh
+    # ✅ Return existing (rolled) schedule if it exists and no force_refresh
     if schedule_data and not force_refresh:
         base_schedule = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
         rolled_schedule = roll_schedule_forward(base_schedule or [])
@@ -163,19 +165,19 @@ def get_plan():
             "crop_stage": get_crop_stage(plot["crop"], age)
         })
 
-    # 🔁 Generate new schedule
+    # 🚀 No schedule yet — generate and save it
     from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
     schedule = generate_ai_schedule(plot, daily, hourly, logs)
     summary = generate_summary(plot["crop"], lat, lon, schedule)
     gem_summary = generate_gem_summary(plot["crop"], lat, lon, plot["name"], plot_id)
 
-    # 💾 Save to Supabase
     payload = {
         "plot_id": plot_id,
         "schedule": schedule,
         "summary": summary,
         "gem_summary": gem_summary
     }
+
     if not schedule_data.get("og_schedule"):
         payload["og_schedule"] = schedule
 
@@ -193,7 +195,6 @@ def get_plan():
         "kc_used": "AI-optimized",
         "crop_stage": get_crop_stage(plot["crop"], age)
     })
-
 
 
 @app.route("/add_plot", methods=["POST"])
