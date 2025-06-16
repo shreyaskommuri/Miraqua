@@ -73,7 +73,6 @@ def get_plot_by_id():
 def get_plan():
     data = request.get_json()
     plot_id = data.get("plot_id")
-
     if not plot_id:
         return jsonify({"error": "Missing plot_id"}), 400
 
@@ -84,77 +83,54 @@ def get_plan():
 
     crop = plot["crop"]
     area = plot["area"]
-    zip_code = plot["zip_code"]
+    zip_code = plot.get("zip_code", "00000")
     flex_type = plot.get("flex_type", "daily")
     planting_date = plot.get("planting_date")
     age_at_entry = plot.get("age_at_entry", 0.0)
     lat, lon = plot["lat"], plot["lon"]
 
     age = get_total_crop_age(planting_date, age_at_entry)
-
-    forecast = get_forecast(lat, lon)
-    hourly_forecast = forecast.get("hourly", {})
-
-    temp = hourly_forecast.get("temperature_2m", [])
-    soil = hourly_forecast.get("soil_moisture_0_to_1cm", [])
-
-    hourly_blocks = [[] for _ in range(7)]
-    now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-    for i in range(len(temp)):
-        dt = now + timedelta(hours=i)
-        day_idx = (dt.date() - now.date()).days
-        if 0 <= day_idx < 7:
-            entry = {
-                "dt": int(dt.timestamp()),
-                "main": {"temp": temp[i] if i < len(temp) else 20},
-                "pop": 0.0,
-                "wind": {"speed": 1.5},
-                "clouds": 50
-            }
-            hourly_blocks[day_idx].append(entry)
-
-    soil_forecast = []
-    for i in range(7):
-        chunk = soil[i * 24:(i + 1) * 24]
-        avg = sum(chunk) / len(chunk) if chunk else 0.25
-        soil_forecast.append(round(avg, 3))
-
-    # ✅ Get schedule AND kc_used
-    schedule, kc_used = calculate_schedule(
-        crop=crop,
-        area=area,
-        age=age,
-        lat=lat,
-        lon=lon,
-        flex_type=flex_type,
-        hourly_blocks=hourly_blocks,
-        soil_forecast=soil_forecast
-    )
-
-    # ✅ Get growth stage label
     crop_stage = get_crop_stage(crop, age)
-
-    # 💧 Additional data
-    first_24_temps = temp[:24]
-    current_temp_f = round(np.mean(first_24_temps) * 9 / 5 + 32, 1) if first_24_temps else 72.0
-    avg_moisture = round(np.mean(soil_forecast) * 100, 2) if soil_forecast else 28.0
-    avg_sunlight = 70.0  # static fallback
-
     plot_name = plot.get("name", f"Plot {plot_id[:5]}")
+
+    # 📦 Forecast and logs
+    forecast = get_forecast(lat, lon)
+    daily = forecast.get("daily", [])
+    hourly = forecast.get("hourly", [])
+    logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
+    logs = logs_res.data or []
+
+    # 🤖 AI Schedule
+    from farmer_ai import generate_ai_schedule
+    schedule = generate_ai_schedule(plot, daily, hourly, logs)
+
+    # 🔢 Extra metrics
+    temp = hourly.get("temperature_2m", [])
+    soil = hourly.get("soil_moisture_0_to_1cm", [])
+    current_temp_f = round(np.mean(temp[:24]) * 9 / 5 + 32, 1) if temp else 72.0
+    avg_moisture = round(np.mean(soil[:168]) * 100, 2) if soil else 28.0
+    avg_sunlight = 70.0  # fallback
+
+    # 📝 Summaries
     summary = generate_summary(crop, lat, lon, schedule)
     gem_summary = generate_gem_summary(crop, lat, lon, plot_name, plot_id)
 
-    # ✅ Save schedule
-    supabase.table("plot_schedules").upsert({
+    # 💾 Save to plot_schedules
+    existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute()
+    existing_data = existing.data or {}
+
+    payload = {
         "plot_id": plot_id,
         "schedule": schedule,
         "summary": summary,
         "gem_summary": gem_summary
-    }, on_conflict=["plot_id"]).execute()
+    }
 
-    print("📤 Saved to Supabase:", schedule)
+    if not existing_data.get("og_schedule"):
+        payload["og_schedule"] = schedule
 
-    # ✅ Final response
+    supabase.table("plot_schedules").upsert(payload, on_conflict=["plot_id"]).execute()
+
     return jsonify({
         "plot_name": plot_name,
         "schedule": schedule,
@@ -164,7 +140,7 @@ def get_plan():
         "moisture": avg_moisture,
         "sunlight": avg_sunlight,
         "total_crop_age": age,
-        "kc_used": kc_used,
+        "kc_used": "AI-optimized",
         "crop_stage": crop_stage
     })
 
@@ -222,10 +198,10 @@ def update_plot_settings():
         return jsonify({"success": False, "error": "Missing plot_id"}), 400
 
     try:
-        # Step 1: Update the plot
+        # Step 1: Update plot fields
         supabase.table("plots").update(updates).eq("id", plot_id).execute()
 
-        # Step 2: Re-fetch updated plot
+        # Step 2: Fetch updated plot
         result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
         plot = result.data
         if not plot:
@@ -236,65 +212,44 @@ def update_plot_settings():
         planting_date = plot.get("planting_date")
         age_at_entry = plot.get("age_at_entry", 0.0)
         age = get_total_crop_age(planting_date, age_at_entry)
-
         lat = plot["lat"]
         lon = plot["lon"]
         flex_type = plot.get("flex_type", "daily")
+        plot_name = plot.get("name", f"Plot {plot_id[:5]}")
 
-        # 🧠 Use same weather logic as /get_plan
-        soil_forecast = []
-        hourly_blocks = [[] for _ in range(7)]
+        # 📦 Get forecast and logs
+        forecast = get_forecast(lat, lon)
+        daily = forecast.get("daily", [])
+        hourly = forecast.get("hourly", [])
+        logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
+        logs = logs_res.data or []
 
-        if RENDER:
-            res = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
-                "lat": lat,
-                "lon": lon,
-                "appid": OPENWEATHER_API_KEY,
-                "units": "imperial"
-            })
-            forecast_data = res.json()
+        # 🤖 AI Schedule
+        from farmer_ai import generate_ai_schedule
+        schedule = generate_ai_schedule(plot, daily, hourly, logs)
+        summary = generate_summary(crop, lat, lon, schedule)
 
-            for entry in forecast_data["list"]:
-                dt = datetime.utcfromtimestamp(entry["dt"])
-                i = (dt.date() - datetime.utcnow().date()).days
-                if 0 <= i < 7:
-                    hourly_blocks[i].append(entry)
+        # 💾 Save schedule to plot_schedules
+        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute()
+        existing_data = existing.data or {}
 
-            for i in range(7):
-                rain_probs = [e.get("pop", 0) for e in hourly_blocks[i]]
-                rain_factor = sum(rain_probs) / len(rain_probs) if rain_probs else 0
-                soil_estimate = max(0.15, min(0.45, 0.35 - (i * 0.03) + rain_factor * 0.2))
-                soil_forecast.append(round(soil_estimate, 3))
-        else:
-            return jsonify({"success": False, "error": "Weather fetch not supported outside Render"}), 500
-
-        # ✅ Call calculate_schedule with real data
-        schedule = calculate_schedule(
-            crop=crop,
-            area=area,
-            age=age,
-            lat=lat,
-            lon=lon,
-            flex_type=flex_type,
-            hourly_blocks=hourly_blocks,
-            soil_forecast=soil_forecast
-        )
-
-        # Step 4: Upsert into plot_schedules
-        existing = supabase.table("plot_schedules").select("id").eq("plot_id", plot_id).limit(1).execute()
-        row_id = existing.data[0]["id"] if existing.data else str(uuid4())
-
-        supabase.table("plot_schedules").upsert({
-            "id": row_id,
+        payload = {
             "plot_id": plot_id,
-            "schedule": schedule
-        }, on_conflict=["plot_id"]).execute()
+            "schedule": schedule,
+            "summary": summary
+        }
+
+        if not existing_data.get("og_schedule"):
+            payload["og_schedule"] = schedule
+
+        supabase.table("plot_schedules").upsert(payload, on_conflict=["plot_id"]).execute()
 
         return jsonify({ "success": True })
 
     except Exception as e:
         print(f"❌ Error in /update_plot_settings: {e}")
         return jsonify({ "success": False, "error": str(e) }), 500
+
     
 @app.route("/generate_ai_schedule", methods=["POST"])
 def generate_ai_schedule_route():
@@ -332,6 +287,7 @@ def generate_ai_schedule_route():
     supabase.table("plot_schedules").upsert({
         "plot_id": plot_id,
         "schedule": schedule,
+        "og_schedule": schedule,  # Store original schedule for reference
         "summary": summary
     }, on_conflict=["plot_id"]).execute()
 

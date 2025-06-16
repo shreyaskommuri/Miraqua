@@ -258,43 +258,96 @@ def generate_ai_schedule(plot, daily, hourly, logs):
     planting_date = plot.get("planting_date", "unknown")
     flex_type = plot.get("flex_type", "daily")
     age = plot.get("age_at_entry", 0.0)
+    lat = plot.get("lat")
+    lon = plot.get("lon")
     today = datetime.utcnow().date().isoformat()
 
     prompt = f"""
-You are Miraqua, a smart irrigation assistant focused on saving as much water as possible.
+You are Miraqua, a smart irrigation assistant designed to save farmers water and money — while keeping their crops healthy.
+
 Today is {today}.
+Your job is to generate a precise, weather-aware, and cost-saving 7-day irrigation schedule tailored to this specific plot.
 
-Use weather, crop data, and watering logs to generate a 7-day irrigation schedule starting from today.
+---
 
-Plot info:
+📍 **Plot Information**
 - Crop: {crop}
 - Area: {area} m²
-- Flex type: {flex_type}
-- Zip code: {zip_code}
-- Crop age: {age} months
-- Planting date: {planting_date}
+- Latitude: {lat}
+- Longitude: {lon}
+- Flex Type: {flex_type}
+- Crop Age: {age} months
+- Planting Date: {planting_date}
 
-Weather forecast (daily):
+---
+
+🌦️ **Weather Forecast**
+Daily Forecast:
 {json.dumps(daily, indent=2)}
 
-Weather forecast (hourly):
+Hourly Forecast:
 {json.dumps(hourly, indent=2)}
 
-Recent watering logs:
+---
+
+💧 **Recent Watering Logs**
 {json.dumps(logs, indent=2)}
 
-Rules:
-- Format output as a JSON array with 7 objects (one per day)
-- Each object must include these fields:
-  • "day" (e.g. "Monday")
-  • "date" (format: YYYY-MM-DD)
-  • "liters"
-  • "time"
-- Optimize for minimal water usage using techniques like the Hargreaves equation
-- Avoid watering if rain or high soil moisture is expected
-- Do NOT wrap output in markdown or explanations
-- Return only valid JSON
+---
+
+🧠 **Irrigation Strategy and Rules**
+
+1. Your #1 goal is to **minimize water usage and save money** — while providing enough irrigation to support healthy crop growth.
+
+2. Use **two evapotranspiration (ET₀) models** to estimate daily crop water needs:
+   - **Penman-Monteith** (preferred): based on temperature, humidity, wind, and solar radiation/cloud cover
+   - **Hargreaves** (fallback): based on high/low temperature and estimated solar radiation
+
+3. For each day:
+   - Compute ET₀ using both models
+   - Adjust by the crop coefficient (Kc) to get ETc:  
+     \[ ETc = ET₀ × Kc \]
+   - If the models differ by >20%, explain the difference and choose the one that results in **less water use without harming the crop**
+
+4. Check soil moisture and forecast conditions:
+   - **Skip irrigation** if:
+     - Soil moisture forecast > 35%
+     - Rain probability > 40%
+     - The crop was watered within the last 48 hours and moisture remains high
+
+5. Choose the **optimal irrigation time** for each day based on:
+   - Early morning (4:00–6:00 AM)
+   - Lowest wind and sunlight hours
+   - Avoidance of runoff, evaporation, and disease risk
+
+6. Vary daily irrigation — **do not use the same liters every day**
+
+7. Optional: If helpful, include a short `"explanation"` field in each day’s object to justify why it was watered or skipped.
+
+---
+
+✅ **Return Format**
+
+Respond with only a valid JSON array containing **exactly 7 objects** (one per day), like this:
+
+[
+  {{
+    "day": "Day 1",
+    "date": "06/16/25",
+    "liters": 6.5,
+    "optimal_time": "05:00 AM"
+  }},
+  ...
+]
+
+### Rules for format:
+- `"day"` must be: `"Day 1"`, `"Day 2"`, ..., `"Day 7"`
+- `"date"` format must be: **MM/DD/YY** (e.g., `"06/16/25"`)
+- `"liters"` must be a numeric value (float or int)
+- `"optimal_time"` must be in **HH:MM AM/PM** format (e.g., `"04:00 AM"`)
+- Do NOT wrap the JSON in markdown, quotes, or code blocks
 """
+
 
     try:
         response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
@@ -309,8 +362,10 @@ Rules:
         # ✅ Enforce correct dates & day names
         for i in range(7):
             date_obj = datetime.utcnow().date() + timedelta(days=i)
-            schedule[i]["date"] = date_obj.isoformat()
-            schedule[i]["day"] = date_obj.strftime("%A")
+            schedule[i]["date"] = date_obj.strftime("%m/%d/%y")
+
+            schedule[i]["day"] = f"Day {i + 1}"
+
 
         print("✅ AI schedule parsed and fixed successfully")
         return schedule
