@@ -44,35 +44,48 @@ const PlotDetailsScreen = () => {
   const [avgSunlight, setAvgSunlight] = useState('--');
   const [showModified, setShowModified] = useState(true);
 
-  const fetchSchedule = useCallback(async () => {
+  const fetchSchedule = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/get_plan`, {
+      // fetch modified
+      const modRes = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plot_id: plot.id,
-          lat: plot.lat,
-          lon: plot.lon,
-          crop: plot.crop.toLowerCase(),
-          area: plot.area || 100,
-          zip_code: plot.zip_code,
-          flex_type: plot.flex_type || 'daily',
+          use_original: false,
+          force_refresh: forceRefresh,
         }),
       });
-      const json = await response.json();
-      setOriginalSchedule(json.schedule || []);
-      setSchedule(json.schedule || []);
-      setSummary(json.gem_summary || json.summary || 'No irrigation schedule found.');
-      setAvgMoisture(typeof json.moisture === 'number' ? `${json.moisture.toFixed(2)}%` : '--');
-      setAvgTemp(typeof json.current_temp_f === 'number' ? `${json.current_temp_f.toFixed(1)}°F` : '--');
-      setAvgSunlight(typeof json.sunlight === 'number' ? `${json.sunlight.toFixed(0)}%` : '--');
+      const modJson = await modRes.json();
+      setSchedule(modJson.schedule || []);
+  
+      // fetch original
+      const ogRes = await fetch(`${BASE_URL}/get_plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plot_id: plot.id,
+          use_original: true,
+          force_refresh: forceRefresh,
+        }),
+      });
+      const ogJson = await ogRes.json();
+      setOriginalSchedule(ogJson.schedule || []);
+  
+      // set shared metadata (from modified or original doesn't matter)
+      setSummary(modJson.gem_summary || modJson.summary || 'No irrigation schedule found.');
+      setAvgMoisture(typeof modJson.moisture === 'number' ? `${modJson.moisture.toFixed(2)}%` : '--');
+      setAvgTemp(typeof modJson.current_temp_f === 'number' ? `${modJson.current_temp_f.toFixed(1)}°F` : '--');
+      setAvgSunlight(typeof modJson.sunlight === 'number' ? `${modJson.sunlight.toFixed(0)}%` : '--');
     } catch {
       setSummary('Failed to load schedule.');
     } finally {
       setLoading(false);
     }
   }, [plot]);
+  
+
 
   useFocusEffect(useCallback(() => { fetchSchedule(); }, [fetchSchedule]));
 
@@ -93,12 +106,19 @@ const PlotDetailsScreen = () => {
 
   const getDayLabel = (dateStr: string) => {
     try {
-      const parsed = parse(dateStr, 'MM/dd/yy', new Date());
+      // Try parsing MM/DD/YY first
+      let parsed;
+      if (dateStr.includes('/')) {
+        parsed = parse(dateStr, 'MM/dd/yy', new Date());
+      } else {
+        parsed = new Date(dateStr); // ISO fallback
+      }
       return format(parsed, 'EEE');
     } catch {
       return '--';
     }
   };
+  
 
   const renderCalendarGrid = () => {
     const displaySchedule = showModified ? schedule : originalSchedule;
@@ -198,12 +218,25 @@ const PlotDetailsScreen = () => {
           <View style={styles.scheduleBox}>
             <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
             <View style={styles.toggleRow}>
-              <Switch value={showModified} onValueChange={setShowModified} trackColor={{ true: '#1aa179', false: '#ccc' }} />
+            <Switch
+            value={showModified}
+            onValueChange={(val) => {
+              setShowModified(val);
+              fetchSchedule(false); // no need to force refresh — both versions are already stored
+            }}
+            
+            trackColor={{ true: '#1aa179', false: '#ccc' }}
+          />
+
+
               <Text style={styles.switchLabel}>Modified Schedule</Text>
             </View>
-            <TouchableOpacity onPress={fetchSchedule}>
+
+            <TouchableOpacity onPress={() => fetchSchedule(true)}>
               <Text style={styles.refreshText}>↻ Refresh</Text>
             </TouchableOpacity>
+
+
             {loading ? <ActivityIndicator color="#1aa179" /> : renderCalendarGrid()}
           </View>
         )}
@@ -227,6 +260,9 @@ const DetailRow = ({ icon, label, value }: { icon: React.ReactNode; label: strin
 );
 
 export default PlotDetailsScreen;
+
+// 🔧 styles (unchanged) remain here…
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#0d3b23' },

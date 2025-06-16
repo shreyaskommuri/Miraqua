@@ -32,30 +32,41 @@ def get_lat_lon(zip_code):
         return lat, lon
     return None, None
 
+import os
+import requests
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
 def get_forecast(lat, lon):
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "hourly": ["temperature_2m", "soil_moisture_0_to_1cm", "evapotranspiration"],
-        "temperature_unit": "celsius",
-        "timezone": "auto"
-    }
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        print("✅ Forecast fetched successfully")
-        return {
-            "hourly": {
-                "temperature_2m": data.get("hourly", {}).get("temperature_2m", []),
-                "soil_moisture_0_to_1cm": data.get("hourly", {}).get("soil_moisture_0_to_1cm", []),
-                "evapotranspiration": data.get("hourly", {}).get("evapotranspiration", [])
-            }
+        url = f"https://api.openweathermap.org/data/2.5/forecast"
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "units": "imperial",  # °F and mph
+            "appid": OPENWEATHER_API_KEY
         }
+
+        res = requests.get(url, params=params, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        print("✅ OpenWeather forecast fetched successfully")
+
+        # Extract next 24 hours
+        hourly = data.get("list", [])[:24]
+
+        return {
+            "hourly": hourly
+        }
+
     except Exception as e:
-        print("❌ Forecast fetch failed:", e)
-        return {"hourly": {}}
+        print(f"❌ Failed to fetch OpenWeather forecast: {e}")
+        return {"hourly": []}
+
+
 
 def dynamic_kc(crop, age_months):
     crop = crop.lower()

@@ -102,3 +102,18 @@ export const fetchPlotById = async (plotId: string) => {
 };
 
 
+export async function getSchedule(plotId: string, useOriginal = false, forceRefresh = false) {
+  const response = await fetch(`${BASE_URL}/get_plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      plot_id: plotId,
+      use_original: useOriginal,
+      force_refresh: forceRefresh
+    })
+  });
+
+  if (!response.ok) throw new Error("Failed to fetch schedule");
+
+  return await response.json();
+}
