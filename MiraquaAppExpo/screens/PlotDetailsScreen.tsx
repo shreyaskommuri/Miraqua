@@ -68,13 +68,40 @@ const PlotDetailsScreen = () => {
           force_refresh: forceRefresh,
         }),
       });
+      
+
       const ogJson = await ogRes.json();
       setOriginalSchedule(ogJson.schedule || []);
 
-      setSummary(modJson.gem_summary || modJson.summary || 'No irrigation schedule found.');
-      setAvgMoisture(typeof modJson.moisture === 'number' ? `${modJson.moisture.toFixed(2)}%` : '--');
-      setAvgTemp(typeof modJson.current_temp_f === 'number' ? `${modJson.current_temp_f.toFixed(1)}°F` : '--');
-      setAvgSunlight(typeof modJson.sunlight === 'number' ? `${modJson.sunlight.toFixed(0)}%` : '--');
+      // ── NEW SUMMARY LOGIC ──
+      const sched = Array.isArray(modJson.schedule) ? modJson.schedule : [];
+      if (sched.length === 0) {
+        setSummary('No irrigation schedule found for this plot.');
+      } else {
+        setSummary(
+          modJson.gem_summary?.trim() ||
+          modJson.summary?.trim() ||
+          'Irrigation schedule loaded.'
+        );
+      }
+      // ───────────────────────
+
+      setAvgMoisture(
+        typeof modJson.moisture === 'number'
+          ? `${modJson.moisture.toFixed(2)}%`
+          : '--'
+      );
+      setAvgTemp(
+        typeof modJson.current_temp_f === 'number'
+          ? `${modJson.current_temp_f.toFixed(1)}°F`
+          : '--'
+      );
+      setAvgSunlight(
+        typeof modJson.sunlight === 'number'
+          ? `${modJson.sunlight.toFixed(0)}%`
+          : '--'
+      );
+
     } catch {
       setSummary('Failed to load schedule.');
     } finally {

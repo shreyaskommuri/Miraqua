@@ -48,6 +48,29 @@ def get_total_crop_age(planting_date: str, age_at_entry: float) -> float:
     except Exception as e:
         print(f"⚠️ Error calculating total crop age: {e}")
         return age_at_entry or 0.0
+    
+def fetch_onecall_weather(lat, lon):
+    """
+    Calls OpenWeather’s OneCall API to return
+    current, hourly (48h), and daily (7d) forecasts.
+    """
+    key = os.getenv("OPENWEATHER_API_KEY")
+    url = "https://api.openweathermap.org/data/2.5/onecall"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "units": "metric",         # °C → we’ll convert to °F below
+        "exclude": "minutely,alerts",
+        "appid": key,
+    }
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return {
+        "current": data.get("current", {}),
+        "hourly":  data.get("hourly", [])[:24],  # next 24h
+        "daily":   data.get("daily", [])[:7],    # next 7d
+    }
 
 def get_crop_stage(crop, age_months):
     if age_months <= 1:
@@ -58,6 +81,31 @@ def get_crop_stage(crop, age_months):
         return "Mid-season Stage"
     else:
         return "Late-season Stage"
+    
+def fetch_current_conditions(lat, lon):
+    """
+    Fetches current temp, humidity, and cloud cover via
+    OpenWeather's free /weather API, so we can approximate sunlight.
+    """
+    key = os.getenv("OPENWEATHER_API_KEY")
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "lat":   lat,
+        "lon":   lon,
+        "units": "metric",   # returns °C and % humidity
+        "appid": key,
+    }
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    data   = r.json()
+    main   = data.get("main", {})
+    clouds = data.get("clouds", {}).get("all")
+    return {
+        "humidity": main.get("humidity"),  # %
+        "temp":     main.get("temp"),      # °C
+        "clouds":   clouds,                # % cloud cover
+    }
+
 
 def roll_schedule_forward(saved_schedule, plot, daily, hourly, logs):
     """
@@ -141,131 +189,113 @@ def roll_schedule_forward(saved_schedule, plot, daily, hourly, logs):
     rolled.sort(key=lambda x: datetime.strptime(x["date"], "%m/%d/%y"))
     return rolled
 
-@app.route('/get_plan', methods=['GET', 'POST'])
+@app.route('/get_plan', methods=['GET','POST'])
 def get_plan():
-    # — pull params from GET or POST —
+    # 1️⃣ Pull params
     if request.method == 'POST':
         body          = request.get_json() or {}
         plot_id       = body.get("plot_id")
         force_refresh = body.get("force_refresh", False)
-        use_original  = body.get("use_original",  False)
+        use_original  = body.get("use_original", False)
     else:
         plot_id       = request.args.get("plot_id")
-        force_refresh = request.args.get("force_refresh", "false").lower() == "true"
-        use_original  = request.args.get("use_original",  "false").lower() == "true"
+        force_refresh = request.args.get("force_refresh","false").lower() == "true"
+        use_original  = request.args.get("use_original","false").lower() == "true"
 
     if not plot_id:
         return jsonify({"error": "Missing plot_id"}), 400
 
-    # 1️⃣ Load plot metadata
-    plot_res = supabase.table("plots")\
-        .select("*")\
-        .eq("id", plot_id)\
-        .single()\
-        .execute()
+    # 2️⃣ Load plot metadata
+    plot_res = supabase.table("plots") \
+        .select("*").eq("id", plot_id).single().execute()
     plot = plot_res.data
     if not plot:
         return jsonify({"error": "Plot not found"}), 404
 
-    # 2️⃣ Fetch weather & logs
-    weather = get_forecast(plot["lat"], plot["lon"])
-    daily   = weather.get("daily", [])
-    hourly  = weather.get("hourly", [])
-    logs_res = supabase.table("watering_log")\
-        .select("*")\
-        .eq("plot_id", plot_id)\
-        .order("watered_at", desc=True)\
-        .limit(7)\
-        .execute()
+    # 3️⃣ Fetch your existing forecast + current conditions
+    forecast = get_forecast(plot["lat"], plot["lon"])
+    daily    = forecast.get("daily", [])
+    hourly   = forecast.get("hourly", [])
+
+    curr     = fetch_current_conditions(plot["lat"], plot["lon"])
+    humidity = curr.get("humidity")
+    temp_c   = curr.get("temp")
+    clouds   = curr.get("clouds")
+
+    # Derive the three metrics for the UI
+    moisture       = humidity                              if isinstance(humidity, (int, float)) else None
+    current_temp_f = round(temp_c * 9/5 + 32, 1)           if isinstance(temp_c,   (int, float)) else None
+    sunlight       = (100 - clouds)                        if isinstance(clouds,   (int, float)) else None
+
+    # 4️⃣ Fetch recent watering logs
+    logs_res = supabase.table("watering_log") \
+        .select("*").eq("plot_id", plot_id) \
+        .order("watered_at", desc=True).limit(7).execute()
     logs = logs_res.data or []
 
-    # 3️⃣ Retrieve saved schedule
-    sched_res = supabase.table("plot_schedules")\
-        .select("*")\
-        .eq("plot_id", plot_id)\
-        .order("updated_at", desc=True)\
-        .limit(1)\
-        .execute()
+    # 5️⃣ Retrieve saved schedule
+    sched_res     = supabase.table("plot_schedules") \
+        .select("*").eq("plot_id", plot_id) \
+        .order("updated_at", desc=True).limit(1).execute()
     sched_list    = sched_res.data or []
     schedule_data = sched_list[0] if sched_list else {}
 
-    # 4️⃣ Decide regen vs. reuse
+    # 6️⃣ Decide whether to regenerate
     should_regen = bool(force_refresh)
     if schedule_data:
         ts = schedule_data.get("updated_at")
         if ts:
             try:
                 last = datetime.fromisoformat(ts)
-                now  = datetime.now(timezone.utc)
-                should_regen = (now - last) > timedelta(hours=24)
-            except ValueError:
+                should_regen = (datetime.now(timezone.utc) - last) > timedelta(hours=24)
+            except:
                 should_regen = True
         else:
             should_regen = True
-    else:
-        should_regen = True
 
-    # 5️⃣ Early exit with rolled saved schedule
+    # 7️⃣ Early‐exit with rolled schedule
     if schedule_data and not should_regen:
         base   = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
         rolled = roll_schedule_forward(base or [], plot, daily, hourly, logs)
         return jsonify({
-            "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
-            "schedule":    rolled,
-            "summary":     schedule_data.get("summary", ""),
-            "gem_summary": schedule_data.get("gem_summary", ""),
+            "plot_name":      plot.get("name", f"Plot {plot_id[:5]}"),
+            "schedule":       rolled,
+            "summary":        schedule_data.get("summary", ""),
+            "gem_summary":    schedule_data.get("gem_summary", ""),
+            "moisture":       moisture,
+            "current_temp_f": current_temp_f,
+            "sunlight":       sunlight,
         })
 
-    # 6️⃣ Otherwise generate fresh
+    # 8️⃣ Generate fresh AI schedule
     schedule    = generate_ai_schedule(plot, daily, hourly, logs)
     summary     = generate_summary(plot["crop"], plot["lat"], plot["lon"], schedule)
-    gem_summary = generate_gem_summary(plot["crop"], plot["lat"], plot["lon"],
-                                       plot.get("name",""), plot_id)
+    gem_summary = generate_gem_summary(
+        plot["crop"], plot["lat"], plot["lon"], plot.get("name", ""), plot_id
+    )
 
-    # 7️⃣ Upsert new schedule
-    payload = {
-        "plot_id":     plot_id,
-        "schedule":    schedule,
-        "summary":     summary,
-        "gem_summary": gem_summary,
-        "og_schedule": schedule_data.get("og_schedule") or schedule,
-        "updated_at":  datetime.now(timezone.utc).isoformat(),
-    }
-    supabase.table("plot_schedules")\
-        .upsert(payload, on_conflict=["plot_id"])\
+    # 9️⃣ Upsert into Supabase
+    supabase.table("plot_schedules") \
+        .upsert({
+            "plot_id":     plot_id,
+            "schedule":    schedule,
+            "summary":     summary,
+            "gem_summary": gem_summary,
+            "og_schedule": schedule_data.get("og_schedule") or schedule,
+            "updated_at":  datetime.now(timezone.utc).isoformat(),
+        }, on_conflict=["plot_id"]) \
         .execute()
 
-    # 8️⃣ Return it
+    # 🔟 Return the new plan + metrics
     return jsonify({
-        "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
-        "schedule":    schedule,
-        "summary":     summary,
-        "gem_summary": gem_summary,
+        "plot_name":      plot.get("name", f"Plot {plot_id[:5]}"),
+        "schedule":       schedule,
+        "summary":        summary,
+        "gem_summary":    gem_summary,
+        "moisture":       moisture,
+        "current_temp_f": current_temp_f,
+        "sunlight":       sunlight,
     })
-
-@app.route("/add_plot", methods=["POST"])
-def add_plot():
-    data = request.get_json()
-
-    # ✅ Validation: planting_date
-    if "planting_date" in data:
-        try:
-            plant_date = datetime.strptime(data["planting_date"], "%Y-%m-%d")
-            if plant_date > datetime.utcnow():
-                return jsonify({"success": False, "error": "Planting date cannot be in the future"}), 400
-        except ValueError:
-            return jsonify({"success": False, "error": "Invalid planting_date format. Use YYYY-MM-DD."}), 400
-
-    # ✅ Validation: age_at_entry
-    if "age_at_entry" in data:
-        try:
-            float(data["age_at_entry"])
-        except:
-            return jsonify({"success": False, "error": "Age at entry must be a number"}), 400
-
-    res = supabase.table("plots").insert(data).execute()
-    return jsonify(res.data[0] if res.data else {"message": "Added"}), 200
-
 
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
