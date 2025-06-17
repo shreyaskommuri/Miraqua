@@ -13,40 +13,44 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { updatePlotSettings, fetchPlotById } from '../api/api';
+import { updatePlotSettings } from '../api/api';
 
-const PlotSettingsScreen = () => {
-  const route = useRoute<RouteProp<RootStackParamList, 'PlotSettings'>>();
+type Props = RouteProp<RootStackParamList, 'PlotSettings'>;
+
+export default function PlotSettingsScreen() {
   const navigation = useNavigation();
-  const plotId = route.params.plot.id;
+  const route = useRoute<Props>();
+  // we expect the navigator to pass the full plot object here:
+  const { plot } = route.params;
 
-  const [crop, setCrop] = useState('');
-  const [area, setArea] = useState('');
-  const [plantingDate, setPlantingDate] = useState<Date>(new Date());
-  const [ageAtEntry, setAgeAtEntry] = useState('');
-  const [flexType, setFlexType] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
+  // initialize state from the passed-in plot
+  const [crop, setCrop]                 = useState<string>(plot.crop || '');
+  const [area, setArea]                 = useState<string>(String(plot.area || ''));
+  const [plantingDate, setPlantingDate] = useState<Date>(
+    plot.planting_date ? new Date(plot.planting_date) : new Date()
+  );
+  const [ageAtEntry, setAgeAtEntry]     = useState<string>(
+    String(plot.age_at_entry ?? '')
+  );
+  const [flexType, setFlexType]         = useState<boolean>(
+    plot.flex_type === 'monthly'
+  );
+  const [showPicker, setShowPicker]     = useState<boolean>(false);
 
+  // In case someone re-opens the screen with new params, re-seed:
   useEffect(() => {
-    const loadPlot = async () => {
-      const updated = await fetchPlotById(plotId);
-      if (updated) {
-        setCrop(updated.crop || '');
-        setArea(String(updated.area || ''));
-        setAgeAtEntry(String(updated.age_at_entry || ''));
-        setFlexType(updated.flex_type === 'monthly');
-
-        if (updated.planting_date) {
-          setPlantingDate(new Date(updated.planting_date));
-        }
-      }
-    };
-    loadPlot();
-  }, [plotId]);
+    setCrop(plot.crop || '');
+    setArea(String(plot.area || ''));
+    setAgeAtEntry(String(plot.age_at_entry ?? ''));
+    setFlexType(plot.flex_type === 'monthly');
+    if (plot.planting_date) {
+      setPlantingDate(new Date(plot.planting_date));
+    }
+  }, [plot]);
 
   const handleSave = async () => {
     const parsedArea = parseFloat(area);
-    const parsedAge = parseFloat(ageAtEntry);
+    const parsedAge  = parseFloat(ageAtEntry);
 
     if (!crop || isNaN(parsedArea) || isNaN(parsedAge)) {
       Alert.alert('❌ Missing or invalid input', 'Please fill out all fields correctly.');
@@ -56,28 +60,26 @@ const PlotSettingsScreen = () => {
     const updates = {
       crop,
       area: parsedArea,
-      planting_date: plantingDate.toISOString().split('T')[0],
+      planting_date: plantingDate.toISOString().split('T')[0], // "YYYY-MM-DD"
       age_at_entry: parseFloat(parsedAge.toFixed(1)),
       flex_type: flexType ? 'monthly' : 'daily',
     };
 
-    const result = await updatePlotSettings(plotId, updates);
+    const result = await updatePlotSettings(plot.id, updates);
     if (result.success) {
-      Alert.alert('✅ Settings Updated', 'Schedule will regenerate accordingly.');
+      Alert.alert('✅ Settings Updated', 'A new schedule will be generated.');
       navigation.goBack();
     } else {
       Alert.alert('❌ Error', result.error || 'Failed to update settings.');
     }
   };
 
-  const handleDateChange = (_: any, selectedDate?: Date) => {
+  const onDateChange = (_: any, selectedDate?: Date) => {
     setShowPicker(false);
-    if (selectedDate) {
-      if (selectedDate > new Date()) {
-        Alert.alert('Invalid date', 'Planted date cannot be in the future.');
-        return;
-      }
+    if (selectedDate && selectedDate <= new Date()) {
       setPlantingDate(selectedDate);
+    } else if (selectedDate) {
+      Alert.alert('Invalid date', 'Planted date cannot be in the future.');
     }
   };
 
@@ -86,82 +88,73 @@ const PlotSettingsScreen = () => {
       <Text style={styles.header}>Edit Plot Settings</Text>
 
       <Text style={styles.label}>Crop Type</Text>
-      <TextInput value={crop} onChangeText={setCrop} style={styles.input} />
+      <TextInput
+        style={styles.input}
+        value={crop}
+        onChangeText={setCrop}
+        placeholder="e.g., Tomatoes"
+      />
 
       <Text style={styles.label}>Area (m² or acres)</Text>
       <TextInput
+        style={styles.input}
         value={area}
         onChangeText={setArea}
+        placeholder="e.g., 50"
         keyboardType="numeric"
-        style={styles.input}
       />
 
       <Text style={styles.label}>Planted Date</Text>
-      <Button title={`📆 ${plantingDate.toDateString()}`} onPress={() => setShowPicker(true)} />
+      <Button
+        title={`📆 ${plantingDate.toDateString()}`}
+        onPress={() => setShowPicker(true)}
+      />
       {showPicker && (
         <DateTimePicker
           value={plantingDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           maximumDate={new Date()}
-          onChange={handleDateChange}
+          onChange={onDateChange}
         />
       )}
 
       <Text style={styles.label}>Crop age at time of planting (in months)</Text>
       <TextInput
+        style={styles.input}
         value={ageAtEntry}
         onChangeText={setAgeAtEntry}
-        keyboardType="numeric"
         placeholder="e.g., 2.5"
-        style={styles.input}
+        keyboardType="numeric"
       />
 
       <View style={styles.flexRow}>
         <Text style={styles.label}>Flex Type</Text>
-        <Switch value={flexType} onValueChange={setFlexType} />
-        <Text style={{ marginLeft: 8 }}>{flexType ? 'Monthly' : 'Daily'}</Text>
+        <Switch
+          value={flexType}
+          onValueChange={setFlexType}
+        />
+        <Text style={{ marginLeft: 8 }}>
+          {flexType ? 'Monthly' : 'Daily'}
+        </Text>
       </View>
 
       <View style={styles.button}>
-        <Button title="Save Changes" color="#1aa179" onPress={handleSave} />
+        <Button
+          title="Save Changes"
+          color="#1aa179"
+          onPress={handleSave}
+        />
       </View>
     </ScrollView>
   );
-};
-
-export default PlotSettingsScreen;
+}
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    backgroundColor: '#fff',
-    flexGrow: 1,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#1aa179',
-  },
-  label: {
-    fontWeight: '600',
-    fontSize: 16,
-    marginTop: 20,
-  },
-  input: {
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 8,
-    fontSize: 16,
-    marginTop: 4,
-  },
-  flexRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  button: {
-    marginTop: 40,
-  },
+  container:  { flexGrow: 1, padding: 20, backgroundColor: '#fff' },
+  header:     { fontSize: 22, fontWeight: 'bold', marginBottom: 24, color: '#1aa179' },
+  label:      { fontWeight: '600', fontSize: 16, marginTop: 20 },
+  input:      { borderBottomWidth: 1, borderColor: '#ccc', paddingVertical: 8, fontSize: 16 },
+  flexRow:    { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
+  button:     { marginTop: 40 },
 });

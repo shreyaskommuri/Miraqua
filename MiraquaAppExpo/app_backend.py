@@ -12,6 +12,9 @@ from timezonefinder import TimezoneFinder
 import resource
 from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time, dynamic_kc
 
+from datetime import datetime, timedelta, timezone
+
+
 # Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
@@ -27,7 +30,7 @@ RENDER = os.getenv("RENDER", "false").lower() == "true"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "farmerAI")))
-from farmer_ai import generate_summary, generate_gem_summary, process_chat_command
+from farmer_ai import generate_summary, generate_gem_summary, process_chat_command, generate_ai_schedule
 
 app = Flask(__name__)
 CORS(app)
@@ -56,6 +59,42 @@ def get_crop_stage(crop, age_months):
     else:
         return "Late-season Stage"
 
+def roll_schedule_forward(saved_schedule, plot, daily, hourly, logs):
+    """
+    Take a saved 7-day schedule list of dicts (with "date" in "%m/%d/%y"),
+    keep only entries from today onward, and fill up to 7 days by
+    pulling new entries from generate_ai_schedule.
+    """
+    today = datetime.now(timezone.utc).date()
+    rolled = []
+
+    # 1) keep all future or today’s entries
+    for entry in saved_schedule:
+        try:
+            dt = datetime.strptime(entry["date"], "%m/%d/%y").date()
+            if dt >= today:
+                rolled.append(entry)
+        except Exception:
+            continue
+
+    # 2) if we lost days (e.g. old plan), fetch fresh and append missing
+    if len(rolled) < 7:
+        try:
+            new_sched = generate_ai_schedule(plot, daily, hourly, logs)
+            existing = { datetime.strptime(e["date"], "%m/%d/%y").date() for e in rolled }
+            for day in new_sched:
+                dt = datetime.strptime(day["date"], "%m/%d/%y").date()
+                if dt >= today and dt not in existing:
+                    rolled.append(day)
+                    existing.add(dt)
+                    if len(rolled) == 7:
+                        break
+        except Exception:
+            pass
+
+    # 3) sort by date and return
+    rolled.sort(key=lambda x: datetime.strptime(x["date"], "%m/%d/%y"))
+    return rolled
 
 def get_lat_lon(zip_code):
     url = f"http://api.zippopotam.us/us/{zip_code}"
@@ -69,132 +108,140 @@ def get_plot_by_id():
     res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
     return jsonify(res.data), 200
 
-@app.route("/get_plan", methods=["POST"])
+def roll_schedule_forward(saved_schedule, plot, daily, hourly, logs):
+    """
+    Keep entries from today onward and fill up to 7 days
+    by fetching new entries as needed.
+    """
+    today = datetime.now(timezone.utc).date()
+    rolled = []
+    # 1) keep future entries
+    for entry in saved_schedule:
+        try:
+            dt = datetime.strptime(entry["date"], "%m/%d/%y").date()
+            if dt >= today:
+                rolled.append(entry)
+        except Exception:
+            continue
+    # 2) append missing days
+    if len(rolled) < 7:
+        try:
+            new_sched = generate_ai_schedule(plot, daily, hourly, logs)
+            existing = { datetime.strptime(e["date"], "%m/%d/%y").date() for e in rolled }
+            for day in new_sched:
+                dt = datetime.strptime(day["date"], "%m/%d/%y").date()
+                if dt >= today and dt not in existing:
+                    rolled.append(day)
+                    existing.add(dt)
+                    if len(rolled) == 7:
+                        break
+        except Exception:
+            pass
+    # 3) sort and return
+    rolled.sort(key=lambda x: datetime.strptime(x["date"], "%m/%d/%y"))
+    return rolled
+
+@app.route('/get_plan', methods=['GET', 'POST'])
 def get_plan():
-    data = request.get_json()
-    plot_id = data.get("plot_id")
-    use_original = data.get("use_original", False)
-    force_refresh = data.get("force_refresh", False)
+    # — pull params from GET or POST —
+    if request.method == 'POST':
+        body          = request.get_json() or {}
+        plot_id       = body.get("plot_id")
+        force_refresh = body.get("force_refresh", False)
+        use_original  = body.get("use_original",  False)
+    else:
+        plot_id       = request.args.get("plot_id")
+        force_refresh = request.args.get("force_refresh", "false").lower() == "true"
+        use_original  = request.args.get("use_original",  "false").lower() == "true"
 
     if not plot_id:
         return jsonify({"error": "Missing plot_id"}), 400
 
-    # Get plot
-    plot_result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
-    plot = plot_result.data
+    # 1️⃣ Load plot metadata
+    plot_res = supabase.table("plots")\
+        .select("*")\
+        .eq("id", plot_id)\
+        .single()\
+        .execute()
+    plot = plot_res.data
     if not plot:
         return jsonify({"error": "Plot not found"}), 404
 
-    lat = plot.get("lat")
-    lon = plot.get("lon")
-    age = get_total_crop_age(plot.get("planting_date"), plot.get("age_at_entry", 0.0))
+    # 2️⃣ Fetch weather & logs
+    weather = get_forecast(plot["lat"], plot["lon"])
+    daily   = weather.get("daily", [])
+    hourly  = weather.get("hourly", [])
+    logs_res = supabase.table("watering_log")\
+        .select("*")\
+        .eq("plot_id", plot_id)\
+        .order("watered_at", desc=True)\
+        .limit(7)\
+        .execute()
+    logs = logs_res.data or []
 
-    forecast = get_forecast(lat, lon)
-    daily = forecast.get("daily", [])
-    hourly = forecast.get("hourly", [])
-    current_weather = forecast.get("current", {})
+    # 3️⃣ Retrieve saved schedule
+    sched_res = supabase.table("plot_schedules")\
+        .select("*")\
+        .eq("plot_id", plot_id)\
+        .order("updated_at", desc=True)\
+        .limit(1)\
+        .execute()
+    sched_list    = sched_res.data or []
+    schedule_data = sched_list[0] if sched_list else {}
 
-    logs = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute().data or []
-
-    schedule_data = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute().data or {}
-
-    # 🌱 Metric Extraction with fallback
-    try:
-        temp_values = [h.get("main", {}).get("temp") for h in hourly[:24] if h.get("main", {}).get("temp") is not None]
-        current_temp_f = round(np.mean(temp_values), 1) if temp_values else 72.0
-    except:
-        current_temp_f = 72.0
-
-
-    try:
-        moisture_values = [d.get("soil_moisture") for d in daily[:1] if d.get("soil_moisture") is not None]
-        moisture = round(np.mean(moisture_values), 2) if moisture_values else 28.0
-    except:
-        moisture = 28.0
-
-    try:
-        clouds = [h.get("clouds", {}).get("all") for h in hourly[:24] if "clouds" in h]
-        sunlight = round(100 - np.mean(clouds), 0) if clouds else 70.0
-
-    except:
-        sunlight = 70.0
-
-    def roll_schedule_forward(saved_schedule):
-        today = datetime.utcnow().date()
-        rolled = []
-        for entry in saved_schedule:
+    # 4️⃣ Decide regen vs. reuse
+    should_regen = bool(force_refresh)
+    if schedule_data:
+        ts = schedule_data.get("updated_at")
+        if ts:
             try:
-                date_obj = datetime.strptime(entry["date"], "%m/%d/%y").date()
-                if date_obj >= today:
-                    rolled.append(entry)
-            except:
-                continue
+                last = datetime.fromisoformat(ts)
+                now  = datetime.now(timezone.utc)
+                should_regen = (now - last) > timedelta(hours=24)
+            except ValueError:
+                should_regen = True
+        else:
+            should_regen = True
+    else:
+        should_regen = True
 
-        # Refill up to 7 days
-        if len(rolled) < 7:
-            from farmer_ai import generate_ai_schedule
-            new_schedule = generate_ai_schedule(plot, daily, hourly, logs)
-            for day in new_schedule:
-                try:
-                    dt = datetime.strptime(day["date"], "%m/%d/%y").date()
-                    if all(datetime.strptime(e["date"], "%m/%d/%y").date() != dt for e in rolled):
-                        rolled.append(day)
-                    if len(rolled) == 7:
-                        break
-                except:
-                    continue
-        return rolled
-
-    # ✅ Use saved schedule unless forcing refresh
-    if schedule_data and not force_refresh:
-        base_schedule = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
-        rolled_schedule = roll_schedule_forward(base_schedule or [])
-
+    # 5️⃣ Early exit with rolled saved schedule
+    if schedule_data and not should_regen:
+        base   = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
+        rolled = roll_schedule_forward(base or [], plot, daily, hourly, logs)
         return jsonify({
-            "plot_name": plot.get("name", f"Plot {plot_id[:5]}"),
-            "schedule": rolled_schedule,
-            "summary": schedule_data.get("summary", ""),
+            "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
+            "schedule":    rolled,
+            "summary":     schedule_data.get("summary", ""),
             "gem_summary": schedule_data.get("gem_summary", ""),
-            "current_temp_f": current_temp_f,
-            "moisture": moisture,
-            "sunlight": sunlight,
-            "total_crop_age": age,
-            "kc_used": "AI-optimized",
-            "crop_stage": get_crop_stage(plot["crop"], age)
         })
 
-    # 🔁 Generate new schedule
-    from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
-    schedule = generate_ai_schedule(plot, daily, hourly, logs)
-    summary = generate_summary(plot["crop"], lat, lon, schedule)
-    gem_summary = generate_gem_summary(plot["crop"], lat, lon, plot["name"], plot_id)
+    # 6️⃣ Otherwise generate fresh
+    schedule    = generate_ai_schedule(plot, daily, hourly, logs)
+    summary     = generate_summary(plot["crop"], plot["lat"], plot["lon"], schedule)
+    gem_summary = generate_gem_summary(plot["crop"], plot["lat"], plot["lon"],
+                                       plot.get("name",""), plot_id)
 
-    # 💾 Save to Supabase
+    # 7️⃣ Upsert new schedule
     payload = {
-        "plot_id": plot_id,
-        "schedule": schedule,
-        "summary": summary,
-        "gem_summary": gem_summary
-    }
-    if not schedule_data.get("og_schedule"):
-        payload["og_schedule"] = schedule
-
-    supabase.table("plot_schedules").upsert(payload, on_conflict=["plot_id"]).execute()
-
-    return jsonify({
-        "plot_name": plot.get("name", f"Plot {plot_id[:5]}"),
-        "schedule": schedule,
-        "summary": summary,
+        "plot_id":     plot_id,
+        "schedule":    schedule,
+        "summary":     summary,
         "gem_summary": gem_summary,
-        "current_temp_f": current_temp_f,
-        "moisture": moisture,
-        "sunlight": sunlight,
-        "total_crop_age": age,
-        "kc_used": "AI-optimized",
-        "crop_stage": get_crop_stage(plot["crop"], age)
+        "og_schedule": schedule_data.get("og_schedule") or schedule,
+        "updated_at":  datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("plot_schedules")\
+        .upsert(payload, on_conflict=["plot_id"])\
+        .execute()
+
+    # 8️⃣ Return it
+    return jsonify({
+        "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
+        "schedule":    schedule,
+        "summary":     summary,
+        "gem_summary": gem_summary,
     })
-
-
 
 @app.route("/add_plot", methods=["POST"])
 def add_plot():
@@ -241,65 +288,42 @@ def revert_schedule():
 
 @app.route('/update_plot_settings', methods=['POST'])
 def update_plot_settings():
-    data = request.get_json()
+    data    = request.get_json() or {}
     plot_id = data.get("plot_id")
     updates = data.get("updates", {})
 
     if not plot_id:
         return jsonify({"success": False, "error": "Missing plot_id"}), 400
 
-    try:
-        # Step 1: Update plot fields
-        supabase.table("plots").update(updates).eq("id", plot_id).execute()
+    # 1) Apply the settings update to the plots table
+    supabase.table("plots") \
+        .update(updates) \
+        .eq("id", plot_id) \
+        .execute()
 
-        # Step 2: Fetch updated plot
-        result = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
-        plot = result.data
-        if not plot:
-            return jsonify({"success": False, "error": "Plot not found"}), 404
+    # 2) Fetch and return the newly updated plot record
+    new_res = (
+        supabase
+        .table("plots")
+        .select("id, user_id, crop, area, zip_code, name, ph_level, lat, lon, flex_type, planting_date, age_at_entry, custom_constraints, created_at")
+        .eq("id", plot_id)
+        .single()
+        .execute()
+    )
+    updated_plot = new_res.data or {}
 
-        crop = plot["crop"]
-        area = plot["area"]
-        planting_date = plot.get("planting_date")
-        age_at_entry = plot.get("age_at_entry", 0.0)
-        age = get_total_crop_age(planting_date, age_at_entry)
-        lat = plot["lat"]
-        lon = plot["lon"]
-        flex_type = plot.get("flex_type", "daily")
-        plot_name = plot.get("name", f"Plot {plot_id[:5]}")
+    # 3) Invalidate/delete any existing schedule so next get_plan regenerates
+    supabase.table("plot_schedules") \
+        .delete() \
+        .eq("plot_id", plot_id) \
+        .execute()
 
-        # 📦 Get forecast and logs
-        forecast = get_forecast(lat, lon)
-        daily = forecast.get("daily", [])
-        hourly = forecast.get("hourly", [])
-        logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
-        logs = logs_res.data or []
+    # 4) Return success and the updated plot back to the client
+    return jsonify({
+        "success": True,
+        "plot":    updated_plot
+    })
 
-        # 🤖 AI Schedule
-        from farmer_ai import generate_ai_schedule
-        schedule = generate_ai_schedule(plot, daily, hourly, logs)
-        summary = generate_summary(crop, lat, lon, schedule)
-
-        # 💾 Save schedule to plot_schedules
-        existing = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute()
-        existing_data = existing.data or {}
-
-        payload = {
-            "plot_id": plot_id,
-            "schedule": schedule,
-            "summary": summary
-        }
-
-        if not existing_data.get("og_schedule"):
-            payload["og_schedule"] = schedule
-
-        supabase.table("plot_schedules").upsert(payload, on_conflict=["plot_id"]).execute()
-
-        return jsonify({ "success": True })
-
-    except Exception as e:
-        print(f"❌ Error in /update_plot_settings: {e}")
-        return jsonify({ "success": False, "error": str(e) }), 500
 
     
 @app.route("/generate_ai_schedule", methods=["POST"])

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -47,7 +47,6 @@ const PlotDetailsScreen = () => {
   const fetchSchedule = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
-      // fetch modified
       const modRes = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,8 +58,7 @@ const PlotDetailsScreen = () => {
       });
       const modJson = await modRes.json();
       setSchedule(modJson.schedule || []);
-  
-      // fetch original
+
       const ogRes = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +70,7 @@ const PlotDetailsScreen = () => {
       });
       const ogJson = await ogRes.json();
       setOriginalSchedule(ogJson.schedule || []);
-  
-      // set shared metadata (from modified or original doesn't matter)
+
       setSummary(modJson.gem_summary || modJson.summary || 'No irrigation schedule found.');
       setAvgMoisture(typeof modJson.moisture === 'number' ? `${modJson.moisture.toFixed(2)}%` : '--');
       setAvgTemp(typeof modJson.current_temp_f === 'number' ? `${modJson.current_temp_f.toFixed(1)}°F` : '--');
@@ -84,8 +81,6 @@ const PlotDetailsScreen = () => {
       setLoading(false);
     }
   }, [plot]);
-  
-
 
   useFocusEffect(useCallback(() => { fetchSchedule(); }, [fetchSchedule]));
 
@@ -104,70 +99,58 @@ const PlotDetailsScreen = () => {
     }
   };
 
-  const getDayLabel = (dateStr: string) => {
-    try {
-      // Try parsing MM/DD/YY first
-      let parsed;
-      if (dateStr.includes('/')) {
-        parsed = parse(dateStr, 'MM/dd/yy', new Date());
-      } else {
-        parsed = new Date(dateStr); // ISO fallback
-      }
-      return format(parsed, 'EEE');
-    } catch {
-      return '--';
-    }
-  };
-  
+ 
 
   const renderCalendarGrid = () => {
-    const displaySchedule = showModified ? schedule : originalSchedule;
-    const padded = [...displaySchedule];
-    while (padded.length < 14) padded.push(null);
-    const week1 = padded.slice(0, 7);
-    const week2 = padded.slice(7, 14);
-
-    const renderRow = (week: any[]) => (
-      <View style={styles.calendarRow}>
-        {week.map((day, i) => (
-          <TouchableOpacity
-            key={i}
-            style={styles.calendarCell}
-            onPress={() => day && navigation.navigate('SpecificDay', {
-              plotId: plot.id,
-              dayData: day,
-              dayIndex: i,
-            })}
-          >
-            {day && (
-              <>
-                <Text style={styles.cellLiters}>{day.liters}L</Text>
-                <Text style={styles.cellTime}>{day.optimal_time}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-
-    const renderHeaders = (week: any[]) => (
-      <View style={styles.calendarRow}>
-        {week.map((day, i) => (
-          <View key={i} style={[styles.calendarCell, { backgroundColor: 'transparent', borderBottomWidth: 0 }]}>
-            <Text style={styles.dayLabel}>{day ? getDayLabel(day.date) : ''}</Text>
-          </View>
-        ))}
-      </View>
-    );
-
+    const display = showModified ? schedule : originalSchedule;
+    if (!display.length) return null;
+  
     return (
       <View style={styles.calendarWrapper}>
-        {renderHeaders(week1)}
-        {renderRow(week1)}
-        {renderRow(week2)}
+        {/* Header row: weekday + date */}
+        <View style={styles.calendarRow}>
+          {display.map((day, i) => {
+            const dt        = parse(day.date, 'MM/dd/yy', new Date());
+            const weekday   = format(dt, 'EEE'); // Tue, Wed, etc.
+            const dateLabel = format(dt, 'd');   // 17, 18, etc.
+  
+            return (
+              <View key={i} style={[styles.calendarCell, styles.headerCell]}>
+                <Text style={styles.dayLabel}>{weekday}</Text>
+                <Text style={styles.dateLabel}>{dateLabel}</Text>
+              </View>
+            );
+          })}
+        </View>
+  
+        {/* Data row: liters & time */}
+        <View style={styles.calendarRow}>
+          {display.map((day, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.calendarCell}
+              onPress={() => navigation.navigate('SpecificDay', {
+                plotId:   plot.id,
+                dayData:  day,
+                dayIndex: i,
+              })}
+            >
+              <Text style={styles.cellLiters}>
+                {day.liters.toFixed(1)}L
+              </Text>
+              <Text style={styles.cellTime}>
+                {day.optimal_time}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     );
   };
+  
+  
+
+  
 
   return (
     <ScrollView style={styles.container}>
@@ -218,24 +201,20 @@ const PlotDetailsScreen = () => {
           <View style={styles.scheduleBox}>
             <Text style={styles.scheduleTitle}>Irrigation Schedule</Text>
             <View style={styles.toggleRow}>
-            <Switch
-            value={showModified}
-            onValueChange={(val) => {
-              setShowModified(val);
-              fetchSchedule(false); // no need to force refresh — both versions are already stored
-            }}
-            
-            trackColor={{ true: '#1aa179', false: '#ccc' }}
-          />
-
-
+              <Switch
+                value={showModified}
+                onValueChange={(val) => {
+                  setShowModified(val);
+                  fetchSchedule(false);
+                }}
+                trackColor={{ true: '#1aa179', false: '#ccc' }}
+              />
               <Text style={styles.switchLabel}>Modified Schedule</Text>
             </View>
 
             <TouchableOpacity onPress={() => fetchSchedule(true)}>
               <Text style={styles.refreshText}>↻ Refresh</Text>
             </TouchableOpacity>
-
 
             {loading ? <ActivityIndicator color="#1aa179" /> : renderCalendarGrid()}
           </View>
@@ -260,6 +239,7 @@ const DetailRow = ({ icon, label, value }: { icon: React.ReactNode; label: strin
 );
 
 export default PlotDetailsScreen;
+
 
 // 🔧 styles (unchanged) remain here…
 
@@ -312,4 +292,15 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   farmerText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  headerCell: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    paddingVertical: 4,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#444',
+    marginTop: 2,
+  },
+  
 });
