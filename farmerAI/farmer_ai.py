@@ -41,37 +41,78 @@ def generate_summary(crop, lat, lon, schedule):
     )
 
 # ✅ AI-GENERATED GEMINI SUMMARY
-def generate_gem_summary(crop, lat, lon, plot_name, plot_id):
+def generate_gem_summary(
+    crop: str,
+    lat: float,
+    lon: float,
+    plot_name: str,
+    schedule: list[dict],
+    daily: list[dict],
+    logs: list[dict],
+) -> str:
+    """
+    Returns a 3-sentence Gemini summary for the upcoming irrigation schedule,
+    using weather (daily) and watering_log (logs) for extra context.
+    If schedule is empty or something fails, returns "" so we never store a dummy message.
+    """
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-
-        # Get schedule
-        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-        schedule = response.data[0]["schedule"] if response.data else []
-
         if not schedule:
-            return "No irrigation schedule found for this plot."
+            return ""
 
-        # Convert schedule to short summary
+        # 1️⃣ Build the schedule lines
         schedule_lines = "\n".join(
-            f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
+            f"{day['date']}: {day['liters']}L at {day.get('optimal_time','N/A')}"
             for day in schedule
         )
 
-        prompt = f"""
-You are helping a farmer with a plot called '{plot_name}' growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).
+        # 2️⃣ Build the 7-day weather snippet
+        if daily:
+            weather_lines = "\n".join(
+                f"{d.get('dt_txt', d.get('date',''))}: "
+                f"{round(d.get('main',{}).get('temp', 0))}°F, "
+                f"{d.get('weather',[{}])[0].get('description','')}"
+                for d in daily
+            )
+        else:
+            weather_lines = "No 7-day forecast available."
 
-Here is the upcoming irrigation schedule:
+        # 3️⃣ Build the recent watering logs snippet
+        if logs:
+            log_lines = "\n".join(
+                f"{l['watered_at'][:10]} → {l['duration_minutes']} min"
+                for l in logs
+            )
+        else:
+            log_lines = "No recent watering logs."
+
+        # 4️⃣ Compose the Gemini prompt
+        prompt = f"""
+You are FarmerBot helping a user grow {crop} on plot "{plot_name}" at ({lat:.4f}, {lon:.4f}).
+
+Here is the upcoming 7-day irrigation schedule:
 {schedule_lines}
 
-Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather, season, bugs(if theres any in that area, that is what YOU are for), and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
-"""
+7-day weather forecast:
+{weather_lines}
 
-        response = model.generate_content(prompt)
-        return response.text.strip()
+Recent watering log:
+{log_lines}
+
+Write a friendly, concise three-sentence summary that:
+1. States total water usage and any skipped days
+2. Highlights key weather considerations
+3. Gives one tailored tip for growing {crop}
+
+No bullet points or markdown—just plain text.
+""".strip()
+
+        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+        return model.generate_content(prompt).text.strip()
 
     except Exception as e:
-        return f"Gemini summary generation failed: {str(e)}"
+        print(f"⚠️ Gemini summary generation failed: {e}")
+        return ""
+
 
 
 # ✅ ATTACH DATE TO EACH DAY
@@ -350,8 +391,8 @@ Your job is to generate a precise, weather-aware, and cost-saving 7-day irrigati
 - Latitude: {lat}
 - Longitude: {lon}
 - Flex Type: {flex_type}
-- Crop Age: {age} months
-- Planting Date: {planting_date}
+- Crop Age: the crop  is {age} months old at {planting_date} so you have to calculate the true age still
+
 
 ---
 
@@ -409,6 +450,7 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
     "day": "Day 1",
     "date": "06/16/25",
     "liters": 6.5,
+    "explanation": "",
     "optimal_time": "05:00 AM"
   }},
   ...

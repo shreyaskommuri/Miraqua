@@ -271,7 +271,13 @@ def get_plan():
     schedule    = generate_ai_schedule(plot, daily, hourly, logs)
     summary     = generate_summary(plot["crop"], plot["lat"], plot["lon"], schedule)
     gem_summary = generate_gem_summary(
-        plot["crop"], plot["lat"], plot["lon"], plot.get("name", ""), plot_id
+        plot["crop"],
+        plot["lat"],
+        plot["lon"],
+        plot.get("name", ""),
+        schedule,
+        daily,
+        logs
     )
 
     # 9️⃣ Upsert into Supabase
