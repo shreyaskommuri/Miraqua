@@ -21,6 +21,7 @@ import type { HomeStackParamList } from '../navigation/HomeStackNavigator';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { EXPO_PUBLIC_MYIPADRESS } from '@env';
 import { parse, format } from 'date-fns';
+import { fetchPlotById } from '../api/api';
 
 const BASE_URL = `http://${EXPO_PUBLIC_MYIPADRESS}:5050`;
 
@@ -34,6 +35,7 @@ const PlotDetailsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { plot } = route.params;
 
+  const [plotData, setPlotData] = useState(plot);
   const [tab, setTab] = useState<'schedule' | 'details'>('schedule');
   const [schedule, setSchedule] = useState<any[]>([]);
   const [originalSchedule, setOriginalSchedule] = useState<any[]>([]);
@@ -47,12 +49,11 @@ const PlotDetailsScreen = () => {
   const fetchSchedule = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
-      // fetch modified
       const modRes = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plot_id: plot.id,
+          plot_id: plotData.id,
           use_original: false,
           force_refresh: forceRefresh,
         }),
@@ -60,12 +61,11 @@ const PlotDetailsScreen = () => {
       const modJson = await modRes.json();
       setSchedule(modJson.schedule || []);
   
-      // fetch original
       const ogRes = await fetch(`${BASE_URL}/get_plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plot_id: plot.id,
+          plot_id: plotData.id,
           use_original: true,
           force_refresh: forceRefresh,
         }),
@@ -73,7 +73,6 @@ const PlotDetailsScreen = () => {
       const ogJson = await ogRes.json();
       setOriginalSchedule(ogJson.schedule || []);
   
-      // set shared metadata (from modified or original doesn't matter)
       setSummary(modJson.gem_summary || modJson.summary || 'No irrigation schedule found.');
       setAvgMoisture(typeof modJson.moisture === 'number' ? `${modJson.moisture.toFixed(2)}%` : '--');
       setAvgTemp(typeof modJson.current_temp_f === 'number' ? `${modJson.current_temp_f.toFixed(1)}°F` : '--');
@@ -83,19 +82,28 @@ const PlotDetailsScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [plot]);
+  }, [plotData.id]);
   
 
 
-  useFocusEffect(useCallback(() => { fetchSchedule(); }, [fetchSchedule]));
+  useFocusEffect(
+    useCallback(() => {
+      const refreshPlot = async () => {
+        const latest = await fetchPlotById(plot.id);
+        if (latest) setPlotData(latest);
+      };
+      refreshPlot();
+      fetchSchedule();
+    }, [plot.id, fetchSchedule])
+  );
 
   const getCropAgeDisplay = () => {
-    if (!plot.planting_date || typeof plot.age_at_entry !== 'number') return '--';
+    if (!plotData.planting_date || typeof plotData.age_at_entry !== 'number') return '--';
     try {
-      const plantingDate = parse(plot.planting_date, 'yyyy-MM-dd', new Date());
+      const plantingDate = parse(plotData.planting_date, 'yyyy-MM-dd', new Date());
       const now = new Date();
       const monthsSince = Math.floor((now.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
-      const totalMonths = Math.floor(plot.age_at_entry + monthsSince);
+      const totalMonths = Math.floor(plotData.age_at_entry + monthsSince);
       const totalYears = Math.floor(totalMonths / 12);
       const remainingMonths = totalMonths % 12;
       return `${totalYears}y ${remainingMonths}m (as of ${format(plantingDate, 'MMM d, yyyy')})`;
@@ -134,7 +142,7 @@ const PlotDetailsScreen = () => {
             key={i}
             style={styles.calendarCell}
             onPress={() => day && navigation.navigate('SpecificDay', {
-              plotId: plot.id,
+              plotId: plotData.id,
               dayData: day,
               dayIndex: i,
             })}
@@ -174,8 +182,8 @@ const PlotDetailsScreen = () => {
       <View style={styles.image} />
       <View style={styles.card}>
         <View style={styles.headerRow}>
-          <Text style={styles.plotName}>{plot.name}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('PlotSettings', { plot })}>
+          <Text style={styles.plotName}>{plotData.name}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('PlotSettings', { plot: plotData })}>
             <Ionicons name="settings-outline" size={22} color="#1aa179" />
           </TouchableOpacity>
         </View>
@@ -183,11 +191,11 @@ const PlotDetailsScreen = () => {
         <View style={styles.metaRow}>
           <View style={styles.metaBox}>
             <Text style={styles.metaText}>Crop</Text>
-            <Text style={styles.metaValue}>{plot.crop}</Text>
+            <Text style={styles.metaValue}>{plotData.crop}</Text>
           </View>
           <View style={styles.metaBox}>
             <Text style={styles.metaText}>ZIP</Text>
-            <Text style={styles.metaValue}>{plot.zip_code || '--'}</Text>
+            <Text style={styles.metaValue}>{plotData.zip_code || '--'}</Text>
           </View>
         </View>
 
@@ -243,7 +251,7 @@ const PlotDetailsScreen = () => {
 
         <TouchableOpacity
           style={styles.farmerButton}
-          onPress={() => navigation.navigate('FarmerChat', { plot })}
+          onPress={() => navigation.navigate('FarmerChat', { plot: plotData })}
         >
           <Text style={styles.farmerText}>Farmer</Text>
         </TouchableOpacity>
