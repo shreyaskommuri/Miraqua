@@ -41,37 +41,38 @@ def generate_summary(crop, lat, lon, schedule):
     )
 
 # ✅ AI-GENERATED GEMINI SUMMARY
-def generate_gem_summary(crop, lat, lon, plot_name, plot_id):
+def generate_gem_summary(crop, lat, lon, schedule, plot_name, plot_id):
     try:
+        # Initialize the model
         model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
-        # Get schedule
-        response = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-        schedule = response.data[0]["schedule"] if response.data else []
-
+        # If there's no schedule data, bail out immediately
         if not schedule:
             return "No irrigation schedule found for this plot."
 
-        # Convert schedule to short summary
+        # Format the schedule into lines for the prompt
         schedule_lines = "\n".join(
             f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
             for day in schedule
         )
 
+        # Build the prompt
         prompt = f"""
 You are helping a farmer with a plot called '{plot_name}' growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).
 
 Here is the upcoming irrigation schedule:
 {schedule_lines}
 
-Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather, season, bugs(if theres any in that area, that is what YOU are for), and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
+Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather or season, and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
 """
 
+        # Generate and return the summary
         response = model.generate_content(prompt)
         return response.text.strip()
 
     except Exception as e:
         return f"Gemini summary generation failed: {str(e)}"
+
 
 
 # ✅ ATTACH DATE TO EACH DAY
@@ -409,6 +410,7 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
     "day": "Day 1",
     "date": "06/16/25",
     "liters": 6.5,
+    "explanation": "Watered based on ETc and soil moisture",
     "optimal_time": "05:00 AM"
   }},
   ...

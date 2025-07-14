@@ -240,9 +240,10 @@ const PlotDetailsScreen = () => {
               <Text style={styles.switchLabel}>Modified Schedule</Text>
             </View>
 
-            <TouchableOpacity onPress={() => fetchSchedule(true)}>
+            <TouchableOpacity onPress={() => fetchSchedule(false)}>
               <Text style={styles.refreshText}>↻ Refresh</Text>
             </TouchableOpacity>
+
 
 
             {loading ? <ActivityIndicator color="#1aa179" /> : renderCalendarGrid()}
