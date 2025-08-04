@@ -5,11 +5,10 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -19,12 +18,12 @@ const SignInScreen = ({ navigation }: any) => {
 
   const handleSignIn = () => {
     // Simple sign-in - just navigate to main app
-    navigation.navigate('MainApp');
+    navigation.navigate('Home');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
       <KeyboardAvoidingView 
         style={styles.container} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -33,7 +32,7 @@ const SignInScreen = ({ navigation }: any) => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="leaf" size={48} color="#10b981" />
+              <Ionicons name="leaf" size={48} color="#10B981" />
             </View>
             <Text style={styles.title}>Welcome to Miraqua</Text>
             <Text style={styles.subtitle}>Smart Garden AI</Text>
@@ -42,11 +41,11 @@ const SignInScreen = ({ navigation }: any) => {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Ionicons name="mail" size={20} color="#6b7280" style={styles.inputIcon} />
+              <Ionicons name="mail" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Email"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9CA3AF"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -55,11 +54,11 @@ const SignInScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed" size={20} color="#6b7280" style={styles.inputIcon} />
+              <Ionicons name="lock-closed" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Password"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9CA3AF"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={true}
@@ -82,7 +81,7 @@ const SignInScreen = ({ navigation }: any) => {
             </View>
 
             <TouchableOpacity style={styles.googleButton}>
-              <Ionicons name="logo-google" size={20} color="#ea4335" />
+              <Ionicons name="logo-google" size={20} color="#EA4335" />
               <Text style={styles.googleText}>Continue with Google</Text>
             </TouchableOpacity>
           </View>
@@ -103,7 +102,7 @@ const SignInScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1F2937',
   },
   content: {
     flex: 1,
@@ -112,48 +111,48 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
   },
   logoContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: '700',
+    color: 'white',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#9CA3AF',
   },
   form: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'white',
     borderRadius: 12,
-    marginBottom: 16,
     paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
   },
   inputIcon: {
     marginRight: 12,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 16,
     fontSize: 16,
-    color: '#1f2937',
+    color: '#1F2937',
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -161,51 +160,51 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#3b82f6',
+    color: '#10B981',
     fontWeight: '500',
   },
   signInButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 16,
+    backgroundColor: '#10B981',
     borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   signInText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: 'white',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginVertical: 24,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#374151',
   },
   dividerText: {
     marginHorizontal: 16,
     fontSize: 14,
-    color: '#6b7280',
+    color: '#9CA3AF',
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    paddingVertical: 16,
+    backgroundColor: 'white',
     borderRadius: 12,
+    paddingVertical: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
   },
   googleText: {
+    marginLeft: 8,
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
-    marginLeft: 8,
+    color: '#374151',
   },
   footer: {
     flexDirection: 'row',
@@ -214,11 +213,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#9CA3AF',
   },
   signUpText: {
     fontSize: 14,
-    color: '#3b82f6',
+    color: '#10B981',
     fontWeight: '600',
   },
 });

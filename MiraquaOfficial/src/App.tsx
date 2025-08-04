@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
@@ -23,14 +24,16 @@ export default function App() {
   }, []);
 
   return (
-    <ErrorBoundaryProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <StatusBar style="auto" />
-          <AppNavigator />
-          <Toaster />
-        </I18nProvider>
-      </ThemeProvider>
-    </ErrorBoundaryProvider>
+    <NavigationContainer>
+      <ErrorBoundaryProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <StatusBar style="auto" />
+            <AppNavigator />
+            <Toaster />
+          </I18nProvider>
+        </ThemeProvider>
+      </ErrorBoundaryProvider>
+    </NavigationContainer>
   );
 }

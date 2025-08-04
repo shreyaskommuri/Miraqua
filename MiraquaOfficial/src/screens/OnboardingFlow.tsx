@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native";
 
@@ -583,4 +582,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingFlow;
+export default OnboardingFlow; 
