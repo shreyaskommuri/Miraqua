@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface Message {
   id: number;
@@ -40,6 +41,7 @@ export default function ChatScreen({ navigation }: any) {
   
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -123,18 +125,30 @@ export default function ChatScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>AI Assistant</Text>
-        <TouchableOpacity onPress={() => setShowChat(true)} style={styles.chatButton}>
-          <Ionicons name="chatbubbles" size={24} color="#ffffff" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => setShowChat(true)} style={styles.chatButton}>
+            <Ionicons name="chatbubbles" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.welcomeCard}>
           <View style={styles.welcomeIcon}>
             <Ionicons name="leaf" size={32} color="#10b981" />
@@ -147,7 +161,7 @@ export default function ChatScreen({ navigation }: any) {
             style={styles.startChatButton}
             onPress={() => setShowChat(true)}
           >
-            <Ionicons name="chatbubbles" size={20} color="#ffffff" />
+            <Ionicons name="chatbubbles" size={20} color="white" />
             <Text style={styles.startChatText}>Start Chat</Text>
           </TouchableOpacity>
         </View>
@@ -186,7 +200,7 @@ export default function ChatScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Chat Modal */}
       <Modal
@@ -198,13 +212,13 @@ export default function ChatScreen({ navigation }: any) {
           style={styles.modalContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <StatusBar barStyle="dark-content" />
+          <StatusBar barStyle="light-content" />
           
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderLeft}>
               <View style={styles.modalHeaderIcon}>
-                <Ionicons name="leaf" size={24} color="#ffffff" />
+                <Ionicons name="leaf" size={24} color="white" />
               </View>
               <View>
                 <Text style={styles.modalHeaderTitle}>AI Assistant</Text>
@@ -212,7 +226,7 @@ export default function ChatScreen({ navigation }: any) {
               </View>
             </View>
             <TouchableOpacity onPress={() => setShowChat(false)} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#6b7280" />
+              <Ionicons name="close" size={24} color="rgba(255, 255, 255, 0.7)" />
             </TouchableOpacity>
           </View>
 
@@ -279,9 +293,9 @@ export default function ChatScreen({ navigation }: any) {
                   </View>
                   <View style={styles.typingBubble}>
                     <View style={styles.typingDots}>
-                      <View style={[styles.typingDot, { animationDelay: '0s' }]} />
-                      <View style={[styles.typingDot, { animationDelay: '0.1s' }]} />
-                      <View style={[styles.typingDot, { animationDelay: '0.2s' }]} />
+                      <View style={styles.typingDot} />
+                      <View style={styles.typingDot} />
+                      <View style={styles.typingDot} />
                     </View>
                   </View>
                 </View>
@@ -295,49 +309,31 @@ export default function ChatScreen({ navigation }: any) {
               <TextInput
                 style={styles.textInput}
                 placeholder="Type a command like 'skip watering tomorrow'..."
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
                 value={inputValue}
                 onChangeText={setInputValue}
                 multiline
+                maxLength={500}
               />
               <TouchableOpacity 
-                style={[
-                  styles.sendButton,
-                  !inputValue.trim() && styles.sendButtonDisabled
-                ]}
+                style={[styles.sendButton, !inputValue.trim() && styles.sendButtonDisabled]}
                 onPress={handleSendMessage}
                 disabled={!inputValue.trim()}
               >
-                <Ionicons name="send" size={20} color="#ffffff" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.quickSuggestions}>
-              <TouchableOpacity 
-                style={styles.quickSuggestion}
-                onPress={() => handleSuggestionClick("Skip watering today")}
-              >
-                <Ionicons name="calendar" size={12} color="#10b981" />
-                <Text style={styles.quickSuggestionText}>Skip watering today</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.quickSuggestion}
-                onPress={() => handleSuggestionClick("Water now")}
-              >
-                <Ionicons name="water" size={12} color="#3b82f6" />
-                <Text style={styles.quickSuggestionText}>Water now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.quickSuggestion}
-                onPress={() => handleSuggestionClick("Show schedule")}
-              >
-                <Ionicons name="settings" size={12} color="#f59e0b" />
-                <Text style={styles.quickSuggestionText}>Show schedule</Text>
+                <Ionicons name="send" size={20} color="white" />
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="Chat"
+      />
     </View>
   );
 }
@@ -345,61 +341,75 @@ export default function ChatScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#111827',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   chatButton: {
-    backgroundColor: '#10b981',
     padding: 8,
-    borderRadius: 8,
   },
   content: {
     flex: 1,
-    padding: 16,
-    gap: 24,
+    paddingHorizontal: 16,
   },
   welcomeCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 24,
   },
   welcomeIcon: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   welcomeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontSize: 24,
+    fontWeight: '700',
+    color: 'white',
     marginBottom: 8,
+    textAlign: 'center',
   },
   welcomeSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 20,
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
   startChatText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: 'white',
   },
   quickActions: {
     gap: 16,
@@ -424,7 +434,8 @@ const styles = StyleSheet.create({
   quickActionsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: 'white',
+    marginBottom: 12,
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -432,27 +443,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quickAction: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     minWidth: '48%',
   },
   quickActionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
+    color: 'white',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#111827',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -460,7 +466,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#111827',
   },
   modalHeaderLeft: {
     flexDirection: 'row',
@@ -478,11 +485,11 @@ const styles = StyleSheet.create({
   modalHeaderTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#10b981',
+    color: 'white',
   },
   modalHeaderSubtitle: {
     fontSize: 12,
-    color: '#10b981',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   closeButton: {
     padding: 4,
@@ -519,41 +526,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userAvatar: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
   },
   aiAvatar: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
   },
   messageContent: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 12,
-    maxWidth: '85%',
   },
   userContent: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
   },
   aiContent: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   messageText: {
     fontSize: 14,
     lineHeight: 20,
   },
   userText: {
-    color: '#ffffff',
+    color: 'white',
   },
   aiText: {
-    color: '#1f2937',
+    color: 'white',
   },
   messageTime: {
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 4,
   },
   userTime: {
-    color: '#dbeafe',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   aiTime: {
-    color: '#6b7280',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   suggestionsContainer: {
     flexDirection: 'row',
@@ -562,17 +570,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   suggestionBadge: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#10b981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   suggestionText: {
     fontSize: 12,
-    color: '#10b981',
-    fontWeight: '500',
+    color: 'white',
   },
   typingContainer: {
     flexDirection: 'row',
@@ -580,7 +585,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typingBubble: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 12,
   },
@@ -589,16 +594,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   typingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#9ca3af',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   inputContainer: {
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
     padding: 16,
-    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#111827',
   },
   inputRow: {
     flexDirection: 'row',
@@ -607,13 +612,13 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    color: '#1f2937',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: 'white',
     maxHeight: 100,
-    textAlignVertical: 'top',
   },
   sendButton: {
     backgroundColor: '#10b981',
@@ -624,27 +629,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#d1d5db',
-  },
-  quickSuggestions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickSuggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#10b981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  quickSuggestionText: {
-    fontSize: 12,
-    color: '#10b981',
-    fontWeight: '500',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
 }); 

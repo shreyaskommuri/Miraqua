@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface Product {
   id: number;
@@ -34,6 +35,7 @@ export default function MarketplaceScreen({ navigation }: any) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Product[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -253,32 +255,41 @@ export default function MarketplaceScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Marketplace</Text>
-        <TouchableOpacity style={styles.cartButton}>
-          <Ionicons name="cart" size={20} color="#6B7280" />
-          {cart.length > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{cart.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.cartButton}>
+            <Ionicons name="cart" size={20} color="white" />
+            {cart.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cart.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <Ionicons name="search" size={20} color="rgba(255, 255, 255, 0.7)" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search products..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -295,7 +306,7 @@ export default function MarketplaceScreen({ navigation }: any) {
               <Ionicons 
                 name={category.icon as any} 
                 size={16} 
-                color={selectedCategory === category.id ? '#10B981' : '#6B7280'} 
+                color={selectedCategory === category.id ? '#10B981' : 'rgba(255, 255, 255, 0.7)'} 
               />
               <Text style={[styles.categoryText, selectedCategory === category.id && styles.activeCategoryText]}>
                 {category.name}
@@ -306,9 +317,17 @@ export default function MarketplaceScreen({ navigation }: any) {
 
         {/* Products Grid */}
         <View style={styles.productsGrid}>
-          {getFilteredProducts().map(renderProductCard)}
+          {getFilteredProducts().map(product => renderProductCard(product))}
         </View>
       </ScrollView>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="Marketplace"
+      />
     </View>
   );
 }
@@ -316,17 +335,41 @@ export default function MarketplaceScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#111827',
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
     padding: 8,
@@ -358,24 +401,22 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   searchInput: {
     flex: 1,
+    fontSize: 14,
+    color: 'white',
     marginLeft: 12,
-    fontSize: 16,
-    color: '#1F2937',
   },
   categoriesContainer: {
     marginBottom: 20,
@@ -383,23 +424,20 @@ const styles = StyleSheet.create({
   categoryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   activeCategoryButton: {
     backgroundColor: '#10B981',
-    borderColor: '#10B981',
   },
   categoryText: {
-    marginLeft: 6,
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
+    marginLeft: 8,
   },
   activeCategoryText: {
     color: 'white',
@@ -410,13 +448,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   productCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     padding: 16,
     width: '48%',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   productHeader: {
     flexDirection: 'row',
@@ -426,7 +462,7 @@ const styles = StyleSheet.create({
   bestsellerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -451,7 +487,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: 80,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -463,12 +499,12 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 4,
   },
   productDescription: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 8,
     lineHeight: 16,
   },
@@ -484,12 +520,12 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginRight: 2,
   },
   reviewsText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   priceContainer: {
     flexDirection: 'row',
@@ -499,30 +535,29 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#10B981',
     marginRight: 8,
   },
   originalPrice: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.5)',
     textDecorationLine: 'line-through',
   },
   featuresContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 4,
     marginBottom: 12,
   },
   featureTag: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginRight: 4,
-    marginBottom: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   featureText: {
     fontSize: 10,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   addToCartButton: {
     flexDirection: 'row',
@@ -530,16 +565,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#10B981',
     paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
+    gap: 4,
   },
   disabledButton: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   addToCartText: {
-    marginLeft: 4,
     fontSize: 12,
+    fontWeight: '600',
     color: 'white',
-    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
@@ -547,8 +583,8 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     height: 200,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
     marginBottom: 16,
   },
 }); 

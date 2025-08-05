@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface PredictiveData {
   date: string;
@@ -26,6 +27,7 @@ export default function PredictiveDashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [activeSchedule, setActiveSchedule] = useState<'current' | 'ai-optimized'>('current');
   const [data, setData] = useState<PredictiveData[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -154,36 +156,65 @@ export default function PredictiveDashboardScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color="#6B7280" />
+          <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+            <Ionicons name="menu" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Predictive Dashboard</Text>
-          <View style={styles.headerRight} />
+          
+          <View style={styles.logoContainer}>
+            <View style={styles.logoIcon}>
+              <Ionicons name="leaf" size={20} color="white" />
+            </View>
+            <Text style={styles.logoText}>Miraqua</Text>
+          </View>
+          
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.settingsButton}>
+              <Ionicons name="settings" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
+        
         <View style={styles.loadingContainer}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <View key={i} style={styles.loadingCard} />
-          ))}
+          <View style={styles.loadingCard} />
+          <View style={styles.loadingCard} />
+          <View style={styles.loadingCard} />
         </View>
+
+        {/* Sidebar Navigation */}
+        <SidebarNavigation
+          visible={showSidebar}
+          onClose={() => setShowSidebar(false)}
+          navigation={navigation}
+          currentRoute="PredictiveDashboard"
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Predictive Dashboard</Text>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Ionicons name="settings" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -257,6 +288,14 @@ export default function PredictiveDashboardScreen({ navigation }: any) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="PredictiveDashboard"
+      />
     </View>
   );
 }
@@ -264,7 +303,7 @@ export default function PredictiveDashboardScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
@@ -272,9 +311,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingTop: 60,
   },
   backButton: {
     padding: 8,
@@ -285,7 +322,8 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   headerRight: {
-    width: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   settingsButton: {
     padding: 8,
@@ -295,15 +333,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   scheduleCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   scheduleHeader: {
     flexDirection: 'row',
@@ -312,15 +345,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scheduleTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
   },
   savingsBadge: {
     backgroundColor: '#10B981',
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 4,
   },
   savingsText: {
     color: 'white',
@@ -329,15 +362,16 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     padding: 4,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 6,
+    alignItems: 'center',
   },
   activeTab: {
     backgroundColor: '#10B981',
@@ -345,28 +379,24 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6B7280',
+    color: 'white',
   },
   activeTabText: {
     color: 'white',
+    fontWeight: '600',
   },
   aiTab: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   chartCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   chartContainer: {
-    marginBottom: 16,
+    marginTop: 8,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -377,25 +407,26 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
   },
   legend: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 16,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
   },
   legendText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'white',
   },
   chartScroll: {
     marginHorizontal: -20,
@@ -423,7 +454,7 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 10,
-    color: '#6B7280',
+    color: '#9CA3AF',
     marginBottom: 4,
   },
   barValue: {
@@ -431,20 +462,15 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   weatherCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   weatherTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 16,
   },
   weatherContainer: {
@@ -458,13 +484,13 @@ const styles = StyleSheet.create({
   },
   weatherDate: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#9CA3AF',
     marginBottom: 8,
   },
   weatherTemp: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginTop: 4,
   },
   weatherRain: {
@@ -473,20 +499,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   insightsCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   insightsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 16,
   },
   insightItem: {
@@ -497,7 +518,7 @@ const styles = StyleSheet.create({
   insightText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: 'white',
     marginLeft: 12,
     lineHeight: 20,
   },
@@ -507,8 +528,29 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     height: 200,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     marginBottom: 16,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
   },
 }); 

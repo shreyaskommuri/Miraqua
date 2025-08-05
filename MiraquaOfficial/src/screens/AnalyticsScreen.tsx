@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface AnalyticsData {
   totalWaterUsed: number;
@@ -27,6 +28,7 @@ export default function AnalyticsScreen({ navigation }: any) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [showSidebar, setShowSidebar] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     totalWaterUsed: 0,
     waterSavings: 0,
@@ -165,17 +167,26 @@ export default function AnalyticsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analytics</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+            <Ionicons name="refresh" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -274,6 +285,14 @@ export default function AnalyticsScreen({ navigation }: any) {
           </View>
         )}
       </ScrollView>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="Analytics"
+      />
     </View>
   );
 }
@@ -281,7 +300,7 @@ export default function AnalyticsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
@@ -289,9 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingTop: 60,
   },
   backButton: {
     padding: 8,
@@ -309,29 +326,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorCard: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#EF4444',
   },
   errorText: {
-    color: '#DC2626',
+    color: '#FCA5A5',
     fontSize: 14,
     marginBottom: 8,
   },
   retryButton: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#EF4444',
     borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignSelf: 'flex-start',
   },
   retryText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -340,17 +357,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     width: '48%',
     marginBottom: 12,
     borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statHeader: {
     flexDirection: 'row',
@@ -358,38 +370,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   statTitle: {
+    fontSize: 12,
+    color: 'white',
     marginLeft: 8,
-    fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
   },
   statValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 4,
   },
   statSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
     padding: 4,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
     alignItems: 'center',
-    borderRadius: 8,
   },
   activeTab: {
     backgroundColor: '#10B981',
@@ -397,29 +405,25 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6B7280',
+    color: 'white',
   },
   activeTabText: {
     color: 'white',
+    fontWeight: '600',
   },
   tabContent: {
     marginBottom: 20,
   },
   chartCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   chartTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 16,
   },
   chartContainer: {
@@ -483,19 +487,44 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   comingSoonText: {
-    fontSize: 16,
-    color: '#6B7280',
+    color: '#9CA3AF',
+    fontSize: 14,
     textAlign: 'center',
-    fontStyle: 'italic',
+    paddingVertical: 20,
   },
   loadingContainer: {
     flex: 1,
     padding: 20,
   },
   loadingCard: {
-    height: 100,
-    backgroundColor: '#E5E7EB',
+    height: 120,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     marginBottom: 16,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 }); 

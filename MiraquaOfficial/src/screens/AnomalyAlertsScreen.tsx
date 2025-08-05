@@ -9,24 +9,25 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface AnomalyAlert {
   id: string;
-  type: 'critical' | 'warning' | 'info';
+  type: 'moisture' | 'temperature' | 'water' | 'system';
+  severity: 'low' | 'medium' | 'high' | 'critical';
   title: string;
   description: string;
+  timestamp: string;
   plotId: string;
   plotName: string;
-  timestamp: string;
-  isResolved: boolean;
-  severity: number;
+  status: 'active' | 'acknowledged' | 'resolved';
 }
 
 export default function AnomalyAlertsScreen({ navigation }: any) {
   const [alerts, setAlerts] = useState<AnomalyAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
-  const [showResolved, setShowResolved] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetchAlerts();
@@ -41,58 +42,58 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
       setAlerts([
         {
           id: '1',
-          type: 'critical',
+          type: 'moisture',
+          severity: 'critical',
           title: 'Low Soil Moisture Detected',
           description: 'Soil moisture levels have dropped below 30% in Plot A. Immediate watering required.',
+          timestamp: '2 minutes ago',
           plotId: 'plot-1',
           plotName: 'Plot A - Tomatoes',
-          timestamp: '2 minutes ago',
-          isResolved: false,
-          severity: 9
+          status: 'active'
         },
         {
           id: '2',
-          type: 'warning',
+          type: 'water',
+          severity: 'medium',
           title: 'Unusual Water Consumption',
           description: 'Water usage is 25% higher than normal for this time of day.',
+          timestamp: '15 minutes ago',
           plotId: 'plot-2',
           plotName: 'Plot B - Lettuce',
-          timestamp: '15 minutes ago',
-          isResolved: false,
-          severity: 6
+          status: 'active'
         },
         {
           id: '3',
-          type: 'info',
+          type: 'system',
+          severity: 'low',
           title: 'Weather Alert',
           description: 'Heavy rainfall expected in the next 2 hours. Consider reducing irrigation.',
+          timestamp: '1 hour ago',
           plotId: 'all',
           plotName: 'All Plots',
-          timestamp: '1 hour ago',
-          isResolved: false,
-          severity: 3
+          status: 'active'
         },
         {
           id: '4',
-          type: 'critical',
+          type: 'moisture',
+          severity: 'critical',
           title: 'Sensor Malfunction',
           description: 'Moisture sensor in Plot C is not responding. Manual inspection required.',
+          timestamp: '3 hours ago',
           plotId: 'plot-3',
           plotName: 'Plot C - Peppers',
-          timestamp: '3 hours ago',
-          isResolved: true,
-          severity: 8
+          status: 'resolved'
         },
         {
           id: '5',
-          type: 'warning',
+          type: 'temperature',
+          severity: 'high',
           title: 'Temperature Spike',
           description: 'Temperature has increased by 8°F in the last hour. Monitor plant stress.',
+          timestamp: '4 hours ago',
           plotId: 'plot-1',
           plotName: 'Plot A - Tomatoes',
-          timestamp: '4 hours ago',
-          isResolved: false,
-          severity: 5
+          status: 'active'
         }
       ]);
     } catch (error) {
@@ -112,7 +113,7 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
           text: 'Resolve',
           onPress: () => {
             setAlerts(prev => prev.map(alert => 
-              alert.id === alertId ? { ...alert, isResolved: true } : alert
+              alert.id === alertId ? { ...alert, status: 'resolved' } : alert
             ));
             Alert.alert('Success', 'Alert marked as resolved');
           }
@@ -141,57 +142,63 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
 
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case 'critical': return 'warning';
-      case 'warning': return 'alert-circle';
-      case 'info': return 'information-circle';
+      case 'moisture': return 'water';
+      case 'temperature': return 'thermometer';
+      case 'water': return 'water';
+      case 'system': return 'cog';
       default: return 'notifications';
     }
   };
 
-  const getAlertColor = (type: string) => {
-    switch (type) {
+  const getAlertColor = (severity: string) => {
+    switch (severity) {
       case 'critical': return '#EF4444';
-      case 'warning': return '#F59E0B';
-      case 'info': return '#3B82F6';
+      case 'high': return '#F59E0B';
+      case 'medium': return '#3B82F6';
+      case 'low': return '#10B981';
       default: return '#6B7280';
     }
   };
 
-  const getSeverityColor = (severity: number) => {
-    if (severity >= 8) return '#EF4444';
-    if (severity >= 5) return '#F59E0B';
-    return '#3B82F6';
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return '#EF4444';
+      case 'high': return '#F59E0B';
+      case 'medium': return '#3B82F6';
+      case 'low': return '#10B981';
+      default: return '#6B7280';
+    }
   };
 
   const filteredAlerts = alerts.filter(alert => {
-    if (!showResolved && alert.isResolved) return false;
-    if (filter !== 'all' && alert.type !== filter) return false;
+    if (alert.status === 'resolved' && selectedFilter === 'active') return false;
+    if (selectedFilter !== 'all' && alert.type !== selectedFilter) return false;
     return true;
   });
 
   const AlertCard = ({ alert }: { alert: AnomalyAlert }) => (
-    <View style={[styles.alertCard, alert.isResolved && styles.resolvedCard]}>
+    <View style={[styles.alertCard, alert.status === 'resolved' && styles.resolvedCard]}>
       <View style={styles.alertHeader}>
         <View style={styles.alertInfo}>
-          <View style={[styles.alertIcon, { backgroundColor: getAlertColor(alert.type) + '20' }]}>
-            <Ionicons name={getAlertIcon(alert.type) as any} size={20} color={getAlertColor(alert.type)} />
+          <View style={[styles.alertIcon, { backgroundColor: getAlertColor(alert.severity) + '20' }]}>
+            <Ionicons name={getAlertIcon(alert.type) as any} size={20} color={getAlertColor(alert.severity)} />
           </View>
           <View style={styles.alertDetails}>
             <Text style={styles.alertTitle}>{alert.title}</Text>
             <Text style={styles.alertPlot}>{alert.plotName}</Text>
-            <Text style={styles.alertTime}>{alert.timestamp}</Text>
+            <Text style={styles.alertTimestamp}>{alert.timestamp}</Text>
           </View>
         </View>
         <View style={styles.alertSeverity}>
           <View style={[styles.severityBar, { backgroundColor: getSeverityColor(alert.severity) }]} />
-          <Text style={styles.severityText}>{alert.severity}/10</Text>
+          <Text style={styles.severityText}>{alert.severity}</Text>
         </View>
       </View>
       
       <Text style={styles.alertDescription}>{alert.description}</Text>
       
       <View style={styles.alertActions}>
-        {!alert.isResolved && (
+        {alert.status !== 'resolved' && (
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => resolveAlert(alert.id)}
@@ -240,32 +247,41 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Anomaly Alerts</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={fetchAlerts}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={fetchAlerts}>
+            <Ionicons name="refresh" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{alerts.filter(a => !a.isResolved).length}</Text>
+            <Text style={styles.statNumber}>{alerts.filter(a => a.status !== 'resolved').length}</Text>
             <Text style={styles.statLabel}>Active Alerts</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{alerts.filter(a => a.type === 'critical' && !a.isResolved).length}</Text>
+            <Text style={styles.statNumber}>{alerts.filter(a => a.severity === 'critical' && a.status !== 'resolved').length}</Text>
             <Text style={styles.statLabel}>Critical</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{alerts.filter(a => a.isResolved).length}</Text>
+            <Text style={styles.statNumber}>{alerts.filter(a => a.status === 'resolved').length}</Text>
             <Text style={styles.statLabel}>Resolved</Text>
           </View>
         </View>
@@ -275,13 +291,13 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
           <View style={styles.filterRow}>
             <Text style={styles.filterLabel}>Filter by type:</Text>
             <View style={styles.filterButtons}>
-              {['all', 'critical', 'warning', 'info'].map((type) => (
+              {['all', 'moisture', 'temperature', 'water', 'system'].map((type) => (
                 <TouchableOpacity
                   key={type}
-                  style={[styles.filterButton, filter === type && styles.activeFilter]}
-                  onPress={() => setFilter(type as any)}
+                  style={[styles.filterButton, selectedFilter === type && styles.activeFilter]}
+                  onPress={() => setSelectedFilter(type as any)}
                 >
-                  <Text style={[styles.filterText, filter === type && styles.activeFilterText]}>
+                  <Text style={[styles.filterText, selectedFilter === type && styles.activeFilterText]}>
                     {type.charAt(0).toUpperCase() + type.slice(1)}
                   </Text>
                 </TouchableOpacity>
@@ -290,33 +306,39 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
           </View>
           
           <TouchableOpacity
-            style={[styles.toggleButton, showResolved && styles.activeToggle]}
-            onPress={() => setShowResolved(!showResolved)}
+            style={[styles.toggleButton, selectedFilter === 'active' && styles.activeToggle]}
+            onPress={() => setSelectedFilter(selectedFilter === 'active' ? 'all' : 'active')}
           >
-            <Ionicons name="checkmark-circle" size={16} color={showResolved ? 'white' : '#6B7280'} />
-            <Text style={[styles.toggleText, showResolved && styles.activeToggleText]}>
-              Show Resolved
+            <Ionicons name="checkmark-circle" size={16} color={selectedFilter === 'active' ? 'white' : '#6B7280'} />
+            <Text style={[styles.toggleText, selectedFilter === 'active' && styles.activeToggleText]}>
+              Show Active
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Alerts List */}
-        <View style={styles.alertsSection}>
-          <Text style={styles.sectionTitle}>
-            {filteredAlerts.length} Alert{filteredAlerts.length !== 1 ? 's' : ''}
-          </Text>
-          {filteredAlerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
-          {filteredAlerts.length === 0 && (
+        <View style={styles.alertsContainer}>
+          {filteredAlerts.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+              <Ionicons name="checkmark-circle" size={48} color="#9CA3AF" />
               <Text style={styles.emptyText}>No alerts found</Text>
               <Text style={styles.emptySubtext}>All systems are running smoothly!</Text>
             </View>
+          ) : (
+            filteredAlerts.map((alert) => (
+              <AlertCard key={alert.id} alert={alert} />
+            ))
           )}
         </View>
       </ScrollView>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="AnomalyAlerts"
+      />
     </View>
   );
 }
@@ -324,7 +346,7 @@ export default function AnomalyAlertsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
@@ -332,9 +354,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingTop: 60,
   },
   backButton: {
     padding: 8,
@@ -360,47 +380,37 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     flex: 1,
     marginHorizontal: 4,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#9CA3AF',
     textAlign: 'center',
   },
   filtersContainer: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   filterRow: {
     marginBottom: 12,
   },
   filterLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: '600',
+    color: 'white',
     marginBottom: 8,
   },
   filterButtons: {
@@ -409,63 +419,53 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
     paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'white',
+    paddingHorizontal: 12,
   },
   activeFilter: {
     backgroundColor: '#10B981',
-    borderColor: '#10B981',
   },
   filterText: {
     fontSize: 12,
-    color: '#374151',
+    color: 'white',
+    fontWeight: '500',
   },
   activeFilterText: {
     color: 'white',
+    fontWeight: '600',
   },
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
     paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
   activeToggle: {
     backgroundColor: '#10B981',
   },
   toggleText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 6,
+    fontSize: 12,
+    color: 'white',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   activeToggleText: {
     color: 'white',
+    fontWeight: '600',
   },
-  alertsSection: {
+  alertsContainer: {
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
-  },
   alertCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   resolvedCard: {
     opacity: 0.6,
@@ -474,16 +474,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   alertInfo: {
     flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
   alertIcon: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -494,62 +495,69 @@ const styles = StyleSheet.create({
   alertTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 4,
   },
-  alertPlot: {
+  alertDescription: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  alertTime: {
-    fontSize: 12,
     color: '#9CA3AF',
+    lineHeight: 20,
   },
   alertSeverity: {
     alignItems: 'center',
   },
   severityBar: {
     width: 4,
-    height: 40,
+    height: 24,
     borderRadius: 2,
     marginBottom: 4,
   },
   severityText: {
     fontSize: 10,
-    color: '#6B7280',
+    color: '#9CA3AF',
+    fontWeight: '600',
   },
-  alertDescription: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
+  alertMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  alertPlot: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  alertTimestamp: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   alertActions: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 6,
-    backgroundColor: '#F3F4F6',
-  },
-  actionText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   viewButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
   },
   deleteButton: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  actionText: {
+    fontSize: 12,
+    color: 'white',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   deleteText: {
-    color: '#EF4444',
+    color: '#FCA5A5',
   },
   emptyState: {
     alignItems: 'center',
@@ -558,13 +566,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#9CA3AF',
     textAlign: 'center',
   },
   loadingContainer: {
@@ -573,8 +581,29 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     height: 120,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     marginBottom: 16,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
   },
 }); 

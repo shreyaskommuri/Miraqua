@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface Report {
   id: string;
@@ -26,6 +27,7 @@ export default function ReportsScreen({ navigation }: any) {
   const [selectedType, setSelectedType] = useState('overview');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetchReports();
@@ -206,17 +208,26 @@ export default function ReportsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reports</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={fetchReports}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={fetchReports}>
+            <Ionicons name="refresh" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -293,6 +304,14 @@ export default function ReportsScreen({ navigation }: any) {
           ))}
         </View>
       </ScrollView>
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="Reports"
+      />
     </View>
   );
 }
@@ -522,5 +541,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     borderRadius: 12,
     marginBottom: 16,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  logoIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
   },
 }); 

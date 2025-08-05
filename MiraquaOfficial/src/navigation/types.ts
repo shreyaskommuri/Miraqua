@@ -20,6 +20,9 @@ export type RootStackParamList = {
   YieldForecast: undefined;
   SmartMap: undefined;
   Community: undefined;
+  SetupPlot: undefined;
+  OnboardingLocation: { plotName?: string; selectedCrop?: string; cropDetails?: any };
+  OnboardingComplete: { plotName?: string; selectedCrop?: string; cropDetails?: any; latitude?: number; longitude?: number; address?: string };
 };
 
 export type MainTabParamList = {

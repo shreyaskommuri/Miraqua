@@ -6,22 +6,22 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   TextInput,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
 interface CommunityPost {
   id: string;
   author: string;
-  authorAvatar: string;
-  title: string;
+  avatar: string;
   content: string;
-  category: 'question' | 'tip' | 'success' | 'general';
+  timestamp: string;
   likes: number;
   comments: number;
-  timestamp: string;
-  isLiked: boolean;
+  tags: string[];
+  type: 'question' | 'tip' | 'achievement' | 'general';
 }
 
 interface CommunityEvent {
@@ -42,6 +42,7 @@ export default function CommunityScreen({ navigation }: any) {
   const [activeTab, setActiveTab] = useState<'posts' | 'events'>('posts');
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
   const [newPostText, setNewPostText] = useState('');
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetchCommunityData();
@@ -57,38 +58,35 @@ export default function CommunityScreen({ navigation }: any) {
         {
           id: '1',
           author: 'Sarah Johnson',
-          authorAvatar: 'https://via.placeholder.com/40/10B981/FFFFFF?text=SJ',
-          title: 'Best practices for tomato growing in dry climates?',
+          avatar: 'https://via.placeholder.com/40/10B981/FFFFFF?text=SJ',
           content: 'I\'m having trouble with my tomatoes in this hot weather. Any tips for maintaining soil moisture without overwatering?',
-          category: 'question',
+          timestamp: '2 hours ago',
           likes: 12,
           comments: 8,
-          timestamp: '2 hours ago',
-          isLiked: false
+          tags: ['tomatoes', 'dry climate', 'soil moisture'],
+          type: 'question'
         },
         {
           id: '2',
           author: 'Mike Chen',
-          authorAvatar: 'https://via.placeholder.com/40/3B82F6/FFFFFF?text=MC',
-          title: 'Success story: 40% water savings with smart irrigation',
+          avatar: 'https://via.placeholder.com/40/3B82F6/FFFFFF?text=MC',
           content: 'After implementing the AI recommendations, I\'ve seen a significant reduction in water usage while maintaining crop health. Highly recommend!',
-          category: 'success',
+          timestamp: '1 day ago',
           likes: 24,
           comments: 15,
-          timestamp: '1 day ago',
-          isLiked: true
+          tags: ['AI', 'water savings', 'smart irrigation'],
+          type: 'achievement'
         },
         {
           id: '3',
           author: 'Emma Davis',
-          authorAvatar: 'https://via.placeholder.com/40/F59E0B/FFFFFF?text=ED',
-          title: 'Organic pest control methods that actually work',
+          avatar: 'https://via.placeholder.com/40/F59E0B/FFFFFF?text=ED',
           content: 'Here are the methods I\'ve found most effective: neem oil for aphids, diatomaceous earth for slugs, and companion planting with marigolds.',
-          category: 'tip',
+          timestamp: '3 days ago',
           likes: 18,
           comments: 12,
-          timestamp: '3 days ago',
-          isLiked: false
+          tags: ['pest control', 'organic', 'neem oil'],
+          type: 'tip'
         }
       ]);
 
@@ -134,7 +132,7 @@ export default function CommunityScreen({ navigation }: any) {
   const likePost = (postId: string) => {
     setPosts(prev => prev.map(post => 
       post.id === postId 
-        ? { ...post, likes: post.isLiked ? post.likes - 1 : post.likes + 1, isLiked: !post.isLiked }
+        ? { ...post, likes: post.likes + 1, isLiked: true }
         : post
     ));
   };
@@ -160,14 +158,13 @@ export default function CommunityScreen({ navigation }: any) {
     const newPost: CommunityPost = {
       id: Date.now().toString(),
       author: 'You',
-      authorAvatar: 'https://via.placeholder.com/40/8B5CF6/FFFFFF?text=YO',
-      title: 'New Post',
+      avatar: 'https://via.placeholder.com/40/8B5CF6/FFFFFF?text=YO',
       content: newPostText,
-      category: 'general',
+      timestamp: 'Just now',
       likes: 0,
       comments: 0,
-      timestamp: 'Just now',
-      isLiked: false
+      tags: [],
+      type: 'general'
     };
 
     setPosts(prev => [newPost, ...prev]);
@@ -202,26 +199,30 @@ export default function CommunityScreen({ navigation }: any) {
     >
       <View style={styles.postHeader}>
         <View style={styles.authorInfo}>
-          <View style={styles.avatar}>
+          <View style={styles.authorAvatar}>
             <Text style={styles.avatarText}>{post.author.split(' ').map(n => n[0]).join('')}</Text>
           </View>
           <View style={styles.authorDetails}>
             <Text style={styles.authorName}>{post.author}</Text>
-            <Text style={styles.postTime}>{post.timestamp}</Text>
+            <Text style={styles.postTimestamp}>{post.timestamp}</Text>
           </View>
         </View>
-        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(post.category) + '20' }]}>
-          <Ionicons name={getCategoryIcon(post.category) as any} size={12} color={getCategoryColor(post.category)} />
-          <Text style={[styles.categoryText, { color: getCategoryColor(post.category) }]}>
-            {post.category}
+        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(post.type) + '20' }]}>
+          <Ionicons name={getCategoryIcon(post.type) as any} size={12} color={getCategoryColor(post.type)} />
+          <Text style={[styles.categoryText, { color: getCategoryColor(post.type) }]}>
+            {post.type}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.postTitle}>{post.title}</Text>
-      <Text style={styles.postContent} numberOfLines={3}>
-        {post.content}
-      </Text>
+      <Text style={styles.postTitle}>{post.content}</Text>
+      <View style={styles.postTags}>
+        {post.tags.map((tag, index) => (
+          <View key={index} style={styles.tagBadge}>
+            <Text style={styles.tagText}>{tag}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={styles.postActions}>
         <TouchableOpacity 
@@ -229,9 +230,9 @@ export default function CommunityScreen({ navigation }: any) {
           onPress={() => likePost(post.id)}
         >
           <Ionicons 
-            name={post.isLiked ? 'heart' : 'heart-outline'} 
+            name="heart" 
             size={16} 
-            color={post.isLiked ? '#EF4444' : '#6B7280'} 
+            color="#EF4444" 
           />
           <Text style={styles.actionText}>{post.likes}</Text>
         </TouchableOpacity>
@@ -289,24 +290,30 @@ export default function CommunityScreen({ navigation }: any) {
         <ScrollView style={styles.modalBody}>
           <View style={styles.postHeader}>
             <View style={styles.authorInfo}>
-              <View style={styles.avatar}>
+              <View style={styles.authorAvatar}>
                 <Text style={styles.avatarText}>{post.author.split(' ').map(n => n[0]).join('')}</Text>
               </View>
               <View style={styles.authorDetails}>
                 <Text style={styles.authorName}>{post.author}</Text>
-                <Text style={styles.postTime}>{post.timestamp}</Text>
+                <Text style={styles.postTimestamp}>{post.timestamp}</Text>
               </View>
             </View>
-            <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(post.category) + '20' }]}>
-              <Ionicons name={getCategoryIcon(post.category) as any} size={12} color={getCategoryColor(post.category)} />
-              <Text style={[styles.categoryText, { color: getCategoryColor(post.category) }]}>
-                {post.category}
+            <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(post.type) + '20' }]}>
+              <Ionicons name={getCategoryIcon(post.type) as any} size={12} color={getCategoryColor(post.type)} />
+              <Text style={[styles.categoryText, { color: getCategoryColor(post.type) }]}>
+                {post.type}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.modalPostTitle}>{post.title}</Text>
-          <Text style={styles.modalPostContent}>{post.content}</Text>
+          <Text style={styles.modalPostTitle}>{post.content}</Text>
+          <View style={styles.postTags}>
+            {post.tags.map((tag, index) => (
+              <View key={index} style={styles.tagBadge}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
 
           <View style={styles.modalActions}>
             <TouchableOpacity 
@@ -314,9 +321,9 @@ export default function CommunityScreen({ navigation }: any) {
               onPress={() => likePost(post.id)}
             >
               <Ionicons 
-                name={post.isLiked ? 'heart' : 'heart-outline'} 
+                name="heart" 
                 size={16} 
-                color={post.isLiked ? '#EF4444' : '#6B7280'} 
+                color="#EF4444" 
               />
               <Text style={styles.actionText}>{post.likes}</Text>
             </TouchableOpacity>
@@ -361,84 +368,126 @@ export default function CommunityScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Community</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={fetchCommunityData}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={fetchCommunityData}>
+            <Ionicons name="refresh" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Create Post */}
-        <View style={styles.createPostSection}>
-          <View style={styles.createPostCard}>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color="#6B7280" />
             <TextInput
-              style={styles.postInput}
-              placeholder="Share your farming experience, ask questions, or share tips..."
+              style={styles.searchInput}
+              placeholder="Search community posts..."
+              placeholderTextColor="#6B7280"
               value={newPostText}
               onChangeText={setNewPostText}
-              multiline
-              numberOfLines={3}
             />
-            <TouchableOpacity
-              style={[styles.createButton, newPostText.trim().length === 0 && styles.createButtonDisabled]}
-              onPress={createPost}
-              disabled={newPostText.trim().length === 0}
-            >
-              <Ionicons name="send" size={16} color="white" />
-              <Text style={styles.createButtonText}>Post</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
+        {/* Filters */}
+        <View style={styles.filtersContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {['all', 'question', 'tip', 'achievement', 'general'].map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.filterButton, activeTab === filter && styles.activeFilterButton]}
+                onPress={() => setActiveTab(filter as 'posts' | 'events')}
+              >
+                <Text style={[styles.filterText, activeTab === filter && styles.activeFilterText]}>
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* New Post */}
+        <View style={styles.newPostContainer}>
+          <TextInput
+            style={styles.newPostInput}
+            placeholder="Share something with the community..."
+            placeholderTextColor="#6B7280"
+            value={newPostText}
+            onChangeText={setNewPostText}
+            multiline
+          />
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
-            onPress={() => setActiveTab('posts')}
+            style={[styles.postButton, !newPostText.trim() && styles.postButtonDisabled]}
+            onPress={createPost}
+            disabled={!newPostText.trim()}
           >
-            <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
-              Community Posts
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'events' && styles.activeTab]}
-            onPress={() => setActiveTab('events')}
-          >
-            <Text style={[styles.tabText, activeTab === 'events' && styles.activeTabText]}>
-              Events
-            </Text>
+            <Ionicons name="send" size={16} color="white" />
+            <Text style={styles.postButtonText}>Post</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Content based on active tab */}
-        {activeTab === 'posts' && (
-          <View style={styles.postsSection}>
-            <Text style={styles.sectionTitle}>Recent Posts</Text>
-            {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </View>
-        )}
+        {/* Posts */}
+        <View style={styles.postsContainer}>
+          {activeTab === 'posts' && (
+            <>
+              <Text style={styles.sectionTitle}>Recent Posts</Text>
+              {posts.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))}
+              {posts.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Ionicons name="people" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>No posts found</Text>
+                  <Text style={styles.emptySubtext}>Be the first to share something!</Text>
+                </View>
+              )}
+            </>
+          )}
 
-        {activeTab === 'events' && (
-          <View style={styles.eventsSection}>
-            <Text style={styles.sectionTitle}>Upcoming Events</Text>
-            {events.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </View>
-        )}
+          {activeTab === 'events' && (
+            <>
+              <Text style={styles.sectionTitle}>Upcoming Events</Text>
+              {events.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+              {events.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Ionicons name="calendar" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>No events found</Text>
+                  <Text style={styles.emptySubtext}>Check back later for upcoming events!</Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
       </ScrollView>
 
       {/* Post Detail Modal */}
       {selectedPost && <PostDetailModal post={selectedPost} />}
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="Community"
+      />
     </View>
   );
 }
@@ -446,17 +495,16 @@ export default function CommunityScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#111827',
   },
   backButton: {
     padding: 8,
@@ -467,14 +515,15 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   headerRight: {
-    width: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   refreshButton: {
     padding: 8,
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
   },
   createPostSection: {
     marginBottom: 24,
@@ -561,15 +610,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   postCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   postHeader: {
     flexDirection: 'row',
@@ -581,11 +625,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flex: 1,
   },
-  avatar: {
+  authorAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -601,31 +645,31 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 2,
   },
-  postTime: {
+  postTimestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 4,
   },
   categoryText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
-    textTransform: 'capitalize',
   },
   postTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: '500',
+    color: 'white',
     marginBottom: 8,
+    lineHeight: 22,
   },
   postContent: {
     fontSize: 14,
@@ -633,17 +677,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
+  postTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tagBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#3B82F6',
+  },
   postActions: {
     flexDirection: 'row',
-    gap: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   actionText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     marginLeft: 4,
   },
   eventCard: {
@@ -715,21 +779,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: '90%',
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    margin: 20,
     maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    width: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -737,12 +797,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
   },
   modalBody: {
     padding: 20,
@@ -750,8 +810,9 @@ const styles = StyleSheet.create({
   modalPostTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 12,
+    lineHeight: 24,
   },
   modalPostContent: {
     fontSize: 16,
@@ -761,11 +822,23 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalActionText: {
+    fontSize: 14,
+    color: 'white',
+    marginLeft: 4,
   },
   commentsSection: {
     marginTop: 16,
@@ -788,9 +861,117 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingCard: {
-    height: 120,
-    backgroundColor: '#E5E7EB',
+    height: 200,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     marginBottom: 16,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  searchContainer: {
+    marginBottom: 20,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: 'white',
+    marginLeft: 12,
+  },
+  filtersContainer: {
+    marginBottom: 20,
+  },
+  filterButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  activeFilterButton: {
+    backgroundColor: '#3B82F6',
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  activeFilterText: {
+    color: 'white',
+  },
+  newPostContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  newPostInput: {
+    fontSize: 14,
+    color: 'white',
+    marginBottom: 12,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  postButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  postButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  postButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  postsContainer: {
+    marginBottom: 20,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 15,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 5,
   },
 }); 

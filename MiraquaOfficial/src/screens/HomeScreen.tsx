@@ -6,363 +6,309 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import OnboardingFlow from './OnboardingFlow';
+import { LinearGradient } from 'expo-linear-gradient';
 import SidebarNavigation from './SidebarNavigation';
 
-interface Plot {
-  id: number;
-  name: string;
-  crop: string;
-  moisture: number;
-  temperature: number;
-  sunlight: number;
-  nextWatering: string;
-  status: 'healthy' | 'needs-water' | 'attention';
-  location: string;
-  lastWatered: string;
-}
-
-interface Notification {
-  id: string;
-  type: 'weather' | 'watering';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  priority: 'low' | 'medium' | 'high';
-  plotId: number;
-  plotName: string;
-}
-
-const mockPlots: Plot[] = [
-  {
-    id: 1,
-    name: "Tomato Garden",
-    crop: "Tomatoes",
-    moisture: 85,
-    temperature: 72,
-    sunlight: 850,
-    nextWatering: "Today 6:00 AM",
-    status: "healthy",
-    location: "North Yard",
-    lastWatered: "Yesterday"
-  },
-  {
-    id: 2,
-    name: "Herb Patch",
-    crop: "Basil & Oregano",
-    moisture: 65,
-    temperature: 74,
-    sunlight: 920,
-    nextWatering: "Tomorrow 5:30 AM",
-    status: "needs-water",
-    location: "Kitchen Window",
-    lastWatered: "2 days ago"
-  }
-];
-
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'weather',
-    title: 'Rain Expected',
-    message: 'Skipping watering for Tomato Garden due to rain forecast',
-    timestamp: '2 hours ago',
-    read: false,
-    priority: 'medium',
-    plotId: 1,
-    plotName: 'Tomato Garden'
-  },
-  {
-    id: '2',
-    type: 'watering',
-    title: 'Watering Complete',
-    message: 'Herb Corner watered for 15 minutes',
-    timestamp: '1 day ago',
-    read: false,
-    priority: 'low',
-    plotId: 2,
-    plotName: 'Herb Corner'
-  },
-  {
-    id: '3',
-    type: 'weather',
-    title: 'Temperature Alert',
-    message: 'High temperature detected in Pepper Patch',
-    timestamp: '3 hours ago',
-    read: false,
-    priority: 'high',
-    plotId: 3,
-    plotName: 'Pepper Patch'
-  }
-];
-
-const StatCard = ({ icon, value, label, subtext, trend, progress }: {
-  icon: string;
-  value: string;
-  label: string;
-  subtext?: string;
-  trend?: string;
-  progress?: number;
-}) => (
-  <View style={styles.statCard}>
-    <View style={styles.statHeader}>
-      <Ionicons name={icon as any} size={20} color="#3B82F6" />
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-    <Text style={styles.statValue}>{value}</Text>
-    {subtext && <Text style={styles.statSubtext}>{subtext}</Text>}
-    {trend && (
-      <View style={styles.trendContainer}>
-        <Ionicons 
-          name={trend.startsWith('-') ? "trending-down" : "trending-up"} 
-          size={12} 
-          color={trend.startsWith('-') ? "#EF4444" : "#10B981"} 
-        />
-        <Text style={[styles.trendText, { color: trend.startsWith('-') ? "#EF4444" : "#10B981" }]}>
-          {trend}
-        </Text>
-      </View>
-    )}
-    {progress !== undefined && (
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-      </View>
-    )}
-  </View>
-);
-
-const PlotCard = ({ plot, onWaterNow, onPress }: { plot: Plot; onWaterNow: (id: number) => void; onPress: () => void }) => (
-  <TouchableOpacity style={styles.plotCard} onPress={onPress}>
-    <View style={styles.plotHeader}>
-      <View style={styles.plotInfo}>
-        <Text style={styles.plotName}>{plot.name}</Text>
-        <Text style={styles.plotCrop}>{plot.crop}</Text>
-        <Text style={styles.plotLocation}>{plot.location}</Text>
-      </View>
-      <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(plot.status) }]}>
-        <Text style={styles.statusText}>{plot.status.replace('-', ' ').toUpperCase()}</Text>
-      </View>
-    </View>
-    
-    <View style={styles.plotStats}>
-      <View style={styles.statItem}>
-        <Ionicons name="water" size={16} color="#3B82F6" />
-        <Text style={styles.statItemText}>{plot.moisture}%</Text>
-      </View>
-      <View style={styles.statItem}>
-        <Ionicons name="thermometer" size={16} color="#F59E0B" />
-        <Text style={styles.statItemText}>{plot.temperature}°F</Text>
-      </View>
-      <View style={styles.statItem}>
-        <Ionicons name="sunny" size={16} color="#F59E0B" />
-        <Text style={styles.statItemText}>{plot.sunlight}</Text>
-      </View>
-    </View>
-    
-    <View style={styles.plotFooter}>
-      <View style={styles.wateringInfo}>
-        <Ionicons name="time" size={14} color="#6B7280" />
-        <Text style={styles.wateringText}>Next: {plot.nextWatering}</Text>
-      </View>
-      <TouchableOpacity 
-        style={[styles.waterButton, plot.status === 'needs-water' && styles.waterButtonActive]} 
-        onPress={() => onWaterNow(plot.id)}
-      >
-        <Ionicons name="play" size={16} color={plot.status === 'needs-water' ? "white" : "#3B82F6"} />
-        <Text style={[styles.waterButtonText, plot.status === 'needs-water' && styles.waterButtonTextActive]}>
-          Water Now
-        </Text>
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-);
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'healthy': return '#10B981';
-    case 'needs-water': return '#F59E0B';
-    case 'attention': return '#EF4444';
-    default: return '#6B7280';
-  }
-};
-
 export default function HomeScreen({ navigation }: any) {
-  const [searchText, setSearchText] = useState('');
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [plots, setPlots] = useState(mockPlots);
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [searchText, setSearchText] = useState('');
 
-  const handleWaterNow = (plotId: number) => {
-    Alert.alert('Watering', 'Starting watering cycle...');
-    // Simulate watering
-    setTimeout(() => {
-      Alert.alert('Success', 'Watering completed!');
-    }, 2000);
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning!';
+    if (hour < 17) return 'Good afternoon!';
+    return 'Good evening!';
   };
-
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
-  };
-
-  const handleAddPlot = (newPlot: any) => {
-    setPlots(prev => [...prev, { ...newPlot, id: prev.length + 1 }]);
-    setShowOnboarding(false);
-  };
-
-  const handlePlotPress = (plotId: number) => {
-    if (navigation) {
-      navigation.navigate('PlotDetails', { plotId });
-    }
-  };
-
-  if (showOnboarding) {
-    return <OnboardingFlow onComplete={handleAddPlot} onCancel={() => setShowOnboarding(false)} />;
-  }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => setShowSidebar(true)}>
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
           <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Ionicons name="leaf" size={20} color="#10B981" />
-          <Text style={styles.headerTitle}>Miraqua</Text>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
         </View>
+        
         <View style={styles.headerRight}>
           <View style={styles.onlineStatus}>
-            <View style={styles.onlineDot} />
+            <Ionicons name="wifi" size={16} color="#10B981" />
             <Text style={styles.onlineText}>Online</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
             <Ionicons name="notifications" size={20} color="white" />
             <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
+              <Text style={styles.notificationCount}>3</Text>
             </View>
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Greeting Section */}
-          <View style={styles.greetingSection}>
-            <View style={styles.greetingLeft}>
-              <Text style={styles.greetingText}>Good evening!</Text>
-              <Text style={styles.greetingEmoji}>👋</Text>
-              <Text style={styles.greetingSubtext}>Your gardens are looking great today</Text>
-            </View>
-            <View style={styles.weatherCard}>
-              <Text style={styles.weatherTemp}>63°F</Text>
-              <Ionicons name="cloudy" size={16} color="#9CA3AF" />
-              <Text style={styles.weatherCondition}>Cloudy •</Text>
-              <Text style={styles.weatherHumidity}>60% humidity</Text>
-            </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Greeting and Weather Section */}
+        <View style={styles.greetingSection}>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greetingText}>
+              {getGreeting()} 👋
+            </Text>
+            <Text style={styles.greetingSubtext}>
+              Your gardens are looking great today
+            </Text>
           </View>
+          
+          <View style={styles.weatherCard}>
+            <Ionicons name="partly-sunny" size={24} color="#F59E0B" />
+            <Text style={styles.temperature}>75°F</Text>
+            <Text style={styles.weatherConditions}>Clear • 71% humidity</Text>
+          </View>
+        </View>
 
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" />
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color="#6B7280" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search plots, crops, or locations..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               value={searchText}
               onChangeText={setSearchText}
             />
           </View>
+        </View>
 
-          {/* Quick Statistics Cards */}
-          <View style={styles.statsGrid}>
-            <StatCard
-              icon="location"
-              value="2"
-              label="Active Plots"
-            />
-            <StatCard
-              icon="water"
-              value="26L"
-              label="Water Usage"
-              subtext="This week"
-            />
-            <StatCard
-              icon="trending-down"
-              value="55%"
-              label="Avg Moisture"
-              trend="-3%"
-              progress={55}
-            />
-            <StatCard
-              icon="time"
-              value="-21m"
-              label="Next Watering"
-            />
+        {/* Top Row Metrics */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <Ionicons name="location" size={20} color="#3B82F6" />
+            <Text style={styles.metricValue}>2</Text>
+            <Text style={styles.metricLabel}>Active Plots</Text>
           </View>
+          
+          <View style={styles.metricCard}>
+            <Ionicons name="water" size={20} color="#3B82F6" />
+            <Text style={styles.metricValue}>26L</Text>
+            <Text style={styles.metricLabel}>This week</Text>
+          </View>
+        </View>
 
-          {/* My Plots Section */}
-          <View style={styles.plotsSection}>
-            <View style={styles.plotsHeader}>
-              <Text style={styles.plotsTitle}>My Plots</Text>
-              <TouchableOpacity onPress={() => setShowOnboarding(true)}>
-                <Ionicons name="add-circle" size={24} color="#3B82F6" />
-              </TouchableOpacity>
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <Ionicons name="trending-down" size={20} color="#F59E0B" />
+            <Text style={styles.metricChange}>-3%</Text>
+            <Text style={styles.metricValue}>55%</Text>
+            <Text style={styles.metricLabel}>Avg Moisture</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: '55%' }]} />
             </View>
-            
-            {plots.map((plot) => (
-              <PlotCard
-                key={plot.id}
-                plot={plot}
-                onWaterNow={handleWaterNow}
-                onPress={() => handlePlotPress(plot.id)}
-              />
-            ))}
+          </View>
+          
+          <View style={styles.metricCard}>
+            <Ionicons name="time" size={20} color="#8B5CF6" />
+            <Text style={styles.metricValue}>2h 0m</Text>
+            <Text style={styles.metricLabel}>Next Watering</Text>
+          </View>
+        </View>
+
+        {/* Bottom Row Metrics */}
+        <View style={styles.bottomMetricsRow}>
+          <View style={styles.bottomMetricCard}>
+            <Ionicons name="wifi" size={20} color="#10B981" />
+            <Text style={styles.bottomMetricValue}>2</Text>
+            <Text style={styles.bottomMetricLabel}>Online Plots</Text>
+            <Text style={styles.bottomMetricSubtext}>1 offline</Text>
+          </View>
+          
+          <View style={styles.bottomMetricCard}>
+            <Ionicons name="water" size={20} color="#3B82F6" />
+            <Text style={[styles.bottomMetricValue, { color: '#3B82F6' }]}>55%</Text>
+            <Text style={styles.bottomMetricLabel}>Avg Moisture</Text>
+            <Text style={styles.bottomMetricSubtext}>Good</Text>
+          </View>
+          
+          <View style={styles.bottomMetricCard}>
+            <Ionicons name="heart" size={20} color="#EF4444" />
+            <Text style={[styles.bottomMetricValue, { color: '#10B981' }]}>84%</Text>
+            <Text style={styles.bottomMetricLabel}>Avg Health</Text>
+            <Text style={styles.bottomMetricSubtext}>Thriving</Text>
+          </View>
+        </View>
+
+        {/* Your Plots Section */}
+        <View style={styles.plotsSection}>
+          <View style={styles.plotsHeader}>
+            <Text style={styles.plotsTitle}>Your Plots (3)</Text>
+            <TouchableOpacity style={styles.refreshButton}>
+              <Ionicons name="refresh" size={20} color="white" />
+            </TouchableOpacity>
           </View>
 
-          {/* Notifications Section */}
-          <View style={styles.notificationsSection}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {notifications.map((notification) => (
-              <TouchableOpacity 
-                key={notification.id} 
-                style={[styles.notificationCard, !notification.read && styles.unreadNotification]}
-                onPress={() => handleMarkAsRead(notification.id)}
-              >
-                <View style={styles.notificationIcon}>
-                  <Ionicons 
-                    name={notification.type === 'weather' ? "cloudy" : "water"} 
-                    size={20} 
-                    color={notification.priority === 'high' ? "#EF4444" : "#3B82F6"} 
-                  />
+          <View style={styles.plotsGrid}>
+            {/* Cherry Tomato Garden Card */}
+            <View style={styles.plotGridCard}>
+              <View style={styles.plotGridHeader}>
+                <View style={styles.plotGridTitleContainer}>
+                  <Text style={styles.plotGridTitle}>Cherry Tomato</Text>
+                  <Ionicons name="wifi" size={14} color="#10B981" />
                 </View>
-                <View style={styles.notificationContent}>
-                  <Text style={styles.notificationTitle}>{notification.title}</Text>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                  <Text style={styles.notificationTime}>{notification.timestamp}</Text>
+                <View style={styles.healthBadgeSmall}>
+                  <Ionicons name="heart" size={10} color="white" />
+                  <Text style={styles.healthPercentageSmall}>87%</Text>
                 </View>
-                {!notification.read && <View style={styles.unreadDot} />}
-              </TouchableOpacity>
-            ))}
+              </View>
+
+              <Text style={styles.plotGridType}>Sweet 100</Text>
+              
+              <View style={styles.plotGridLocation}>
+                <Ionicons name="location" size={12} color="#9CA3AF" />
+                <Text style={styles.plotGridLocationText}>Backyard Plot A</Text>
+              </View>
+
+              {/* Compact Sensor Readings */}
+              <View style={styles.plotGridSensors}>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="water" size={12} color="#3B82F6" />
+                  <Text style={styles.plotGridSensorValue}>68%</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>72°F</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="sunny" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>85%</Text>
+                </View>
+              </View>
+
+              {/* Compact Status */}
+              <View style={styles.plotGridFooter}>
+                <View style={styles.plotGridStatus}>
+                  <View style={styles.onlineDotSmall} />
+                  <Text style={styles.plotGridStatusText}>Online</Text>
+                </View>
+                <Text style={styles.plotGridNextWatering}>Tomorrow 6AM</Text>
+              </View>
+            </View>
+
+            {/* Herb Garden Card */}
+            <View style={styles.plotGridCard}>
+              <View style={styles.plotGridHeader}>
+                <View style={styles.plotGridTitleContainer}>
+                  <Text style={styles.plotGridTitle}>Herb Garden</Text>
+                  <Ionicons name="wifi" size={14} color="#10B981" />
+                </View>
+                <View style={styles.healthBadgeSmall}>
+                  <Ionicons name="heart" size={10} color="white" />
+                  <Text style={styles.healthPercentageSmall}>92%</Text>
+                </View>
+              </View>
+
+              <Text style={styles.plotGridType}>Basil & Rosemary</Text>
+              
+              <View style={styles.plotGridLocation}>
+                <Ionicons name="location" size={12} color="#9CA3AF" />
+                <Text style={styles.plotGridLocationText}>Kitchen Window</Text>
+              </View>
+
+              {/* Compact Sensor Readings */}
+              <View style={styles.plotGridSensors}>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="water" size={12} color="#3B82F6" />
+                  <Text style={styles.plotGridSensorValue}>55%</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>70°F</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="sunny" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>92%</Text>
+                </View>
+              </View>
+
+              {/* Compact Status */}
+              <View style={styles.plotGridFooter}>
+                <View style={styles.plotGridStatus}>
+                  <View style={styles.onlineDotSmall} />
+                  <Text style={styles.plotGridStatusText}>Online</Text>
+                </View>
+                <Text style={styles.plotGridNextWatering}>Today 8PM</Text>
+              </View>
+            </View>
+
+            {/* Pepper Patch Card */}
+            <View style={styles.plotGridCard}>
+              <View style={styles.plotGridHeader}>
+                <View style={styles.plotGridTitleContainer}>
+                  <Text style={styles.plotGridTitle}>Pepper Patch</Text>
+                  <Ionicons name="wifi" size={14} color="#EF4444" />
+                </View>
+                <View style={[styles.healthBadgeSmall, { backgroundColor: '#F59E0B' }]}>
+                  <Ionicons name="heart" size={10} color="white" />
+                  <Text style={styles.healthPercentageSmall}>73%</Text>
+                </View>
+              </View>
+
+              <Text style={styles.plotGridType}>California Wonder</Text>
+              
+              <View style={styles.plotGridLocation}>
+                <Ionicons name="location" size={12} color="#9CA3AF" />
+                <Text style={styles.plotGridLocationText}>Side Garden</Text>
+              </View>
+
+              {/* Compact Sensor Readings */}
+              <View style={styles.plotGridSensors}>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="water" size={12} color="#3B82F6" />
+                  <Text style={styles.plotGridSensorValue}>42%</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>75°F</Text>
+                </View>
+                <View style={styles.plotGridSensor}>
+                  <Ionicons name="sunny" size={12} color="#F59E0B" />
+                  <Text style={styles.plotGridSensorValue}>78%</Text>
+                </View>
+              </View>
+
+              {/* Compact Status */}
+              <View style={styles.plotGridFooter}>
+                <View style={styles.plotGridStatus}>
+                  <View style={[styles.onlineDotSmall, { backgroundColor: '#EF4444' }]} />
+                  <Text style={styles.plotGridStatusText}>Offline</Text>
+                </View>
+                <Text style={styles.plotGridNextWatering}>In 2 hours</Text>
+              </View>
+            </View>
           </View>
+        </View>
+
+        {/* Timestamp */}
+        <View style={styles.timestampContainer}>
+          <Text style={styles.timestampText}>Last updated: 2:34:56 PM</Text>
         </View>
       </ScrollView>
 
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('SetupPlot')}>
+        <Ionicons name="add" size={24} color="white" />
+      </TouchableOpacity>
+
       {/* Sidebar Navigation */}
-      <SidebarNavigation 
-        visible={showSidebar} 
-        onClose={() => setShowSidebar(false)} 
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
         navigation={navigation}
         currentRoute="home"
       />
@@ -373,7 +319,7 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
@@ -381,19 +327,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#1F2937',
-    paddingTop: 50,
+    paddingTop: 60,
   },
   menuButton: {
     padding: 8,
   },
-  headerCenter: {
+  logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerTitle: {
-    marginLeft: 8,
-    fontSize: 20,
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 18,
     fontWeight: '700',
     color: 'white',
   },
@@ -404,27 +357,22 @@ const styles = StyleSheet.create({
   onlineStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 4,
+    marginRight: 16,
   },
   onlineText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#10B981',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
+    padding: 4,
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 0,
+    right: 0,
     backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,
@@ -432,134 +380,144 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  notificationBadgeText: {
-    fontSize: 10,
+  notificationCount: {
     color: 'white',
+    fontSize: 10,
     fontWeight: '600',
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
-    padding: 20,
+    flex: 1,
+    paddingHorizontal: 20,
   },
   greetingSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 24,
   },
-  greetingLeft: {
+  greetingContainer: {
     flex: 1,
   },
   greetingText: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  greetingEmoji: {
-    fontSize: 20,
+    color: 'white',
     marginBottom: 4,
   },
   greetingSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 16,
+    color: '#9CA3AF',
+    lineHeight: 22,
   },
   weatherCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    minWidth: 100,
   },
-  weatherTemp: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+  temperature: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+    marginTop: 4,
   },
-  weatherCondition: {
+  weatherConditions: {
     fontSize: 12,
-    color: '#6B7280',
-  },
-  weatherHumidity: {
-    fontSize: 10,
     color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 2,
   },
   searchContainer: {
+    marginBottom: 24,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
     fontSize: 16,
-    color: '#1F2937',
+    color: 'white',
+    marginLeft: 12,
   },
-  statsGrid: {
+  metricsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  statCard: {
-    backgroundColor: 'white',
+  metricCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
-    padding: 16,
-    width: '48%',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    padding: 20,
+    flex: 1,
+    marginHorizontal: 4,
+    position: 'relative',
   },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statLabel: {
-    marginLeft: 8,
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 24,
+  metricValue: {
+    fontSize: 28,
     fontWeight: '700',
-    color: '#1F2937',
+    color: 'white',
+    marginTop: 8,
     marginBottom: 4,
   },
-  statSubtext: {
-    fontSize: 10,
-    color: '#9CA3AF',
-  },
-  trendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  metricChange: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F59E0B',
     marginTop: 4,
   },
-  trendText: {
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: '500',
+  metricLabel: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     marginTop: 8,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#10B981',
     borderRadius: 2,
+  },
+  bottomMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  bottomMetricCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  bottomMetricValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: 'white',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  bottomMetricLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  bottomMetricSubtext: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 2,
   },
   plotsSection: {
     marginBottom: 24,
@@ -571,149 +529,282 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   plotsTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+  },
+  refreshButton: {
+    padding: 4,
   },
   plotCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 20,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   plotHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  plotInfo: {
+  plotTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  plotName: {
+  plotTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: 'white',
+    marginRight: 8,
   },
-  plotCrop: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  plotLocation: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  statusIndicator: {
+  healthBadge: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    color: 'white',
-    fontWeight: '600',
-  },
-  plotStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statItemText: {
+  healthPercentage: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
     marginLeft: 4,
+  },
+  plotType: {
     fontSize: 14,
-    color: '#374151',
+    color: 'white',
+    marginBottom: 8,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginLeft: 4,
+  },
+  sensorReadings: {
+    marginBottom: 16,
+  },
+  sensorItem: {
+    marginBottom: 12,
+  },
+  sensorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sensorValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sensorProgressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    marginBottom: 2,
+    overflow: 'hidden',
+  },
+  sensorProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  sensorLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  wateringSchedule: {
+    marginBottom: 16,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  scheduleText: {
+    fontSize: 14,
+    color: 'white',
+    marginLeft: 4,
+  },
+  lastWatered: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 18,
   },
   plotFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  wateringInfo: {
+  statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  wateringText: {
-    marginLeft: 4,
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  waterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-  },
-  waterButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  waterButtonText: {
-    marginLeft: 4,
-    fontSize: 12,
-    color: '#3B82F6',
-    fontWeight: '500',
-  },
-  waterButtonTextActive: {
-    color: 'white',
-  },
-  notificationsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
-  },
-  notificationCard: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  unreadNotification: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#F0F9FF',
-  },
-  notificationIcon: {
-    marginRight: 12,
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  notificationMessage: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  notificationTime: {
-    fontSize: 10,
-    color: '#9CA3AF',
-  },
-  unreadDot: {
+  onlineDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    color: 'white',
+  },
+  healthStatus: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  wateringScheduleWithAction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  scheduleContainer: {
+    flex: 1,
+  },
+  waterButton: {
     backgroundColor: '#3B82F6',
-    alignSelf: 'center',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  waterButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  timestampContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  timestampText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  plotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  plotGridCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    width: '48%',
+    minWidth: 150,
+  },
+  plotGridHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  plotGridTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  plotGridTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    marginRight: 4,
+  },
+  healthBadgeSmall: {
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  healthPercentageSmall: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 3,
+  },
+  plotGridType: {
+    fontSize: 12,
+    color: 'white',
+    marginBottom: 4,
+  },
+  plotGridLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  plotGridLocationText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 3,
+  },
+  plotGridSensors: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  plotGridSensor: {
+    alignItems: 'center',
+  },
+  plotGridSensorValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 2,
+  },
+  plotGridFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  plotGridStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+    marginRight: 4,
+  },
+  plotGridStatusText: {
+    fontSize: 10,
+    color: 'white',
+  },
+  plotGridNextWatering: {
+    fontSize: 10,
+    color: '#9CA3AF',
   },
 }); 

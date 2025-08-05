@@ -10,24 +10,23 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SidebarNavigation from './SidebarNavigation';
 
-interface PlantAnalysis {
+interface ScanResult {
   id: string;
   plantName: string;
   healthScore: number;
   issues: string[];
   recommendations: string[];
-  imageUrl: string;
   timestamp: string;
-  plotId: string;
-  plotName: string;
+  imageUrl?: string;
 }
 
 export default function PlantHealthScannerScreen({ navigation }: any) {
-  const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [recentScans, setRecentScans] = useState<PlantAnalysis[]>([]);
-  const [selectedPlant, setSelectedPlant] = useState<PlantAnalysis | null>(null);
+  const [scanResults, setScanResults] = useState<ScanResult[]>([]);
+  const [selectedPlant, setSelectedPlant] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetchRecentScans();
@@ -38,17 +37,15 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      setRecentScans([
+      setScanResults([
         {
           id: '1',
           plantName: 'Tomato Plant',
           healthScore: 85,
           issues: ['Slight yellowing on lower leaves', 'Minor nutrient deficiency'],
           recommendations: ['Increase nitrogen fertilizer', 'Check soil pH levels'],
-          imageUrl: 'https://via.placeholder.com/150/10B981/FFFFFF?text=Tomato',
           timestamp: '2 hours ago',
-          plotId: 'plot-1',
-          plotName: 'Plot A'
+          imageUrl: 'https://via.placeholder.com/150/10B981/FFFFFF?text=Tomato'
         },
         {
           id: '2',
@@ -56,10 +53,8 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
           healthScore: 92,
           issues: ['Minor pest damage'],
           recommendations: ['Apply organic pest control', 'Monitor for further damage'],
-          imageUrl: 'https://via.placeholder.com/150/10B981/FFFFFF?text=Lettuce',
           timestamp: '1 day ago',
-          plotId: 'plot-2',
-          plotName: 'Plot B'
+          imageUrl: 'https://via.placeholder.com/150/10B981/FFFFFF?text=Lettuce'
         },
         {
           id: '3',
@@ -67,10 +62,8 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
           healthScore: 78,
           issues: ['Overwatering detected', 'Root rot symptoms'],
           recommendations: ['Reduce watering frequency', 'Improve drainage'],
-          imageUrl: 'https://via.placeholder.com/150/F59E0B/FFFFFF?text=Pepper',
           timestamp: '2 days ago',
-          plotId: 'plot-3',
-          plotName: 'Plot C'
+          imageUrl: 'https://via.placeholder.com/150/F59E0B/FFFFFF?text=Pepper'
         }
       ]);
     } catch (error) {
@@ -89,19 +82,17 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
           text: 'Simulate Scan',
           onPress: () => {
             setTimeout(() => {
-              const newScan: PlantAnalysis = {
+              const newScan: ScanResult = {
                 id: Date.now().toString(),
                 plantName: 'New Plant Scan',
                 healthScore: Math.floor(Math.random() * 30) + 70,
                 issues: ['AI analysis in progress...'],
                 recommendations: ['Processing recommendations...'],
-                imageUrl: 'https://via.placeholder.com/150/3B82F6/FFFFFF?text=Scan',
                 timestamp: 'Just now',
-                plotId: 'plot-1',
-                plotName: 'Plot A'
+                imageUrl: 'https://via.placeholder.com/150/3B82F6/FFFFFF?text=Scan'
               };
-              setRecentScans(prev => [newScan, ...prev]);
-              setSelectedPlant(newScan);
+              setScanResults(prev => [newScan, ...prev]);
+              setSelectedPlant(newScan.id);
               setIsScanning(false);
               Alert.alert('Scan Complete', 'Plant analysis completed successfully!');
             }, 3000);
@@ -124,16 +115,15 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
     return 'Poor';
   };
 
-  const ScanCard = ({ scan }: { scan: PlantAnalysis }) => (
+  const ScanCard = ({ scan }: { scan: ScanResult }) => (
     <TouchableOpacity 
       style={styles.scanResultCard}
-      onPress={() => setSelectedPlant(scan)}
+      onPress={() => setSelectedPlant(scan.id)}
     >
       <View style={styles.scanHeader}>
         <Image source={{ uri: scan.imageUrl }} style={styles.scanImage} />
         <View style={styles.scanInfo}>
           <Text style={styles.scanResultTitle}>{scan.plantName}</Text>
-          <Text style={styles.scanPlot}>{scan.plotName}</Text>
           <Text style={styles.scanTime}>{scan.timestamp}</Text>
         </View>
         <View style={styles.healthScore}>
@@ -148,39 +138,35 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
     </TouchableOpacity>
   );
 
-  const AnalysisModal = ({ scan }: { scan: PlantAnalysis }) => (
+  const AnalysisModal = ({ scan }: { scan: ScanResult }) => (
     <View style={styles.modalOverlay}>
       <View style={styles.modalContent}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Plant Analysis</Text>
           <TouchableOpacity onPress={() => setSelectedPlant(null)}>
-            <Ionicons name="close" size={24} color="#6B7280" />
+            <Ionicons name="close" size={24} color="rgba(255, 255, 255, 0.7)" />
           </TouchableOpacity>
         </View>
         
         <ScrollView style={styles.modalBody}>
-          <Image source={{ uri: scan.imageUrl }} style={styles.modalImage} />
-          
-          <View style={styles.analysisSection}>
-            <Text style={styles.sectionTitle}>Plant Details</Text>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Plant:</Text>
-              <Text style={styles.detailValue}>{scan.plantName}</Text>
+          <View style={styles.modalPlantInfo}>
+            <Image source={{ uri: scan.imageUrl }} style={styles.modalPlantImage} />
+            <View style={styles.modalPlantDetails}>
+              <Text style={styles.modalPlantName}>{scan.plantName}</Text>
+              <Text style={styles.modalPlantTime}>{scan.timestamp}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Location:</Text>
-              <Text style={styles.detailValue}>{scan.plotName}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Health Score:</Text>
-              <Text style={[styles.detailValue, { color: getHealthColor(scan.healthScore) }]}>
-                {scan.healthScore}/100 ({getHealthStatus(scan.healthScore)})
-              </Text>
+            <View style={styles.modalHealthScore}>
+              <View style={[styles.modalScoreCircle, { borderColor: getHealthColor(scan.healthScore) }]}>
+                <Text style={[styles.modalScoreText, { color: getHealthColor(scan.healthScore) }]}>
+                  {scan.healthScore}
+                </Text>
+              </View>
+              <Text style={styles.modalScoreLabel}>Health Score</Text>
             </View>
           </View>
 
-          <View style={styles.analysisSection}>
-            <Text style={styles.sectionTitle}>Detected Issues</Text>
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>Detected Issues</Text>
             {scan.issues.map((issue, index) => (
               <View key={index} style={styles.issueItem}>
                 <Ionicons name="warning" size={16} color="#F59E0B" />
@@ -189,8 +175,8 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
             ))}
           </View>
 
-          <View style={styles.analysisSection}>
-            <Text style={styles.sectionTitle}>Recommendations</Text>
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>Recommendations</Text>
             {scan.recommendations.map((rec, index) => (
               <View key={index} style={styles.recommendationItem}>
                 <Ionicons name="bulb" size={16} color="#10B981" />
@@ -202,7 +188,7 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
           <View style={styles.modalActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('PlotDetails', { plot: { id: scan.plotId, name: scan.plotName } })}
+              onPress={() => navigation.navigate('PlotDetails', { plot: { id: 'plot-1', name: 'Plot A' } })}
             >
               <Ionicons name="eye" size={16} color="#3B82F6" />
               <Text style={styles.actionText}>View Plot</Text>
@@ -222,17 +208,26 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6B7280" />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Plant Health Scanner</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={fetchRecentScans}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
+        
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIcon}>
+            <Ionicons name="leaf" size={20} color="white" />
+          </View>
+          <Text style={styles.logoText}>Miraqua</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={fetchRecentScans}>
+            <Ionicons name="refresh" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -269,10 +264,10 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
         {/* Recent Scans */}
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>Recent Scans</Text>
-          {recentScans.map((scan) => (
+          {scanResults.map((scan) => (
             <ScanCard key={scan.id} scan={scan} />
           ))}
-          {recentScans.length === 0 && (
+          {scanResults.length === 0 && (
             <View style={styles.emptyState}>
               <Ionicons name="camera" size={48} color="#9CA3AF" />
               <Text style={styles.emptyText}>No scans yet</Text>
@@ -300,7 +295,15 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
       </ScrollView>
 
       {/* Analysis Modal */}
-      {selectedPlant && <AnalysisModal scan={selectedPlant} />}
+      {selectedPlant && scanResults.find(scan => scan.id === selectedPlant) && <AnalysisModal scan={scanResults.find(scan => scan.id === selectedPlant)!} />}
+
+      {/* Sidebar Navigation */}
+      <SidebarNavigation
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        navigation={navigation}
+        currentRoute="PlantHealthScanner"
+      />
     </View>
   );
 }
@@ -308,45 +311,57 @@ export default function PlantHealthScannerScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#111827',
   },
-  backButton: {
+  menuButton: {
     padding: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   refreshButton: {
     padding: 8,
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
   },
   scanSection: {
     marginBottom: 24,
   },
   scanCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    alignItems: 'center',
   },
   scanPrompt: {
     alignItems: 'center',
@@ -354,13 +369,13 @@ const styles = StyleSheet.create({
   scanTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginTop: 16,
     marginBottom: 8,
   },
   scanSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -374,7 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   scanningButton: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#6B7280',
   },
   scanningContent: {
     flexDirection: 'row',
@@ -392,19 +407,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 16,
   },
   scanResultCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   scanHeader: {
     flexDirection: 'row',
@@ -422,17 +432,17 @@ const styles = StyleSheet.create({
   scanResultTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginBottom: 4,
   },
   scanPlot: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 2,
   },
   scanTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   healthScore: {
     alignItems: 'center',
@@ -452,7 +462,7 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: 10,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   tipsSection: {
     marginBottom: 20,
@@ -460,20 +470,15 @@ const styles = StyleSheet.create({
   tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   tipText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: 'white',
     marginLeft: 12,
   },
   emptyState: {
@@ -483,13 +488,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   modalOverlay: {
@@ -498,21 +503,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: '90%',
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    margin: 20,
     maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    width: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -520,39 +521,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
   },
   modalBody: {
     padding: 20,
   },
-  modalImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  analysisSection: {
-    marginBottom: 20,
-  },
-  detailRow: {
+  modalPlantInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalPlantImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 16,
+  },
+  modalPlantDetails: {
+    flex: 1,
+  },
+  modalPlantName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    marginBottom: 4,
+  },
+  modalPlantTime: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  modalHealthScore: {
+    alignItems: 'center',
+  },
+  modalScoreCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  detailLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
+  modalScoreText: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  detailValue: {
-    fontSize: 14,
-    color: '#1F2937',
+  modalScoreLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  modalSection: {
+    marginBottom: 24,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: 'white',
+    marginBottom: 12,
   },
   issueItem: {
     flexDirection: 'row',
@@ -562,7 +592,7 @@ const styles = StyleSheet.create({
   issueText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginLeft: 8,
   },
   recommendationItem: {
@@ -573,7 +603,7 @@ const styles = StyleSheet.create({
   recommendationText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginLeft: 8,
   },
   modalActions: {
@@ -587,16 +617,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     flex: 1,
     justifyContent: 'center',
   },
   actionText: {
     fontSize: 14,
-    color: '#374151',
+    color: 'white',
     marginLeft: 4,
   },
   shareButton: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
   },
 }); 
