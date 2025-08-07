@@ -116,7 +116,7 @@ export default function ChatScreen({ navigation }: any) {
       const plot = mockPlots.find(p => p.id.toString() === plotId);
       if (plot) {
         const plotMessage: Message = {
-          id: Date.now(),
+          id: Date.now() + Math.random(),
           type: 'ai',
           content: `I see you've selected ${plot.name}. This plot is growing ${plot.crop} with ${plot.moisture}% soil moisture, ${plot.temperature}°F temperature, and ${plot.sunlight}% sunlight. The sensor battery is at ${plot.batteryLevel}% and pH is ${plot.soilPh}. How can I help optimize this plot?`,
           timestamp: new Date(),
@@ -131,7 +131,7 @@ export default function ChatScreen({ navigation }: any) {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
-      id: Date.now(),
+      id: Date.now() + Math.random(),
       type: 'user',
       content: inputValue,
       timestamp: new Date()
@@ -145,7 +145,7 @@ export default function ChatScreen({ navigation }: any) {
     setTimeout(() => {
       const aiResponse = generateAIResponse(inputValue);
       const aiMessage: Message = {
-        id: Date.now() + 1,
+        id: Date.now() + Math.random(),
         type: 'ai',
         content: aiResponse.content,
         timestamp: new Date(),
@@ -254,7 +254,7 @@ export default function ChatScreen({ navigation }: any) {
   const handleQuickAction = (action: string) => {
     // Send the quick action as a user message
     const userMessage: Message = {
-      id: Date.now(),
+      id: Date.now() + Math.random(),
       type: 'user',
       content: action,
       timestamp: new Date()
@@ -267,7 +267,7 @@ export default function ChatScreen({ navigation }: any) {
     setTimeout(() => {
       const aiResponse = generateAIResponse(action);
       const aiMessage: Message = {
-        id: Date.now() + 1,
+        id: Date.now() + Math.random(),
         type: 'ai',
         content: aiResponse.content,
         timestamp: new Date(),

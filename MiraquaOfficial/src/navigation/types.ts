@@ -23,6 +23,11 @@ export type RootStackParamList = {
   SetupPlot: undefined;
   OnboardingLocation: { plotName?: string; selectedCrop?: string; cropDetails?: any };
   OnboardingComplete: { plotName?: string; selectedCrop?: string; cropDetails?: any; latitude?: number; longitude?: number; address?: string };
+  TermsOfService: undefined;
+  PrivacyPolicy: undefined;
+  NotificationSettings: undefined;
+  Help: undefined;
+  Subscription: undefined;
 };
 
 export type MainTabParamList = {

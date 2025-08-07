@@ -27,6 +27,11 @@ import CommunityScreen from '../screens/CommunityScreen';
 import SetupPlotScreen from '../screens/SetupPlotScreen';
 import OnboardingLocationScreen from '../screens/OnboardingLocationScreen';
 import OnboardingCompleteScreen from '../screens/OnboardingCompleteScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import HelpScreen from '../screens/HelpScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 import { RootStackParamList } from './types';
 
@@ -59,6 +64,11 @@ const AppNavigator = () => {
       <Stack.Screen name="SetupPlot" component={SetupPlotScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OnboardingLocation" component={OnboardingLocationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OnboardingComplete" component={OnboardingCompleteScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Help" component={HelpScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
