@@ -28,6 +28,7 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   Help: undefined;
   Subscription: undefined;
+  ForgotPassword: undefined;
 };
 
 export type MainTabParamList = {

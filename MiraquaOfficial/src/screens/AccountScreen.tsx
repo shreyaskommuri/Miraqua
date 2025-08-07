@@ -958,5 +958,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'white',
     fontWeight: '500',
-      },
-  }); 
+  },
+});

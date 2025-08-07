@@ -32,6 +32,7 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import HelpScreen from '../screens/HelpScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 import { RootStackParamList } from './types';
 
@@ -69,6 +70,7 @@ const AppNavigator = () => {
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Help" component={HelpScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
