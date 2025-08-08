@@ -94,6 +94,7 @@ const Index = () => {
   };
 
   const handleViewDetails = (plotId: number) => {
+    console.log('Navigating to plot details:', plotId);
     navigation.navigate('PlotDetails' as never, { plotId } as never);
   };
 
@@ -417,6 +418,7 @@ const Index = () => {
                     key={plot.id}
                     style={styles.plotCard}
                     onPress={() => handleViewDetails(plot.id)}
+                    activeOpacity={0.7}
                   >
                     <View style={styles.plotCardContent}>
                       <View style={styles.plotHeader}>
@@ -980,6 +982,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
   },
   plotCardContent: {
     padding: 16,

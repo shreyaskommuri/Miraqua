@@ -3,7 +3,7 @@ export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
   Home: undefined;
-  PlotDetails: { plot: any };
+  PlotDetails: { plotId?: number; plot?: any };
   Weather: undefined;
   Account: undefined;
   Chat: undefined;
@@ -29,6 +29,11 @@ export type RootStackParamList = {
   Help: undefined;
   Subscription: undefined;
   ForgotPassword: undefined;
+  Calendar: { plotId?: number };
+  AddSchedule: { plotId?: number };
+  ScheduleSettings: { plotId?: number };
+  ScheduleAnalytics: { plotId?: number };
+  ExportSchedule: { plotId?: number };
 };
 
 export type MainTabParamList = {

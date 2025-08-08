@@ -43,7 +43,7 @@ interface PlotData {
 export default function ChatScreen({ navigation }: any) {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 1,
+      id: Date.now() + Math.random(),
       type: 'ai',
       content: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
       timestamp: new Date(),
@@ -108,6 +108,7 @@ export default function ChatScreen({ navigation }: any) {
   ];
 
   const handlePlotSelection = (plotId: string) => {
+    console.log('Plot selected:', plotId);
     setSelectedPlotId(plotId);
     setShowPlotSelector(false);
     
@@ -320,7 +321,11 @@ export default function ChatScreen({ navigation }: any) {
           <Text style={styles.quickActionsTitle}>Quick actions:</Text>
           <TouchableOpacity 
             style={styles.plotSelector}
-            onPress={() => setShowPlotSelector(true)}
+            onPress={() => {
+              console.log('Plot selector pressed');
+              setShowPlotSelector(true);
+            }}
+            activeOpacity={0.7}
           >
             <Text style={styles.plotSelectorText}>
               {selectedPlot ? selectedPlot.name : "General Question"}
@@ -363,6 +368,7 @@ export default function ChatScreen({ navigation }: any) {
                   selectedPlotId === "general" && styles.selectedPlotOption
                 ]}
                 onPress={() => handlePlotSelection("general")}
+                activeOpacity={0.7}
               >
                 <View style={styles.plotOptionContent}>
                   <Ionicons name="leaf" size={20} color="#10b981" />
@@ -381,6 +387,7 @@ export default function ChatScreen({ navigation }: any) {
                     selectedPlotId === plot.id.toString() && styles.selectedPlotOption
                   ]}
                   onPress={() => handlePlotSelection(plot.id.toString())}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.plotOptionContent}>
                     <Ionicons name="leaf" size={20} color="#10b981" />
@@ -655,8 +662,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
   },
   plotSelectorText: {
     fontSize: 12,
@@ -714,11 +722,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   plotOption: {
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    minHeight: 56,
   },
   selectedPlotOption: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',

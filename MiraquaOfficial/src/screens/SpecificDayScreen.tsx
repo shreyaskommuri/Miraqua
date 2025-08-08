@@ -1,545 +1,517 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  SafeAreaView,
   StatusBar,
   Alert,
-  TextInput,
-  Modal,
+  Switch,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
-interface DayData {
-  plotId: number;
-  date: string;
-  hourlyWeather: Array<{
-    hour: string;
-    temp: number;
-    icon: string;
-    description: string;
-  }>;
-  scheduledWatering: {
-    time: string;
-    duration: number;
-    volume: number;
-  };
+interface ScheduleSlot {
+  time: string;
+  volume: number;
 }
 
-export default function SpecificDayScreen({ navigation, route }: any) {
-  const { plotId, day, date } = route.params || { plotId: 1, day: 'Today', date: 'Today' };
-  
-  const [dayData, setDayData] = useState<DayData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [watering, setWatering] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState(false);
-  const [scheduleTime, setScheduleTime] = useState('07:00');
-  const [scheduleDuration, setScheduleDuration] = useState(5);
+interface ScheduleEntry {
+  morning: ScheduleSlot | null;
+  afternoon: ScheduleSlot | null;
+  evening: ScheduleSlot | null;
+}
 
-  useEffect(() => {
-    fetchDayData();
-  }, [plotId, date]);
+interface SpecificDayScreenProps {
+  route: any;
+  navigation: any;
+}
 
-  const fetchDayData = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setDayData({
-        plotId: parseInt(plotId?.toString() || '1'),
-        date: date || 'Today',
-        hourlyWeather: [
-          { hour: '6 AM', temp: 65, icon: 'sun', description: 'Sunny' },
-          { hour: '9 AM', temp: 70, icon: 'sun', description: 'Sunny' },
-          { hour: '12 PM', temp: 75, icon: 'cloud', description: 'Partly Cloudy' },
-          { hour: '3 PM', temp: 78, icon: 'cloud', description: 'Cloudy' },
-          { hour: '6 PM', temp: 72, icon: 'rain', description: 'Light Rain' },
-          { hour: '9 PM', temp: 68, icon: 'cloud', description: 'Cloudy' }
-        ],
-        scheduledWatering: {
-          time: '7:00 AM',
-          duration: 5,
-          volume: 15
-        }
-      });
-      
-      // Initialize edit state with current values
-      setScheduleTime('07:00');
-      setScheduleDuration(5);
-    } catch (err) {
-      setError("Couldn't load day details");
-    } finally {
-      setLoading(false);
-    }
+const SpecificDayScreen = ({ route, navigation }: SpecificDayScreenProps) => {
+  const { plotId, date, schedule } = route.params;
+  const [currentSchedule, setCurrentSchedule] = useState<ScheduleEntry>(schedule || {
+    morning: null,
+    afternoon: null,
+    evening: null,
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [autoWatering, setAutoWatering] = useState(true);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
-  const handleWaterNow = async () => {
-    setWatering(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      Alert.alert('Success', 'Watering completed successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start watering');
-    } finally {
-      setWatering(false);
-    }
+  const getTotalVolume = (schedule: ScheduleEntry) => {
+    return (schedule.morning?.volume || 0) + 
+           (schedule.afternoon?.volume || 0) + 
+           (schedule.evening?.volume || 0);
   };
 
-  const handleScheduleUpdate = async () => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      Alert.alert('Success', 'Schedule updated successfully!');
-      setEditingSchedule(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update schedule');
-    }
+  const handleAddWatering = (period: 'morning' | 'afternoon' | 'evening') => {
+    const newSchedule = { ...currentSchedule };
+    newSchedule[period] = { time: '06:00', volume: 10 };
+    setCurrentSchedule(newSchedule);
+    setIsEditing(true);
   };
 
-  const getWeatherIcon = (icon: string) => {
-    switch (icon) {
-      case 'sun': return <Ionicons name="sunny" size={24} color="#f59e0b" />;
-      case 'cloud': return <Ionicons name="cloudy" size={24} color="#6b7280" />;
-      case 'rain': return <Ionicons name="rainy" size={24} color="#3b82f6" />;
-      default: return <Ionicons name="cloudy" size={24} color="#6b7280" />;
-    }
+  const handleRemoveWatering = (period: 'morning' | 'afternoon' | 'evening') => {
+    const newSchedule = { ...currentSchedule };
+    newSchedule[period] = null;
+    setCurrentSchedule(newSchedule);
+    setIsEditing(true);
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Loading...</Text>
-        </View>
-        
-        <View style={styles.loadingContainer}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <View key={i} style={styles.loadingCard} />
-          ))}
-        </View>
-      </View>
-    );
-  }
+  const handleSaveSchedule = () => {
+    Alert.alert('Success', 'Schedule saved successfully!');
+    setIsEditing(false);
+  };
 
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Error</Text>
-        </View>
-        
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={48} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchDayData}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const handleWaterNow = () => {
+    Alert.alert('Watering', 'Starting manual watering...');
+  };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6b7280" />
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{dayData?.date}</Text>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings" size={20} color="#6b7280" />
+        
+        <View style={styles.headerContent}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="calendar" size={20} color="white" />
+          </View>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>Day Schedule</Text>
+            <Text style={styles.headerSubtitle}>{formatDate(date)}</Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.saveButton}
+          onPress={handleSaveSchedule}
+          disabled={!isEditing}
+        >
+          <Text style={[styles.saveButtonText, !isEditing && styles.saveButtonDisabled]}>
+            Save
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Weather Forecast */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hourly Weather</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weatherScroll}>
-            {dayData?.hourlyWeather.map((hour, index) => (
-              <View key={index} style={styles.weatherCard}>
-                <Text style={styles.hourText}>{hour.hour}</Text>
-                {getWeatherIcon(hour.icon)}
-                <Text style={styles.tempText}>{hour.temp}°F</Text>
-                <Text style={styles.descriptionText}>{hour.description}</Text>
-              </View>
-            ))}
-          </ScrollView>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Date Header */}
+        <View style={styles.dateHeader}>
+          <LinearGradient
+            colors={['#10B981', '#3B82F6']}
+            style={styles.dateGradient}
+          >
+            <View style={styles.dateContent}>
+              <Ionicons name="calendar" size={24} color="white" />
+              <Text style={styles.dateText}>{formatDate(date)}</Text>
+              <Text style={styles.dateSubtext}>Plot {plotId} Schedule</Text>
+            </View>
+          </LinearGradient>
         </View>
 
-        {/* Scheduled Watering */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Scheduled Watering</Text>
-          <View style={styles.wateringCard}>
-            <View style={styles.wateringHeader}>
-              <Ionicons name="water" size={24} color="#3b82f6" />
-              <Text style={styles.wateringTitle}>Today's Schedule</Text>
-            </View>
-            
-            <View style={styles.wateringDetails}>
-              <View style={styles.detailRow}>
-                <Ionicons name="time" size={16} color="#6b7280" />
-                <Text style={styles.detailText}>{dayData?.scheduledWatering.time}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="timer" size={16} color="#6b7280" />
-                <Text style={styles.detailText}>{dayData?.scheduledWatering.duration} minutes</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="droplets" size={16} color="#6b7280" />
-                <Text style={styles.detailText}>{dayData?.scheduledWatering.volume}L</Text>
-              </View>
-            </View>
+        {/* Summary Stats */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Ionicons name="water" size={20} color="#3B82F6" />
+            <Text style={styles.summaryValue}>{getTotalVolume(currentSchedule)}L</Text>
+            <Text style={styles.summaryLabel}>Total Water</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Ionicons name="time" size={20} color="#10B981" />
+            <Text style={styles.summaryValue}>
+              {Object.values(currentSchedule).filter(Boolean).length}
+            </Text>
+            <Text style={styles.summaryLabel}>Sessions</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Ionicons name="leaf" size={20} color="#F59E0B" />
+            <Text style={styles.summaryValue}>
+              {getTotalVolume(currentSchedule) * 0.1}%
+            </Text>
+            <Text style={styles.summaryLabel}>Efficiency</Text>
+          </View>
+        </View>
 
-            <View style={styles.wateringActions}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.waterNowButton]} 
-                onPress={handleWaterNow}
-                disabled={watering}
-              >
-                {watering ? (
-                  <Ionicons name="refresh" size={20} color="white" />
-                ) : (
-                  <Ionicons name="play" size={20} color="white" />
-                )}
-                <Text style={styles.actionButtonText}>
-                  {watering ? 'Watering...' : 'Water Now'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.editButton]} 
-                onPress={() => setEditingSchedule(true)}
-              >
-                <Ionicons name="create" size={20} color="#3b82f6" />
-                <Text style={styles.editButtonText}>Edit Schedule</Text>
-              </TouchableOpacity>
+        {/* Watering Sessions */}
+        <View style={styles.sessionsCard}>
+          <Text style={styles.sectionTitle}>Watering Sessions</Text>
+          
+          {/* Morning Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="sunny" size={16} color="#F59E0B" />
+                <Text style={styles.sessionTitle}>Morning</Text>
+              </View>
+              {currentSchedule.morning ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.morning.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.morning.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('morning')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('morning')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
             </View>
+          </View>
+
+          {/* Afternoon Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="partly-sunny" size={16} color="#F59E0B" />
+                <Text style={styles.sessionTitle}>Afternoon</Text>
+              </View>
+              {currentSchedule.afternoon ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.afternoon.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.afternoon.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('afternoon')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('afternoon')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Evening Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="moon" size={16} color="#8B5CF6" />
+                <Text style={styles.sessionTitle}>Evening</Text>
+              </View>
+              {currentSchedule.evening ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.evening.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.evening.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('evening')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('evening')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Settings */}
+        <View style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="settings" size={16} color="#6B7280" />
+              <Text style={styles.settingText}>Auto Watering</Text>
+            </View>
+            <Switch
+              value={autoWatering}
+              onValueChange={setAutoWatering}
+              trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+              thumbColor={autoWatering ? 'white' : '#9CA3AF'}
+            />
+          </View>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actionsCard}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleWaterNow}
+            >
+              <Ionicons name="play" size={20} color="#10B981" />
+              <Text style={styles.actionText}>Water Now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('ScheduleSettings', { plotId })}
+            >
+              <Ionicons name="settings" size={20} color="#3B82F6" />
+              <Text style={styles.actionText}>Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('ScheduleAnalytics', { plotId })}
+            >
+              <Ionicons name="analytics" size={20} color="#8B5CF6" />
+              <Text style={styles.actionText}>Analytics</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('ExportSchedule', { plotId })}
+            >
+              <Ionicons name="download" size={20} color="#F59E0B" />
+              <Text style={styles.actionText}>Export</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-
-      {/* Edit Schedule Modal */}
-      <Modal
-        visible={editingSchedule}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Watering Schedule</Text>
-              <TouchableOpacity onPress={() => setEditingSchedule(false)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.modalBody}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Time</Text>
-                <TextInput
-                  style={styles.input}
-                  value={scheduleTime}
-                  onChangeText={setScheduleTime}
-                  placeholder="07:00"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Duration (minutes)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={scheduleDuration.toString()}
-                  onChangeText={(text) => setScheduleDuration(parseInt(text) || 0)}
-                  placeholder="5"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setEditingSchedule(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.saveButton} 
-                onPress={handleScheduleUpdate}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+    </SafeAreaView>
   );
-}
+};
+
+const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 20,
   },
   backButton: {
     padding: 8,
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerInfo: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: 'bold',
+    color: 'white',
   },
-  settingsButton: {
-    padding: 8,
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  saveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  saveButtonDisabled: {
+    color: 'rgba(255, 255, 255, 0.3)',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
   },
-  section: {
-    marginBottom: 24,
+  dateHeader: {
+    marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  sectionTitle: {
+  dateGradient: {
+    padding: 20,
+  },
+  dateContent: {
+    alignItems: 'center',
+  },
+  dateText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  weatherScroll: {
-    marginBottom: 16,
-  },
-  weatherCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    alignItems: 'center',
-    minWidth: 80,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  hourText: {
+  dateSubtext: {
     fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  tempText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },
-  descriptionText: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  wateringCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  wateringHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  wateringTitle: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  wateringDetails: {
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#374151',
-  },
-  wateringActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  waterNowButton: {
-    backgroundColor: '#3B82F6',
-  },
-  editButton: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-  },
-  actionButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
-  },
-  editButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#3B82F6',
-  },
-  loadingContainer: {
-    padding: 16,
-  },
-  loadingCard: {
-    height: 80,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
+  summaryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalHeader: {
+    marginBottom: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
     alignItems: 'center',
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 8,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+  },
+  sessionsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 20,
     marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
-  },
-  modalBody: {
-    marginBottom: 20,
-  },
-  inputGroup: {
+    color: 'white',
     marginBottom: 16,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
+  sessionItem: {
+    marginBottom: 16,
   },
-  input: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  modalActions: {
+  sessionHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
+  sessionInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  saveButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginLeft: 8,
-    borderRadius: 8,
-    backgroundColor: '#3B82F6',
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    color: 'white',
+  sessionTitle: {
+    fontSize: 14,
     fontWeight: '500',
+    color: 'white',
+    marginLeft: 8,
   },
-}); 
+  sessionDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sessionTime: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginRight: 8,
+  },
+  sessionVolume: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  removeButton: {
+    padding: 4,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  addButtonText: {
+    fontSize: 12,
+    color: '#10B981',
+    marginLeft: 4,
+  },
+  settingsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingText: {
+    fontSize: 14,
+    color: 'white',
+    marginLeft: 8,
+  },
+  actionsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionButton: {
+    width: (width - 64) / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 12,
+    color: 'white',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+});
+
+export default SpecificDayScreen; 

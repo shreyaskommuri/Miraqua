@@ -155,7 +155,14 @@ export default function HomeScreen({ navigation }: any) {
 
           <View style={styles.plotsGrid}>
             {/* Cherry Tomato Garden Card */}
-            <View style={styles.plotGridCard}>
+            <TouchableOpacity 
+              style={styles.plotGridCard}
+              onPress={() => {
+                console.log('Cherry Tomato pressed');
+                navigation.navigate('PlotDetails' as never, { plotId: 1 } as never);
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.plotGridHeader}>
                 <View style={styles.plotGridTitleContainer}>
                   <Text style={styles.plotGridTitle}>Cherry Tomato</Text>
@@ -198,10 +205,17 @@ export default function HomeScreen({ navigation }: any) {
                 </View>
                 <Text style={styles.plotGridNextWatering}>Tomorrow 6AM</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Herb Garden Card */}
-            <View style={styles.plotGridCard}>
+            <TouchableOpacity 
+              style={styles.plotGridCard}
+              onPress={() => {
+                console.log('Herb Garden pressed');
+                navigation.navigate('PlotDetails' as never, { plotId: 2 } as never);
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.plotGridHeader}>
                 <View style={styles.plotGridTitleContainer}>
                   <Text style={styles.plotGridTitle}>Herb Garden</Text>
@@ -244,10 +258,17 @@ export default function HomeScreen({ navigation }: any) {
                 </View>
                 <Text style={styles.plotGridNextWatering}>Today 8PM</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Pepper Patch Card */}
-            <View style={styles.plotGridCard}>
+            <TouchableOpacity 
+              style={styles.plotGridCard}
+              onPress={() => {
+                console.log('Pepper Patch pressed');
+                navigation.navigate('PlotDetails' as never, { plotId: 3 } as never);
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.plotGridHeader}>
                 <View style={styles.plotGridTitleContainer}>
                   <Text style={styles.plotGridTitle}>Pepper Patch</Text>
@@ -290,7 +311,7 @@ export default function HomeScreen({ navigation }: any) {
                 </View>
                 <Text style={styles.plotGridNextWatering}>In 2 hours</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

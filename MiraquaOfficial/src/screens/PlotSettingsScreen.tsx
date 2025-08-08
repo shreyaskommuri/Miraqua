@@ -10,8 +10,12 @@ import {
   TextInput,
   Switch,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 interface PlotData {
   id: string;
@@ -68,6 +72,37 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
 
   const [activeTab, setActiveTab] = useState('general');
   const [isLoading, setIsLoading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const cropTypes = [
+    { value: "cherry-tomatoes", label: "Cherry Tomatoes" },
+    { value: "bell-peppers", label: "Bell Peppers" },
+    { value: "basil", label: "Basil" },
+    { value: "oregano", label: "Oregano" },
+    { value: "lettuce", label: "Lettuce" },
+    { value: "carrots", label: "Carrots" },
+    { value: "strawberries", label: "Strawberries" },
+    { value: "cucumbers", label: "Cucumbers" },
+    { value: "spinach", label: "Spinach" },
+    { value: "kale", label: "Kale" }
+  ];
+
+  const soilTypes = [
+    { value: "loamy", label: "Loamy" },
+    { value: "sandy", label: "Sandy" },
+    { value: "clay", label: "Clay" },
+    { value: "silty", label: "Silty" },
+    { value: "peaty", label: "Peaty" },
+    { value: "chalky", label: "Chalky" }
+  ];
+
+  const irrigationMethods = [
+    { value: "drip", label: "Drip Irrigation" },
+    { value: "sprinkler", label: "Sprinkler System" },
+    { value: "soaker", label: "Soaker Hose" },
+    { value: "manual", label: "Manual Watering" },
+    { value: "mist", label: "Misting System" }
+  ];
 
   useEffect(() => {
     loadPlotData();
@@ -76,9 +111,7 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
   const loadPlotData = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      // Data is already set in state
     } catch (error) {
       Alert.alert('Error', 'Failed to load plot data');
     } finally {
@@ -91,16 +124,17 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
       ...prev,
       [field]: value
     }));
+    setHasChanges(true);
   };
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      Alert.alert('Success', 'Plot settings saved successfully');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      Alert.alert('✅ Settings saved', 'Your plot settings have been updated successfully');
+      setHasChanges(false);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save settings');
+      Alert.alert('Error', 'Failed to save settings. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -119,10 +153,10 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
             setIsLoading(true);
             try {
               await new Promise(resolve => setTimeout(resolve, 1000));
-              Alert.alert('Success', 'Plot deleted successfully');
+              Alert.alert('🗑️ Plot deleted', 'Your plot has been removed successfully');
               navigation.goBack();
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete plot');
+              Alert.alert('Error', 'Failed to delete plot. Please try again.');
             } finally {
               setIsLoading(false);
             }
@@ -143,10 +177,10 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
           onPress: async () => {
             setIsLoading(true);
             try {
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              Alert.alert('Success', 'Test watering completed successfully');
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              Alert.alert('💧 Test watering completed', 'Manual watering cycle ran for 30 seconds');
             } catch (error) {
-              Alert.alert('Error', 'Test watering failed');
+              Alert.alert('Error', 'Failed to start test watering');
             } finally {
               setIsLoading(false);
             }
@@ -156,200 +190,456 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
     );
   };
 
+  const addSensor = () => {
+    Alert.alert('Add Sensor', 'Sensor pairing mode activated. Follow device instructions.');
+  };
+
+  const getDaysPlanted = () => {
+    const planted = plotData.plantingDate;
+    const now = new Date();
+    return Math.floor((now.getTime() - planted.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
   const renderGeneralSettings = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>General Settings</Text>
-      
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Plot Name</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.name}
-          onChangeText={(text) => handleFieldChange('name', text)}
-          placeholder="Enter plot name"
-        />
-      </View>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="leaf" size={20} color="#10B981" />
+          </View>
+          <Text style={styles.cardTitle}>Basic Information</Text>
+        </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Plot Name</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.name}
+                onChangeText={(text) => handleFieldChange('name', text)}
+                placeholder="Enter plot name"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Zone Number</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.zoneNumber}
+                onChangeText={(text) => handleFieldChange('zoneNumber', text)}
+                placeholder="e.g., A-1, Zone 3"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+          </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Crop Type</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.cropType}
-          onChangeText={(text) => handleFieldChange('cropType', text)}
-          placeholder="Enter crop type"
-        />
-      </View>
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Crop Type</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.cropType}
+                onChangeText={(text) => handleFieldChange('cropType', text)}
+                placeholder="Select crop type"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Variety</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.variety}
-          onChangeText={(text) => handleFieldChange('variety', text)}
-          placeholder="Enter variety"
-        />
-      </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Variety</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.variety}
+                onChangeText={(text) => handleFieldChange('variety', text)}
+                placeholder="e.g., Sweet 100, Roma"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+          </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Zone Number</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.zoneNumber}
-          onChangeText={(text) => handleFieldChange('zoneNumber', text)}
-          placeholder="Enter zone number"
-        />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Location Description</Text>
+            <TextInput
+              style={styles.input}
+              value={plotData.location}
+              onChangeText={(text) => handleFieldChange('location', text)}
+              placeholder="e.g., Backyard Plot A, Greenhouse Section 2"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            />
+          </View>
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Latitude</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.coordinates.lat.toString()}
+                onChangeText={(text) => handleFieldChange('coordinates', { ...plotData.coordinates, lat: parseFloat(text) || 0 })}
+                placeholder="37.7749"
+                keyboardType="numeric"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Longitude</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.coordinates.lng.toString()}
+                onChangeText={(text) => handleFieldChange('coordinates', { ...plotData.coordinates, lng: parseFloat(text) || 0 })}
+                placeholder="-122.4194"
+                keyboardType="numeric"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Area (sq ft)</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.area.toString()}
+                onChangeText={(text) => handleFieldChange('area', parseFloat(text) || 0)}
+                placeholder="25"
+                keyboardType="numeric"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Soil Type</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.soilType}
+                onChangeText={(text) => handleFieldChange('soilType', text)}
+                placeholder="Select soil type"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Irrigation Method</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.irrigationMethod}
+                onChangeText={(text) => handleFieldChange('irrigationMethod', text)}
+                placeholder="Select method"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+          </View>
+
+          <View style={styles.plantingInfo}>
+            <View style={styles.plantingHeader}>
+              <Ionicons name="calendar" size={20} color="#10B981" />
+              <Text style={styles.plantingTitle}>Planted {getDaysPlanted()} days ago</Text>
+            </View>
+            <Text style={styles.plantingSubtitle}>
+              Expected harvest: {plotData.expectedHarvest.toLocaleDateString()}
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
 
   const renderWateringSettings = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Watering Settings</Text>
-      
-      <View style={styles.switchGroup}>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Auto Watering</Text>
-          <Switch
-            value={plotData.autoWatering}
-            onValueChange={(value) => handleFieldChange('autoWatering', value)}
-            trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={plotData.autoWatering ? '#f5dd4b' : '#f4f3f4'}
-          />
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="water" size={20} color="#3B82F6" />
+          </View>
+          <Text style={styles.cardTitle}>Watering Configuration</Text>
+          <TouchableOpacity style={styles.testButton} onPress={testWatering}>
+            <Ionicons name="water" size={16} color="#3B82F6" />
+            <Text style={styles.testButtonText}>Test Water</Text>
+          </TouchableOpacity>
         </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="water" size={20} color="#3B82F6" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Auto Watering</Text>
+                <Text style={styles.switchSubtitle}>Enable automatic irrigation</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.autoWatering}
+              onValueChange={(value) => handleFieldChange('autoWatering', value)}
+              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              thumbColor={plotData.autoWatering ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
 
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Smart Scheduling</Text>
-          <Switch
-            value={plotData.smartScheduling}
-            onValueChange={(value) => handleFieldChange('smartScheduling', value)}
-            trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={plotData.smartScheduling ? '#f5dd4b' : '#f4f3f4'}
-          />
-        </View>
+          <View style={styles.sliderGroup}>
+            <Text style={styles.label}>Moisture Threshold ({plotData.moistureThreshold}%)</Text>
+            <View style={styles.sliderContainer}>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${plotData.moistureThreshold}%` }]} />
+              </View>
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>20% (Dry)</Text>
+                <Text style={styles.sliderLabel}>100% (Saturated)</Text>
+              </View>
+            </View>
+          </View>
 
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Weather Integration</Text>
-          <Switch
-            value={plotData.weatherIntegration}
-            onValueChange={(value) => handleFieldChange('weatherIntegration', value)}
-            trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={plotData.weatherIntegration ? '#f5dd4b' : '#f4f3f4'}
-          />
+          <View style={styles.sliderGroup}>
+            <Text style={styles.label}>Watering Duration ({plotData.wateringDuration} minutes)</Text>
+            <View style={styles.sliderContainer}>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${(plotData.wateringDuration / 30) * 100}%` }]} />
+              </View>
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>2 min</Text>
+                <Text style={styles.sliderLabel}>30 min</Text>
+              </View>
+            </View>
+          </View>
         </View>
       </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Moisture Threshold (%)</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.moistureThreshold.toString()}
-          onChangeText={(text) => handleFieldChange('moistureThreshold', parseInt(text) || 0)}
-          placeholder="Enter threshold"
-          keyboardType="numeric"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Watering Duration (minutes)</Text>
-        <TextInput
-          style={styles.input}
-          value={plotData.wateringDuration.toString()}
-          onChangeText={(text) => handleFieldChange('wateringDuration', parseInt(text) || 0)}
-          placeholder="Enter duration"
-          keyboardType="numeric"
-        />
-      </View>
-
-      <TouchableOpacity style={styles.testButton} onPress={testWatering}>
-        <Ionicons name="water" size={20} color="#3B82F6" />
-        <Text style={styles.testButtonText}>Test Watering</Text>
-      </TouchableOpacity>
     </View>
   );
 
   const renderSensorSettings = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Sensor Settings</Text>
-      
-      <View style={styles.sensorCard}>
-        <View style={styles.sensorHeader}>
-          <Ionicons name="thermometer" size={24} color="#3B82F6" />
-          <Text style={styles.sensorTitle}>Moisture Sensor</Text>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="wifi" size={20} color="#F59E0B" />
+          </View>
+          <Text style={styles.cardTitle}>Sensor Management</Text>
         </View>
-        <View style={styles.sensorStatus}>
-          <Text style={[styles.statusText, { color: plotData.sensors.moisture.status === 'online' ? '#10B981' : '#EF4444' }]}>
-            {plotData.sensors.moisture.status.toUpperCase()}
-          </Text>
-          <Text style={styles.batteryText}>Battery: {plotData.sensors.moisture.battery}%</Text>
-        </View>
-      </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.sensorGrid}>
+            <View style={styles.sensorCard}>
+              <View style={styles.sensorHeader}>
+                <Ionicons name="water" size={20} color="#10B981" />
+                <Text style={styles.sensorTitle}>Moisture Sensor</Text>
+                <View style={[styles.statusBadge, { backgroundColor: plotData.sensors.moisture.status === 'online' ? '#10B981' : '#EF4444' }]}>
+                  <Text style={styles.statusText}>{plotData.sensors.moisture.status}</Text>
+                </View>
+              </View>
+              <View style={styles.sensorDetails}>
+                <View style={styles.sensorDetail}>
+                  <Text style={styles.detailLabel}>Battery</Text>
+                  <View style={styles.batteryInfo}>
+                    <Ionicons name="battery-charging" size={16} color="#10B981" />
+                    <Text style={styles.batteryText}>{plotData.sensors.moisture.battery}%</Text>
+                  </View>
+                </View>
+                <View style={styles.sensorDetail}>
+                  <Text style={styles.detailLabel}>Signal</Text>
+                  <Text style={styles.signalText}>{plotData.sensors.moisture.signal}</Text>
+                </View>
+              </View>
+            </View>
 
-      <View style={styles.sensorCard}>
-        <View style={styles.sensorHeader}>
-          <Ionicons name="thermometer" size={24} color="#F59E0B" />
-          <Text style={styles.sensorTitle}>Temperature Sensor</Text>
-        </View>
-        <View style={styles.sensorStatus}>
-          <Text style={[styles.statusText, { color: plotData.sensors.temperature.status === 'online' ? '#10B981' : '#EF4444' }]}>
-            {plotData.sensors.temperature.status.toUpperCase()}
-          </Text>
-          <Text style={styles.batteryText}>Battery: {plotData.sensors.temperature.battery}%</Text>
+            <View style={styles.sensorCard}>
+              <View style={styles.sensorHeader}>
+                <Ionicons name="thermometer" size={20} color="#F59E0B" />
+                <Text style={styles.sensorTitle}>Temperature Sensor</Text>
+                <View style={[styles.statusBadge, { backgroundColor: plotData.sensors.temperature.status === 'online' ? '#10B981' : '#EF4444' }]}>
+                  <Text style={styles.statusText}>{plotData.sensors.temperature.status}</Text>
+                </View>
+              </View>
+              <View style={styles.sensorDetails}>
+                <View style={styles.sensorDetail}>
+                  <Text style={styles.detailLabel}>Battery</Text>
+                  <View style={styles.batteryInfo}>
+                    <Ionicons name="battery-charging" size={16} color="#F59E0B" />
+                    <Text style={styles.batteryText}>{plotData.sensors.temperature.battery}%</Text>
+                  </View>
+                </View>
+                <View style={styles.sensorDetail}>
+                  <Text style={styles.detailLabel}>Signal</Text>
+                  <Text style={styles.signalText}>{plotData.sensors.temperature.signal}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.addSensorButton} onPress={addSensor}>
+            <Ionicons name="add" size={20} color="#3B82F6" />
+            <Text style={styles.addSensorText}>Add New Sensor</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 
+  const renderAdvancedSettings = () => (
+    <View style={styles.section}>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="settings" size={20} color="#8B5CF6" />
+          </View>
+          <Text style={styles.cardTitle}>Advanced Options</Text>
+        </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+                             <Ionicons name="analytics" size={20} color="#8B5CF6" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Smart Scheduling</Text>
+                <Text style={styles.switchSubtitle}>AI-powered watering optimization</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.smartScheduling}
+              onValueChange={(value) => handleFieldChange('smartScheduling', value)}
+              trackColor={{ false: '#374151', true: '#8B5CF6' }}
+              thumbColor={plotData.smartScheduling ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="sunny" size={20} color="#F59E0B" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Weather Integration</Text>
+                <Text style={styles.switchSubtitle}>Skip watering when rain is expected</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.weatherIntegration}
+              onValueChange={(value) => handleFieldChange('weatherIntegration', value)}
+              trackColor={{ false: '#374151', true: '#F59E0B' }}
+              thumbColor={plotData.weatherIntegration ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="notifications" size={20} color="#3B82F6" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Push Notifications</Text>
+                <Text style={styles.switchSubtitle}>Get alerts for important events</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.notifications}
+              onValueChange={(value) => handleFieldChange('notifications', value)}
+              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              thumbColor={plotData.notifications ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.dangerCard}>
+        <View style={styles.cardHeader}>
+          <View style={styles.dangerIcon}>
+            <Ionicons name="warning" size={20} color="#EF4444" />
+          </View>
+          <Text style={styles.dangerTitle}>Danger Zone</Text>
+        </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.dangerContent}>
+            <Text style={styles.dangerHeader}>Delete Plot</Text>
+            <Text style={styles.dangerText}>
+              This will permanently delete this plot and all associated data. This action cannot be undone.
+            </Text>
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <Ionicons name="trash" size={20} color="#EF4444" />
+              <Text style={styles.deleteButtonText}>Delete Plot</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (isLoading && !plotData.name) {
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingSpinner} />
+        <Text style={styles.loadingText}>Loading plot settings...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color="#6b7280" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Plot Settings</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-          <Ionicons name="checkmark" size={20} color="#10B981" />
-        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={20} color="white" />
+            </TouchableOpacity>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>Settings</Text>
+              <Text style={styles.headerSubtitle}>Configure "{plotData.name}"</Text>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            {hasChanges && (
+              <View style={styles.unsavedBadge}>
+                <Ionicons name="wifi" size={12} color="#3B82F6" />
+              </View>
+            )}
+            <TouchableOpacity 
+              style={[styles.saveButton, !hasChanges && styles.saveButtonDisabled]} 
+              onPress={handleSave}
+              disabled={isLoading || !hasChanges}
+            >
+              <Ionicons name="checkmark" size={16} color="white" />
+              <Text style={styles.saveButtonText}>{isLoading ? "Saving..." : "Save"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'general' && styles.activeTab]}
-          onPress={() => setActiveTab('general')}
-        >
-          <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>General</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'watering' && styles.activeTab]}
-          onPress={() => setActiveTab('watering')}
-        >
-          <Text style={[styles.tabText, activeTab === 'watering' && styles.activeTabText]}>Watering</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'sensors' && styles.activeTab]}
-          onPress={() => setActiveTab('sensors')}
-        >
-          <Text style={[styles.tabText, activeTab === 'sensors' && styles.activeTabText]}>Sensors</Text>
-        </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'general' && styles.activeTab]}
+            onPress={() => setActiveTab('general')}
+          >
+            <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>General</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'watering' && styles.activeTab]}
+            onPress={() => setActiveTab('watering')}
+          >
+            <Text style={[styles.tabText, activeTab === 'watering' && styles.activeTabText]}>Watering</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'sensors' && styles.activeTab]}
+            onPress={() => setActiveTab('sensors')}
+          >
+            <Text style={[styles.tabText, activeTab === 'sensors' && styles.activeTabText]}>Sensors</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'advanced' && styles.activeTab]}
+            onPress={() => setActiveTab('advanced')}
+          >
+            <Text style={[styles.tabText, activeTab === 'advanced' && styles.activeTabText]}>Advanced</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {activeTab === 'general' && renderGeneralSettings()}
         {activeTab === 'watering' && renderWateringSettings()}
         {activeTab === 'sensors' && renderSensorSettings()}
+        {activeTab === 'advanced' && renderAdvancedSettings()}
       </ScrollView>
-
-      {/* Delete Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Ionicons name="trash" size={20} color="#EF4444" />
-          <Text style={styles.deleteButtonText}>Delete Plot</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -357,50 +647,116 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#111827',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+  loadingSpinner: {
+    width: 48,
+    height: 48,
+    borderWidth: 4,
+    borderColor: '#10B981',
+    borderTopColor: 'transparent',
+    borderRadius: 24,
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingTop: 50,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  saveButton: {
-    padding: 8,
-  },
-  tabContainer: {
+  headerLeft: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  tab: {
+    alignItems: 'center',
     flex: 1,
-    paddingVertical: 12,
+  },
+  headerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
+  unsavedBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  unsavedText: {
+    fontSize: 10,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  saveButtonDisabled: {
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  tabContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tab: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginHorizontal: 4,
+  },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#3B82F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
   },
   tabText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
   },
   activeTabText: {
-    color: '#3B82F6',
+    color: 'white',
     fontWeight: '600',
   },
   content: {
@@ -410,114 +766,280 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  sectionTitle: {
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  dangerCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dangerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
+    color: 'white',
+    flex: 1,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  switchGroup: {
-    marginBottom: 16,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: '#374151',
+  dangerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#EF4444',
+    flex: 1,
   },
   testButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    paddingVertical: 12,
-    marginTop: 16,
   },
   testButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
     color: '#3B82F6',
+    fontSize: 14,
     fontWeight: '500',
+    marginLeft: 4,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  inputGroup: {
+    flex: 1,
+    marginRight: 12,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: 'white',
+  },
+  switchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  switchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  switchText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  switchTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  switchSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  sliderGroup: {
+    marginBottom: 20,
+  },
+  sliderContainer: {
+    marginTop: 8,
+  },
+  sliderTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    position: 'relative',
+  },
+  sliderFill: {
+    height: 6,
+    backgroundColor: '#3B82F6',
+    borderRadius: 3,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  plantingInfo: {
+    padding: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  plantingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  plantingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#10B981',
+    marginLeft: 8,
+  },
+  plantingSubtitle: {
+    fontSize: 14,
+    color: 'rgba(16, 185, 129, 0.8)',
+    marginLeft: 28,
+  },
+  sensorGrid: {
+    marginBottom: 16,
   },
   sensorCard: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sensorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
   sensorTitle: {
-    marginLeft: 8,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
+    flex: 1,
+    marginLeft: 8,
   },
-  sensorStatus: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
+    color: 'white',
+  },
+  sensorDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sensorDetail: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  batteryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   batteryText: {
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 4,
   },
-  footer: {
+  signalText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  addSensorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 16,
+  },
+  addSensorText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#3B82F6',
+    marginLeft: 8,
+  },
+  dangerContent: {
     padding: 16,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+  },
+  dangerHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginBottom: 8,
+  },
+  dangerText: {
+    fontSize: 14,
+    color: 'rgba(239, 68, 68, 0.8)',
+    marginBottom: 16,
+    lineHeight: 20,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
     paddingVertical: 12,
   },
   deleteButtonText: {
-    marginLeft: 8,
     fontSize: 16,
-    color: '#EF4444',
     fontWeight: '500',
+    color: 'white',
+    marginLeft: 8,
   },
 }); 

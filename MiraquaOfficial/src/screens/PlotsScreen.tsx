@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface Plot {
   id: string;
@@ -24,38 +25,50 @@ interface Plot {
 const plots: Plot[] = [
   {
     id: '1',
-    name: 'Garden Plot 1',
-    crop: 'Tomatoes',
-    health: 85,
-    moisture: 72,
-    size: '4x6 ft',
-    lastWatered: '2 hours ago',
-    nextWatering: 'Tomorrow 8 AM',
+    name: 'Cherry Tomato',
+    crop: 'Sweet 100',
+    health: 87,
+    moisture: 68,
+    size: 'Backyard Plot A',
+    lastWatered: 'Yesterday',
+    nextWatering: 'Tomorrow 6AM',
   },
   {
     id: '2',
     name: 'Herb Garden',
-    crop: 'Basil, Mint, Rosemary',
+    crop: 'Basil & Rosemary',
     health: 92,
-    moisture: 68,
-    size: '3x4 ft',
-    lastWatered: '4 hours ago',
-    nextWatering: 'Today 6 PM',
+    moisture: 55,
+    size: 'Kitchen Window',
+    lastWatered: '2 days ago',
+    nextWatering: 'Today 8PM',
   },
   {
     id: '3',
-    name: 'Vegetable Patch',
-    crop: 'Lettuce, Carrots',
-    health: 78,
-    moisture: 45,
-    size: '5x8 ft',
-    lastWatered: '1 hour ago',
-    nextWatering: 'Today 8 PM',
+    name: 'Pepper Patch',
+    crop: 'California Wonder',
+    health: 73,
+    moisture: 42,
+    size: 'Side Garden',
+    lastWatered: '3 days ago',
+    nextWatering: 'In 2 hours',
   },
 ];
 
-const PlotCard = ({ plot }: { plot: Plot }) => (
-  <TouchableOpacity style={styles.plotCard}>
+const PlotCard = ({ plot }: { plot: Plot }) => {
+  const navigation = useNavigation();
+  
+  const handlePlotPress = () => {
+    console.log('Plot pressed:', plot.id);
+    navigation.navigate('PlotDetails' as never, { plotId: parseInt(plot.id) } as never);
+  };
+
+  return (
+    <TouchableOpacity 
+      style={styles.plotCard}
+      onPress={handlePlotPress}
+      activeOpacity={0.7}
+    >
     <View style={styles.plotHeader}>
       <View>
         <Text style={styles.plotName}>{plot.name}</Text>
@@ -88,7 +101,8 @@ const PlotCard = ({ plot }: { plot: Plot }) => (
       </View>
     </View>
   </TouchableOpacity>
-);
+  );
+};
 
 export default function PlotsScreen() {
   return (
@@ -97,7 +111,7 @@ export default function PlotsScreen() {
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Your Plots</Text>
+          <Text style={styles.title}>Your Plots (3)</Text>
           <TouchableOpacity style={styles.addButton}>
             <Ionicons name="add" size={24} color="#ffffff" />
           </TouchableOpacity>

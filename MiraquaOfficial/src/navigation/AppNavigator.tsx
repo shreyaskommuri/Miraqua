@@ -33,6 +33,8 @@ import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import HelpScreen from '../screens/HelpScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import CalendarScreen from '../screens/CalendarScreen';
+import AddScheduleScreen from '../screens/AddScheduleScreen';
 
 import { RootStackParamList } from './types';
 
@@ -71,6 +73,8 @@ const AppNavigator = () => {
       <Stack.Screen name="Help" component={HelpScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Calendar" component={CalendarScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
