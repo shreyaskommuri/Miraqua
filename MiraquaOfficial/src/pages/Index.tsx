@@ -25,7 +25,7 @@ const Index = () => {
       crop: 'Tomatoes',
       location: 'Backyard',
       status: 'healthy',
-      moisture: 75,
+      moistureimage.png: 75,
       temperature: 72,
       sunlight: 85,
       nextWatering: '2h 30m'

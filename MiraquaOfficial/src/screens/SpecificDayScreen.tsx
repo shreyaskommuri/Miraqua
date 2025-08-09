@@ -125,6 +125,28 @@ const SpecificDayScreen = ({ route, navigation }: SpecificDayScreenProps) => {
           </LinearGradient>
         </View>
 
+        {/* Scheduled Watering Cards */}
+        <View style={styles.scheduledWateringCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <Ionicons name="time" size={16} color="#3B82F6" />
+              <Text style={styles.cardTitle}>Scheduled Watering</Text>
+            </View>
+            <TouchableOpacity style={styles.settingsButton}>
+              <Ionicons name="settings" size={16} color="#3B82F6" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.cardContent}>
+            <View style={styles.timeInfo}>
+              <Text style={styles.timeText}>7:00 AM</Text>
+              <Text style={styles.detailsText}>5 min • 15L</Text>
+            </View>
+            <View style={styles.waterIcon}>
+              <Ionicons name="water" size={32} color="#3B82F6" />
+            </View>
+          </View>
+        </View>
+
         {/* Summary Stats */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
@@ -511,6 +533,55 @@ const styles = StyleSheet.create({
     color: 'white',
     marginTop: 8,
     textAlign: 'center',
+  },
+  scheduledWateringCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  settingsButton: {
+    padding: 4,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeInfo: {
+    flex: 1,
+  },
+  timeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  detailsText: {
+    fontSize: 14,
+    color: '#3B82F6',
+  },
+  waterIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
