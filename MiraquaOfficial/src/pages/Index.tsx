@@ -25,7 +25,7 @@ const Index = () => {
       crop: 'Tomatoes',
       location: 'Backyard',
       status: 'healthy',
-      moistureimage.png: 75,
+      moisture: 75,
       temperature: 72,
       sunlight: 85,
       nextWatering: '2h 30m'
@@ -257,7 +257,10 @@ const Index = () => {
               <Text style={styles.onlineText}>Online</Text>
               <Ionicons name="wifi" size={12} color="#10B981" />
             </View>
-            <TouchableOpacity style={styles.notificationButton}>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
               <Ionicons name="notifications" size={20} color="#374151" />
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>3</Text>

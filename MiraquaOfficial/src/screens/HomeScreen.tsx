@@ -45,7 +45,10 @@ export default function HomeScreen({ navigation }: any) {
             <Ionicons name="wifi" size={16} color="#10B981" />
             <Text style={styles.onlineText}>Online</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Ionicons name="notifications" size={20} color="white" />
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationCount}>3</Text>
