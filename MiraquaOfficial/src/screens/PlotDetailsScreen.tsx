@@ -624,6 +624,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Bottom Action Buttons */}
+      <View style={styles.bottomButtons}>
+        <TouchableOpacity style={styles.askMiraquaButton}>
+          <Ionicons name="chatbubble" size={20} color="#6B7280" />
+          <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.waterNowBottomButton}>
+          <Ionicons name="water" size={20} color="white" />
+          <Text style={styles.waterNowBottomText}>Water Now</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -1231,6 +1243,42 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 10,
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  bottomButtons: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+    backgroundColor: '#111827',
+  },
+  askMiraquaButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#374151',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  askMiraquaText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  waterNowBottomButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  waterNowBottomText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
 });
 
