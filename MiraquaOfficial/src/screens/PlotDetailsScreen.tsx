@@ -722,6 +722,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: -20,
   },
   headerAction: {
     padding: 8,
