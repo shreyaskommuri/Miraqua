@@ -627,7 +627,10 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       
       {/* Bottom Action Buttons */}
       <View style={styles.bottomButtons}>
-        <TouchableOpacity style={styles.askMiraquaButton}>
+        <TouchableOpacity 
+          style={styles.askMiraquaButton}
+          onPress={() => navigation.navigate('Chat')}
+        >
           <Ionicons name="chatbubble" size={20} color="#6B7280" />
           <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
         </TouchableOpacity>

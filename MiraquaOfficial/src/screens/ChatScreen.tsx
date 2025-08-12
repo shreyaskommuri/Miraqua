@@ -1,27 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  SafeAreaView,
   StatusBar,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
+  ScrollView,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import SidebarNavigation from './SidebarNavigation';
-
-interface Message {
-  id: number;
-  type: 'user' | 'ai';
-  content: string;
-  timestamp: Date;
-  suggestions?: string[];
-}
 
 interface PlotData {
   id: number;
@@ -40,22 +29,31 @@ interface PlotData {
   lastWatered: string;
 }
 
-export default function ChatScreen({ navigation }: any) {
+interface Message {
+  id: number;
+  sender: 'user' | 'bot';
+  text: string;
+  time: string;
+}
+
+interface ChatScreenProps {
+  navigation: any;
+}
+
+export default function ChatScreen({ navigation }: ChatScreenProps) {
+  const [message, setMessage] = useState('');
+  const [showGardenStatus, setShowGardenStatus] = useState(true);
+  const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
+  const [selectedPlotId, setSelectedPlotId] = useState<string>('general');
+  const [showPlotSelector, setShowPlotSelector] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: Date.now() + Math.random(),
-      type: 'ai',
-      content: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
-      timestamp: new Date(),
+      id: 1,
+      sender: 'bot',
+      text: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
+      time: 'now'
     }
   ]);
-  
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [selectedPlotId, setSelectedPlotId] = useState<string>("general");
-  const [showGardenStatus, setShowGardenStatus] = useState(true);
-  const [showPlotSelector, setShowPlotSelector] = useState(false);
 
   // Mock plot data
   const mockPlots: PlotData[] = [
@@ -93,8 +91,6 @@ export default function ChatScreen({ navigation }: any) {
     }
   ];
 
-  const selectedPlot = selectedPlotId === "general" ? null : mockPlots.find(p => p.id.toString() === selectedPlotId);
-
   const quickActions = selectedPlot ? [
     "Water now",
     "Skip watering", 
@@ -107,190 +103,82 @@ export default function ChatScreen({ navigation }: any) {
     "Adjust"
   ];
 
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
   const handlePlotSelection = (plotId: string) => {
-    console.log('Plot selected:', plotId);
     setSelectedPlotId(plotId);
     setShowPlotSelector(false);
     
-    // Add a message about the selected plot
-    if (plotId !== "general") {
+    if (plotId === 'general') {
+      setSelectedPlot(null);
+    } else {
       const plot = mockPlots.find(p => p.id.toString() === plotId);
+      setSelectedPlot(plot || null);
+      
+      // Add initial message about the selected plot
       if (plot) {
         const plotMessage: Message = {
-          id: Date.now() + Math.random(),
-          type: 'ai',
-          content: `I see you've selected ${plot.name}. This plot is growing ${plot.crop} with ${plot.moisture}% soil moisture, ${plot.temperature}°F temperature, and ${plot.sunlight}% sunlight. The sensor battery is at ${plot.batteryLevel}% and pH is ${plot.soilPh}. How can I help optimize this plot?`,
-          timestamp: new Date(),
-          suggestions: ["Water now", "Check health", "Adjust settings", "View schedule"]
+          id: Date.now(),
+          sender: 'bot',
+          text: `I see you're asking about your ${plot.name}. Here's what I know: It's growing ${plot.crop} with ${plot.moisture}% soil moisture, ${plot.temperature}°F temperature, and ${plot.sunlight}% sunlight. The sensor battery is at ${plot.batteryLevel}% and pH is ${plot.soilPh}. How can I help optimize this plot?`,
+          time: 'now'
         };
         setMessages(prev => [...prev, plotMessage]);
       }
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now() + Math.random(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
-    setIsTyping(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(inputValue);
-      const aiMessage: Message = {
-        id: Date.now() + Math.random(),
-        type: 'ai',
-        content: aiResponse.content,
-        timestamp: new Date(),
-        suggestions: aiResponse.suggestions
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
-  };
-
-  const generateAIResponse = (input: string) => {
-    const lowerInput = input.toLowerCase();
-    
-    // Handle specific quick actions
-    if (lowerInput.includes('water plants') || lowerInput.includes('water now')) {
-      return {
-        content: "I'll water your plants now. Based on current soil moisture levels, I'm applying 15 minutes of irrigation to all active plots. The system will automatically adjust the duration based on soil conditions and weather data.",
-        suggestions: ["Check watering status", "Adjust duration", "Skip next watering"]
-      };
-    }
-    
-    if (lowerInput.includes('skip watering')) {
-      return {
-        content: "I've skipped the next scheduled watering for all plots. The system will resume normal irrigation after this cycle. Your plants will receive water during the following scheduled session.",
-        suggestions: ["Resume watering", "Check schedule", "Adjust settings"]
-      };
-    }
-    
-    if (lowerInput.includes('plant health') || lowerInput.includes('check health')) {
-      return {
-        content: "Checking plant health across all plots... Your tomatoes show excellent growth with 85% sunlight absorption. The herb garden needs attention - soil pH is slightly high at 7.2. I recommend adjusting the irrigation schedule for the basil plants.",
-        suggestions: ["View detailed report", "Adjust pH", "Optimize lighting"]
-      };
-    }
-    
-    if (lowerInput.includes('adjust')) {
-      return {
-        content: "I can help you adjust various settings. What would you like to modify? I can change watering schedules, adjust soil pH, modify light exposure, or optimize irrigation patterns.",
-        suggestions: ["Watering schedule", "Soil pH", "Light settings", "Irrigation patterns"]
-      };
-    }
-    
-    if (selectedPlot) {
-      if (lowerInput.includes('water')) {
-        return {
-          content: `Based on ${selectedPlot.name}'s current moisture level of ${selectedPlot.moisture}%, I ${selectedPlot.moisture < 50 ? 'recommend watering soon' : 'suggest waiting until tomorrow'}. The soil pH of ${selectedPlot.soilPh} is ${selectedPlot.soilPh > 7 ? 'slightly alkaline' : selectedPlot.soilPh < 6.5 ? 'slightly acidic' : 'optimal'} for ${selectedPlot.crop}.`,
-          suggestions: ["Water now", "Skip watering", "Check schedule"]
-        };
-      } else if (lowerInput.includes('health') || lowerInput.includes('problem')) {
-        return {
-          content: `Your ${selectedPlot.name} shows ${selectedPlot.status} status. With ${selectedPlot.sunlight}% sunlight and ${selectedPlot.temperature}°F temperature, conditions are ${selectedPlot.temperature > 80 ? 'quite warm' : selectedPlot.temperature < 60 ? 'cool' : 'good'} for ${selectedPlot.crop}. ${selectedPlot.batteryLevel < 30 ? 'Note: The sensor battery is low and should be replaced soon.' : ''}`,
-          suggestions: ["Check sensors", "Adjust settings", "View details"]
-        };
-      } else if (lowerInput.includes('schedule')) {
-        return {
-          content: `For ${selectedPlot.name}, the next watering is scheduled for ${selectedPlot.nextWatering}. Based on current moisture (${selectedPlot.moisture}%) and weather conditions, this timing looks ${selectedPlot.moisture > 70 ? 'possibly too frequent - consider extending the interval' : 'appropriate'}.`,
-          suggestions: ["Adjust schedule", "Water now", "Skip next"]
-        };
-      }
-    }
-    
-    if (lowerInput.includes('skip') && lowerInput.includes('tomorrow')) {
-      return {
-        content: "I'll skip watering tomorrow for your plots. The schedule has been updated and your plants will receive water the following day instead. This adjustment takes into account the current soil moisture and weather forecast.",
-        suggestions: ["Undo this change", "Show updated schedule", "Skip for specific plot"]
-      };
-    }
-    
-    if (lowerInput.includes('weather') || lowerInput.includes('forecast')) {
-      return {
-        content: "The weather forecast shows partly cloudy skies with a 20% chance of rain tomorrow. Temperature will range from 68-76°F. Based on this, I recommend proceeding with the current watering schedule as natural precipitation is unlikely.",
-        suggestions: ["Adjust for weather", "Show 7-day forecast", "Water now before rain"]
-      };
-    }
-    
-    if (lowerInput.includes('increase') || lowerInput.includes('more water')) {
-      return {
-        content: "I can increase the watering duration by 25% for your selected plots. This will add approximately 2-3 minutes to each watering session. Would you like me to apply this change?",
-        suggestions: ["Confirm increase", "Decrease instead", "Set specific duration"]
-      };
-    }
-    
-    if (lowerInput.includes('when') && (lowerInput.includes('water') || lowerInput.includes('next'))) {
-      return {
-        content: "Your next scheduled watering is today at 6:00 AM for the Tomato Garden, and tomorrow at 5:30 AM for the Herb Patch. Both schedules are optimized based on current soil moisture and weather conditions.",
-        suggestions: ["Change watering time", "Water now", "View full schedule"]
-      };
-    }
-    
-    return {
-      content: "I understand you're asking about irrigation management. I can help you skip waterings, adjust schedules, change watering amounts, or provide information about your plots. What specific action would you like me to take?",
-      suggestions: [
-        "Skip next watering",
-        "Show current schedule", 
-        "Adjust water amount",
-        "Check soil moisture"
-      ]
-    };
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputValue(suggestion);
-  };
-
   const handleQuickAction = (action: string) => {
-    // Send the quick action as a user message
-    const userMessage: Message = {
-      id: Date.now() + Math.random(),
-      type: 'user',
-      content: action,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setIsTyping(true);
-
-    // Simulate AI response based on the quick action
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(action);
-      const aiMessage: Message = {
-        id: Date.now() + Math.random(),
-        type: 'ai',
-        content: aiResponse.content,
-        timestamp: new Date(),
-        suggestions: aiResponse.suggestions
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+    setMessage(action);
+    handleSendMessage(action);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleSendMessage = (customMessage?: string) => {
+    const messageToSend = customMessage || message;
+    if (messageToSend.trim()) {
+      const newMessage: Message = {
+        id: Date.now(),
+        sender: 'user',
+        text: messageToSend,
+        time: 'now'
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setMessage('');
+      
+      // Simulate AI response with plot context
+      setTimeout(() => {
+        let botResponse = "I understand your concern. Let me analyze your garden data and provide personalized recommendations.";
+        
+        if (selectedPlot) {
+          if (messageToSend.toLowerCase().includes('water')) {
+            botResponse = `Based on ${selectedPlot.name}'s current moisture level of ${selectedPlot.moisture}%, I ${selectedPlot.moisture < 50 ? 'recommend watering soon' : 'suggest waiting until tomorrow'}. The soil pH of ${selectedPlot.soilPh} is ${selectedPlot.soilPh > 7 ? 'slightly alkaline' : selectedPlot.soilPh < 6.5 ? 'slightly acidic' : 'optimal'} for ${selectedPlot.crop}.`;
+          } else if (messageToSend.toLowerCase().includes('health') || messageToSend.toLowerCase().includes('problem')) {
+            botResponse = `Your ${selectedPlot.name} shows ${selectedPlot.status} status. With ${selectedPlot.sunlight}% sunlight and ${selectedPlot.temperature}°F temperature, conditions are ${selectedPlot.temperature > 80 ? 'quite warm' : selectedPlot.temperature < 60 ? 'cool' : 'good'} for ${selectedPlot.crop}. ${selectedPlot.batteryLevel < 30 ? 'Note: The sensor battery is low and should be replaced soon.' : ''}`;
+          } else if (messageToSend.toLowerCase().includes('schedule')) {
+            botResponse = `For ${selectedPlot.name}, the next watering is scheduled for ${selectedPlot.nextWatering}. Based on current moisture (${selectedPlot.moisture}%) and weather conditions, this timing looks ${selectedPlot.moisture > 70 ? 'possibly too frequent - consider extending the interval' : 'appropriate'}.`;
+          }
+        }
+        
+        const aiMessage: Message = {
+          id: Date.now() + 1,
+          sender: 'bot',
+          text: botResponse,
+          time: 'now'
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      }, 1000);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.menuButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.menuButton}>
           <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
         
@@ -302,15 +190,12 @@ export default function ChatScreen({ navigation }: any) {
         </View>
         
         <View style={styles.headerRight}>
-          <View style={styles.statusIndicator}>
-            <Ionicons name="wifi" size={16} color="#10b981" />
-            <Text style={styles.statusText}>Online</Text>
+          <View style={styles.onlineStatus}>
+            <Ionicons name="wifi" size={16} color="white" />
+            <Text style={styles.onlineText}>Online</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Ionicons name="notifications" size={24} color="white" />
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications" size={20} color="white" />
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationCount}>3</Text>
             </View>
@@ -324,11 +209,7 @@ export default function ChatScreen({ navigation }: any) {
           <Text style={styles.quickActionsTitle}>Quick actions:</Text>
           <TouchableOpacity 
             style={styles.plotSelector}
-            onPress={() => {
-              console.log('Plot selector pressed');
-              setShowPlotSelector(true);
-            }}
-            activeOpacity={0.7}
+            onPress={() => setShowPlotSelector(true)}
           >
             <Text style={styles.plotSelectorText}>
               {selectedPlot ? selectedPlot.name : "General Question"}
@@ -371,7 +252,6 @@ export default function ChatScreen({ navigation }: any) {
                   selectedPlotId === "general" && styles.selectedPlotOption
                 ]}
                 onPress={() => handlePlotSelection("general")}
-                activeOpacity={0.7}
               >
                 <View style={styles.plotOptionContent}>
                   <Ionicons name="leaf" size={20} color="#10b981" />
@@ -390,7 +270,6 @@ export default function ChatScreen({ navigation }: any) {
                     selectedPlotId === plot.id.toString() && styles.selectedPlotOption
                   ]}
                   onPress={() => handlePlotSelection(plot.id.toString())}
-                  activeOpacity={0.7}
                 >
                   <View style={styles.plotOptionContent}>
                     <Ionicons name="leaf" size={20} color="#10b981" />
@@ -408,76 +287,48 @@ export default function ChatScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Messages */}
-      <ScrollView style={styles.messagesContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.messagesContent}>
-          {messages.map((message) => (
-            <View key={message.id} style={[
-              styles.messageContainer,
-              message.type === 'user' ? styles.userMessage : styles.aiMessage
-            ]}>
-              <View style={styles.messageBubble}>
-                <View style={styles.messageHeader}>
-                  <View style={[
-                    styles.messageAvatar,
-                    message.type === 'user' ? styles.userAvatar : styles.aiAvatar
-                  ]}>
-                    <Ionicons 
-                      name={message.type === 'user' ? 'person' : 'leaf'} 
-                      size={16} 
-                      color={message.type === 'user' ? '#3b82f6' : '#10b981'} 
-                    />
-                  </View>
-                  <View style={[
-                    styles.messageContent,
-                    message.type === 'user' ? styles.userContent : styles.aiContent
-                  ]}>
-                    <Text style={[
-                      styles.messageText,
-                      message.type === 'user' ? styles.userText : styles.aiText
-                    ]}>
-                      {message.content}
-                    </Text>
-                    <Text style={[
-                      styles.messageTime,
-                      message.type === 'user' ? styles.userTime : styles.aiTime
-                    ]}>
-                      {formatTime(message.timestamp)}
-                    </Text>
-                  </View>
+      {/* Messages - Scrollable Area */}
+      <ScrollView style={styles.chatArea} showsVerticalScrollIndicator={false}>
+        <View style={styles.messagesContainer}>
+          {messages.map((msg) => (
+            <View
+              key={msg.id}
+              style={[
+                styles.messageRow,
+                msg.sender === 'user' ? styles.userMessageRow : styles.botMessageRow
+              ]}
+            >
+              <View style={styles.messageContent}>
+                <View style={[
+                  styles.avatar,
+                  msg.sender === 'user' ? styles.userAvatar : styles.botAvatar
+                ]}>
+                  <Ionicons 
+                    name={msg.sender === 'user' ? 'person' : 'leaf'} 
+                    size={16} 
+                    color="white" 
+                  />
                 </View>
-                
-                {message.suggestions && (
-                  <View style={styles.suggestionsContainer}>
-                    {message.suggestions.map((suggestion, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.suggestionBadge}
-                        onPress={() => handleSuggestionClick(suggestion)}
-                      >
-                        <Text style={styles.suggestionText}>{suggestion}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <View style={[
+                  styles.messageBubble,
+                  msg.sender === 'user' ? styles.userBubble : styles.botBubble
+                ]}>
+                  <Text style={[
+                    styles.messageText,
+                    msg.sender === 'user' ? styles.userText : styles.botText
+                  ]}>
+                    {msg.text}
+                  </Text>
+                  <Text style={[
+                    styles.messageTime,
+                    msg.sender === 'user' ? styles.userTime : styles.botTime
+                  ]}>
+                    {msg.time}
+                  </Text>
+                </View>
               </View>
             </View>
           ))}
-          
-          {isTyping && (
-            <View style={styles.typingContainer}>
-              <View style={styles.aiAvatar}>
-                <Ionicons name="leaf" size={16} color="#10b981" />
-              </View>
-              <View style={styles.typingBubble}>
-                <View style={styles.typingDots}>
-                  <View style={styles.typingDot} />
-                  <View style={styles.typingDot} />
-                  <View style={styles.typingDot} />
-                </View>
-              </View>
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -511,66 +362,75 @@ export default function ChatScreen({ navigation }: any) {
                 style={styles.closeStatusButton}
                 onPress={() => setShowGardenStatus(false)}
               >
-                <Ionicons name="close" size={16} color="rgba(255, 255, 255, 0.7)" />
+                <Ionicons name="close" size={16} color="white" />
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      )}
-
-      {/* Input Area */}
-      <KeyboardAvoidingView 
-        style={styles.inputContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <View style={styles.inputRow}>
-          <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="camera" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="mic" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <View style={styles.textInputContainer}>
+          
+          {/* Input Area */}
+          <View style={styles.inputArea}>
+            <TouchableOpacity style={styles.inputButton}>
+              <Ionicons name="camera" size={20} color="#6b7280" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.inputButton}>
+              <Ionicons name="mic" size={20} color="#6b7280" />
+            </TouchableOpacity>
             <TextInput
               style={styles.textInput}
               placeholder={selectedPlot 
                 ? `Ask about your ${selectedPlot.name}...` 
                 : "Ask me anything about your garden..."
               }
-              placeholderTextColor="rgba(107, 114, 128, 0.7)"
-              value={inputValue}
-              onChangeText={setInputValue}
-              multiline
-              maxLength={500}
+              placeholderTextColor="#9CA3AF"
+              value={message}
+              onChangeText={setMessage}
+              onSubmitEditing={() => handleSendMessage()}
             />
+            <TouchableOpacity 
+              style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+              onPress={() => handleSendMessage()}
+              disabled={!message.trim()}
+            >
+              <Ionicons name="paper-plane" size={20} color="white" />
+            </TouchableOpacity>
           </View>
+        </View>
+      )}
+      
+      {/* Input Area when garden status is hidden */}
+      {!showGardenStatus && (
+        <View style={styles.standaloneInputArea}>
+          <TouchableOpacity style={styles.inputButton}>
+            <Ionicons name="camera" size={20} color="#6b7280" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.inputButton}>
+            <Ionicons name="mic" size={20} color="#6b7280" />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.textInput}
+            placeholder={selectedPlot 
+              ? `Ask about your ${selectedPlot.name}...` 
+              : "Ask me anything about your garden..."
+            }
+            placeholderTextColor="#9CA3AF"
+            value={message}
+            onChangeText={setMessage}
+            onSubmitEditing={() => handleSendMessage()}
+          />
           <TouchableOpacity 
-            style={[styles.sendButton, !inputValue.trim() && styles.sendButtonDisabled]}
-            onPress={handleSendMessage}
-            disabled={!inputValue.trim()}
+            style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+            onPress={() => handleSendMessage()}
+            disabled={!message.trim()}
           >
-            <Ionicons name="send" size={20} color="white" />
+            <Ionicons name="paper-plane" size={20} color="white" />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-
-      {/* Sidebar Navigation */}
-      <SidebarNavigation
-        visible={showSidebar}
-        onClose={() => setShowSidebar(false)}
-        navigation={navigation}
-        currentRoute="Chat"
-      />
-    </SafeAreaView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#111827',
-  },
   container: {
     flex: 1,
     backgroundColor: '#111827',
@@ -579,10 +439,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 16,
-    backgroundColor: '#111827',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 60,
+    backgroundColor: '#374151',
   },
   menuButton: {
     padding: 8,
@@ -594,30 +454,34 @@ const styles = StyleSheet.create({
   logoIcon: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   logoText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: 'white',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
-  statusIndicator: {
+  onlineStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginRight: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
-  statusText: {
+  onlineText: {
     fontSize: 12,
-    color: '#10b981',
+    color: 'white',
+    marginLeft: 4,
     fontWeight: '500',
   },
   notificationButton: {
@@ -628,7 +492,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#ef4444',
+    backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -636,25 +500,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notificationCount: {
-    fontSize: 10,
     color: 'white',
+    fontSize: 10,
     fontWeight: '600',
   },
   quickActionsSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
+    padding: 12,
+    backgroundColor: '#1F2937',
   },
   quickActionsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   quickActionsTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: 'white',
   },
   plotSelector: {
@@ -665,12 +527,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 36,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 28,
   },
   plotSelectorText: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   quickActionsGrid: {
@@ -684,15 +546,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    flex: 1,
-    minWidth: '22%',
+    paddingVertical: 8,
+    minWidth: '45%',
+    alignItems: 'center',
   },
   quickActionText: {
-    fontSize: 12,
     color: 'white',
+    fontSize: 12,
     fontWeight: '500',
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -755,223 +616,169 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
   },
-  messagesContainer: {
+  chatArea: {
     flex: 1,
     backgroundColor: '#111827',
   },
-  messagesContent: {
-    padding: 16,
-    gap: 16,
-    paddingBottom: 8,
+  messagesContainer: {
+    padding: 20,
   },
-  messageContainer: {
-    flexDirection: 'row',
+  messageRow: {
+    marginBottom: 16,
   },
-  userMessage: {
-    justifyContent: 'flex-end',
+  userMessageRow: {
+    alignItems: 'flex-end',
   },
-  aiMessage: {
-    justifyContent: 'flex-start',
+  botMessageRow: {
+    alignItems: 'flex-start',
   },
-  messageBubble: {
-    maxWidth: '80%',
-  },
-  messageHeader: {
+  messageContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    maxWidth: '80%',
   },
-  messageAvatar: {
+  avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 8,
   },
   userAvatar: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  aiAvatar: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  messageContent: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  userContent: {
     backgroundColor: '#3b82f6',
   },
-  aiContent: {
+  botAvatar: {
+    backgroundColor: '#10b981',
+  },
+  messageBubble: {
+    padding: 16,
+    borderRadius: 20,
+    maxWidth: '85%',
+  },
+  userBubble: {
+    backgroundColor: '#3b82f6',
+  },
+  botBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
   },
   userText: {
     color: 'white',
   },
-  aiText: {
+  botText: {
     color: 'white',
   },
   messageTime: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 8,
   },
   userTime: {
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  aiTime: {
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  suggestionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  suggestionBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  suggestionText: {
-    fontSize: 12,
-    color: '#10b981',
-    fontWeight: '500',
-  },
-  typingContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  typingBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  typingDots: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  botTime: {
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   gardenStatusCard: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#1F2937',
     marginHorizontal: 16,
     marginBottom: 8,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#374151',
   },
   gardenStatusContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 16,
   },
   gardenStatusLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    marginBottom: 16,
   },
   gardenStatusIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#10b981',
+    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   gardenStatusInfo: {
     flex: 1,
   },
   gardenStatusTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: 'white',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   gardenStatusSubtitle: {
-    fontSize: 12,
-    color: '#d1d5db',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
   },
   gardenStatusRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   statusBadge: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   statusBadgeText: {
-    fontSize: 12,
     color: 'white',
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   closeStatusButton: {
-    padding: 4,
+    padding: 8,
   },
-  inputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
-    paddingBottom: 20,
-  },
-  inputRow: {
+  inputArea: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
+    alignItems: 'center',
+    gap: 12,
+  },
+  standaloneInputArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1F2937',
+    gap: 12,
   },
   inputButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  textInputContainer: {
+  textInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 40,
-    maxHeight: 100,
-  },
-  textInput: {
-    fontSize: 14,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     color: 'white',
-    padding: 0,
+    fontSize: 16,
   },
   sendButton: {
-    backgroundColor: '#10b981',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
   },
