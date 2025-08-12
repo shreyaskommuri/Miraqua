@@ -16,6 +16,61 @@ export default function HomeScreen({ navigation }: any) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchText, setSearchText] = useState('');
 
+  // Define plots data
+  const [plots] = useState([
+    {
+      id: 1,
+      name: 'Cherry Tomato',
+      type: 'Sweet 100',
+      location: 'Backyard Plot A',
+      health: 87,
+      moisture: 68,
+      temperature: 72,
+      humidity: 85,
+      status: 'Online',
+      nextWatering: 'Tomorrow 6AM',
+      wifiStatus: '#10B981'
+    },
+    {
+      id: 2,
+      name: 'Herb Garden',
+      type: 'Basil & Rosemary',
+      location: 'Kitchen Window',
+      health: 92,
+      moisture: 55,
+      temperature: 70,
+      humidity: 92,
+      status: 'Online',
+      nextWatering: 'Today 8PM',
+      wifiStatus: '#10B981'
+    },
+    {
+      id: 3,
+      name: 'Pepper Patch',
+      type: 'California Wonder',
+      location: 'Side Garden',
+      health: 73,
+      moisture: 42,
+      temperature: 75,
+      humidity: 78,
+      status: 'Offline',
+      nextWatering: 'In 2 hours',
+      wifiStatus: '#EF4444'
+    }
+  ]);
+
+  // Filter plots based on search text
+  const filteredPlots = plots.filter(plot => {
+    if (!searchText.trim()) return true;
+    
+    const searchLower = searchText.toLowerCase();
+    return (
+      plot.name.toLowerCase().includes(searchLower) ||
+      plot.type.toLowerCase().includes(searchLower) ||
+      plot.location.toLowerCase().includes(searchLower)
+    );
+  });
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning!';
@@ -59,22 +114,24 @@ export default function HomeScreen({ navigation }: any) {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Greeting and Weather Section */}
-        <View style={styles.greetingSection}>
-          <View style={styles.greetingContainer}>
-            <Text style={styles.greetingText}>
-              {getGreeting()} 👋
-            </Text>
-            <Text style={styles.greetingSubtext}>
-              Your gardens are looking great today
-            </Text>
+        {!searchText.trim() && (
+          <View style={styles.greetingSection}>
+            <View style={styles.greetingContainer}>
+              <Text style={styles.greetingText}>
+                {getGreeting()} 👋
+              </Text>
+              <Text style={styles.greetingSubtext}>
+                Your gardens are looking great today
+              </Text>
+            </View>
+            
+            <View style={styles.weatherCard}>
+              <Ionicons name="partly-sunny" size={24} color="#F59E0B" />
+              <Text style={styles.temperature}>75°F</Text>
+              <Text style={styles.weatherConditions}>Clear • 71% humidity</Text>
+            </View>
           </View>
-          
-          <View style={styles.weatherCard}>
-            <Ionicons name="partly-sunny" size={24} color="#F59E0B" />
-            <Text style={styles.temperature}>75°F</Text>
-            <Text style={styles.weatherConditions}>Clear • 71% humidity</Text>
-          </View>
-        </View>
+        )}
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -91,237 +148,161 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         {/* Top Row Metrics */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Ionicons name="location" size={20} color="#3B82F6" />
-            <Text style={styles.metricValue}>2</Text>
-            <Text style={styles.metricLabel}>Active Plots</Text>
-          </View>
-          
-          <View style={styles.metricCard}>
-            <Ionicons name="water" size={20} color="#3B82F6" />
-            <Text style={styles.metricValue}>26L</Text>
-            <Text style={styles.metricLabel}>This week</Text>
-          </View>
-        </View>
-
-        <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Ionicons name="trending-down" size={20} color="#F59E0B" />
-            <Text style={styles.metricChange}>-3%</Text>
-            <Text style={styles.metricValue}>55%</Text>
-            <Text style={styles.metricLabel}>Avg Moisture</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '55%' }]} />
+        {!searchText.trim() && (
+          <View style={styles.metricsRow}>
+            <View style={styles.metricCard}>
+              <Ionicons name="location" size={20} color="#3B82F6" />
+              <Text style={styles.metricValue}>{filteredPlots.length}</Text>
+              <Text style={styles.metricLabel}>Active Plots</Text>
+            </View>
+            
+            <View style={styles.metricCard}>
+              <Ionicons name="water" size={20} color="#3B82F6" />
+              <Text style={styles.metricValue}>26L</Text>
+              <Text style={styles.metricLabel}>This week</Text>
             </View>
           </View>
-          
-          <View style={styles.metricCard}>
-            <Ionicons name="time" size={20} color="#8B5CF6" />
-            <Text style={styles.metricValue}>2h 0m</Text>
-            <Text style={styles.metricLabel}>Next Watering</Text>
+        )}
+
+        {!searchText.trim() && (
+          <View style={styles.metricsRow}>
+            <View style={styles.metricCard}>
+              <Ionicons name="trending-down" size={20} color="#F59E0B" />
+              <Text style={styles.metricChange}>-3%</Text>
+              <Text style={styles.metricValue}>55%</Text>
+              <Text style={styles.metricLabel}>Avg Moisture</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: '55%' }]} />
+              </View>
+            </View>
+            
+            <View style={styles.metricCard}>
+              <Ionicons name="time" size={20} color="#8B5CF6" />
+              <Text style={styles.metricValue}>2h 0m</Text>
+              <Text style={styles.metricLabel}>Next Watering</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Bottom Row Metrics */}
-        <View style={styles.bottomMetricsRow}>
-          <View style={styles.bottomMetricCard}>
-            <Ionicons name="wifi" size={20} color="#10B981" />
-            <Text style={styles.bottomMetricValue}>2</Text>
-            <Text style={styles.bottomMetricLabel}>Online Plots</Text>
-            <Text style={styles.bottomMetricSubtext}>1 offline</Text>
+        {!searchText.trim() && (
+          <View style={styles.bottomMetricsRow}>
+            <View style={styles.bottomMetricCard}>
+              <Ionicons name="wifi" size={20} color="#10B981" />
+              <Text style={styles.bottomMetricValue}>{filteredPlots.filter(p => p.status === 'Online').length}</Text>
+              <Text style={styles.bottomMetricLabel}>Online Plots</Text>
+              <Text style={styles.bottomMetricSubtext}>{filteredPlots.filter(p => p.status === 'Offline').length} offline</Text>
+            </View>
+            
+            <View style={styles.bottomMetricCard}>
+              <Ionicons name="water" size={20} color="#3B82F6" />
+              <Text style={[styles.bottomMetricValue, { color: '#3B82F6' }]}>55%</Text>
+              <Text style={styles.bottomMetricLabel}>Avg Moisture</Text>
+              <Text style={styles.bottomMetricSubtext}>Good</Text>
+            </View>
+            
+            <View style={styles.bottomMetricCard}>
+              <Ionicons name="heart" size={20} color="#EF4444" />
+              <Text style={[styles.bottomMetricValue, { color: '#10B981' }]}>84%</Text>
+              <Text style={styles.bottomMetricLabel}>Avg Health</Text>
+              <Text style={styles.bottomMetricSubtext}>Thriving</Text>
+            </View>
           </View>
-          
-          <View style={styles.bottomMetricCard}>
-            <Ionicons name="water" size={20} color="#3B82F6" />
-            <Text style={[styles.bottomMetricValue, { color: '#3B82F6' }]}>55%</Text>
-            <Text style={styles.bottomMetricLabel}>Avg Moisture</Text>
-            <Text style={styles.bottomMetricSubtext}>Good</Text>
-          </View>
-          
-          <View style={styles.bottomMetricCard}>
-            <Ionicons name="heart" size={20} color="#EF4444" />
-            <Text style={[styles.bottomMetricValue, { color: '#10B981' }]}>84%</Text>
-            <Text style={styles.bottomMetricLabel}>Avg Health</Text>
-            <Text style={styles.bottomMetricSubtext}>Thriving</Text>
-          </View>
-        </View>
+        )}
 
         {/* Your Plots Section */}
         <View style={styles.plotsSection}>
           <View style={styles.plotsHeader}>
-            <Text style={styles.plotsTitle}>Your Plots (3)</Text>
+            <Text style={styles.plotsTitle}>
+              {searchText.trim() ? `Search Results (${filteredPlots.length})` : `Your Plots (${filteredPlots.length})`}
+            </Text>
             <TouchableOpacity style={styles.refreshButton}>
               <Ionicons name="refresh" size={20} color="white" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.plotsGrid}>
-            {/* Cherry Tomato Garden Card */}
-            <TouchableOpacity 
-              style={styles.plotGridCard}
-              onPress={() => {
-                console.log('Cherry Tomato pressed');
-                navigation.navigate('PlotDetails' as never, { plotId: 1 } as never);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.plotGridHeader}>
-                <View style={styles.plotGridTitleContainer}>
-                  <Text style={styles.plotGridTitle}>Cherry Tomato</Text>
-                  <Ionicons name="wifi" size={14} color="#10B981" />
-                </View>
-                <View style={styles.healthBadgeSmall}>
-                  <Ionicons name="heart" size={10} color="white" />
-                  <Text style={styles.healthPercentageSmall}>87%</Text>
-                </View>
-              </View>
+          {searchText.trim() && filteredPlots.length === 0 ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search" size={48} color="#6B7280" />
+              <Text style={styles.noResultsTitle}>No plots found</Text>
+              <Text style={styles.noResultsSubtext}>
+                Try searching with different keywords or check your plot names
+              </Text>
+            </View>
+          ) : !searchText.trim() && filteredPlots.length === 0 ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="leaf" size={48} color="#6B7280" />
+              <Text style={styles.noResultsTitle}>No plots available</Text>
+              <Text style={styles.noResultsSubtext}>
+                Add your first plot to get started
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.plotsGrid}>
+              {filteredPlots.map((plot) => (
+                <TouchableOpacity 
+                  key={plot.id}
+                  style={styles.plotGridCard}
+                  onPress={() => {
+                    console.log(`${plot.name} pressed`);
+                    navigation.navigate('PlotDetails' as never, { plotId: plot.id } as never);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.plotGridHeader}>
+                    <View style={styles.plotGridTitleContainer}>
+                      <Text style={styles.plotGridTitle}>{plot.name}</Text>
+                      <Ionicons name="wifi" size={14} color={plot.wifiStatus} />
+                    </View>
+                    <View style={[styles.healthBadgeSmall, plot.health < 80 && { backgroundColor: '#F59E0B' }]}>
+                      <Ionicons name="heart" size={10} color="white" />
+                      <Text style={styles.healthPercentageSmall}>{plot.health}%</Text>
+                    </View>
+                  </View>
 
-              <Text style={styles.plotGridType}>Sweet 100</Text>
-              
-              <View style={styles.plotGridLocation}>
-                <Ionicons name="location" size={12} color="#9CA3AF" />
-                <Text style={styles.plotGridLocationText}>Backyard Plot A</Text>
-              </View>
+                  <Text style={styles.plotGridType}>{plot.type}</Text>
+                  
+                  <View style={styles.plotGridLocation}>
+                    <Ionicons name="location" size={12} color="#9CA3AF" />
+                    <Text style={styles.plotGridLocationText}>{plot.location}</Text>
+                  </View>
 
-              {/* Compact Sensor Readings */}
-              <View style={styles.plotGridSensors}>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="water" size={12} color="#3B82F6" />
-                  <Text style={styles.plotGridSensorValue}>68%</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>72°F</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="sunny" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>85%</Text>
-                </View>
-              </View>
+                  {/* Compact Sensor Readings */}
+                  <View style={styles.plotGridSensors}>
+                    <View style={styles.plotGridSensor}>
+                      <Ionicons name="water" size={12} color="#3B82F6" />
+                      <Text style={styles.plotGridSensorValue}>{plot.moisture}%</Text>
+                    </View>
+                    <View style={styles.plotGridSensor}>
+                      <Ionicons name="thermometer" size={12} color="#F59E0B" />
+                      <Text style={styles.plotGridSensorValue}>{plot.temperature}°F</Text>
+                    </View>
+                    <View style={styles.plotGridSensor}>
+                      <Ionicons name="sunny" size={12} color="#F59E0B" />
+                      <Text style={styles.plotGridSensorValue}>{plot.humidity}%</Text>
+                    </View>
+                  </View>
 
-              {/* Compact Status */}
-              <View style={styles.plotGridFooter}>
-                <View style={styles.plotGridStatus}>
-                  <View style={styles.onlineDotSmall} />
-                  <Text style={styles.plotGridStatusText}>Online</Text>
-                </View>
-                <Text style={styles.plotGridNextWatering}>Tomorrow 6AM</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Herb Garden Card */}
-            <TouchableOpacity 
-              style={styles.plotGridCard}
-              onPress={() => {
-                console.log('Herb Garden pressed');
-                navigation.navigate('PlotDetails' as never, { plotId: 2 } as never);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.plotGridHeader}>
-                <View style={styles.plotGridTitleContainer}>
-                  <Text style={styles.plotGridTitle}>Herb Garden</Text>
-                  <Ionicons name="wifi" size={14} color="#10B981" />
-                </View>
-                <View style={styles.healthBadgeSmall}>
-                  <Ionicons name="heart" size={10} color="white" />
-                  <Text style={styles.healthPercentageSmall}>92%</Text>
-                </View>
-              </View>
-
-              <Text style={styles.plotGridType}>Basil & Rosemary</Text>
-              
-              <View style={styles.plotGridLocation}>
-                <Ionicons name="location" size={12} color="#9CA3AF" />
-                <Text style={styles.plotGridLocationText}>Kitchen Window</Text>
-              </View>
-
-              {/* Compact Sensor Readings */}
-              <View style={styles.plotGridSensors}>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="water" size={12} color="#3B82F6" />
-                  <Text style={styles.plotGridSensorValue}>55%</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>70°F</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="sunny" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>92%</Text>
-                </View>
-              </View>
-
-              {/* Compact Status */}
-              <View style={styles.plotGridFooter}>
-                <View style={styles.plotGridStatus}>
-                  <View style={styles.onlineDotSmall} />
-                  <Text style={styles.plotGridStatusText}>Online</Text>
-                </View>
-                <Text style={styles.plotGridNextWatering}>Today 8PM</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Pepper Patch Card */}
-            <TouchableOpacity 
-              style={styles.plotGridCard}
-              onPress={() => {
-                console.log('Pepper Patch pressed');
-                navigation.navigate('PlotDetails' as never, { plotId: 3 } as never);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.plotGridHeader}>
-                <View style={styles.plotGridTitleContainer}>
-                  <Text style={styles.plotGridTitle}>Pepper Patch</Text>
-                  <Ionicons name="wifi" size={14} color="#EF4444" />
-                </View>
-                <View style={[styles.healthBadgeSmall, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="heart" size={10} color="white" />
-                  <Text style={styles.healthPercentageSmall}>73%</Text>
-                </View>
-              </View>
-
-              <Text style={styles.plotGridType}>California Wonder</Text>
-              
-              <View style={styles.plotGridLocation}>
-                <Ionicons name="location" size={12} color="#9CA3AF" />
-                <Text style={styles.plotGridLocationText}>Side Garden</Text>
-              </View>
-
-              {/* Compact Sensor Readings */}
-              <View style={styles.plotGridSensors}>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="water" size={12} color="#3B82F6" />
-                  <Text style={styles.plotGridSensorValue}>42%</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="thermometer" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>75°F</Text>
-                </View>
-                <View style={styles.plotGridSensor}>
-                  <Ionicons name="sunny" size={12} color="#F59E0B" />
-                  <Text style={styles.plotGridSensorValue}>78%</Text>
-                </View>
-              </View>
-
-              {/* Compact Status */}
-              <View style={styles.plotGridFooter}>
-                <View style={styles.plotGridStatus}>
-                  <View style={[styles.onlineDotSmall, { backgroundColor: '#EF4444' }]} />
-                  <Text style={styles.plotGridStatusText}>Offline</Text>
-                </View>
-                <Text style={styles.plotGridNextWatering}>In 2 hours</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+                  {/* Compact Status */}
+                  <View style={styles.plotGridFooter}>
+                    <View style={styles.plotGridStatus}>
+                      <View style={[styles.onlineDotSmall, plot.status === 'Offline' && { backgroundColor: '#EF4444' }]} />
+                      <Text style={styles.plotGridStatusText}>{plot.status}</Text>
+                    </View>
+                    <Text style={styles.plotGridNextWatering}>{plot.nextWatering}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Timestamp */}
-        <View style={styles.timestampContainer}>
-          <Text style={styles.timestampText}>Last updated: 2:34:56 PM</Text>
-        </View>
+        {!searchText.trim() && (
+          <View style={styles.timestampContainer}>
+            <Text style={styles.timestampText}>Last updated: 2:34:56 PM</Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Floating Action Button */}
@@ -830,5 +811,21 @@ const styles = StyleSheet.create({
   plotGridNextWatering: {
     fontSize: 10,
     color: '#9CA3AF',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  noResultsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+    marginTop: 16,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 8,
   },
 }); 
