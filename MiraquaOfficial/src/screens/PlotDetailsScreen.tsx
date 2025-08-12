@@ -449,10 +449,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <Text style={styles.actionText}>Analytics</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="settings" size={24} color="#F59E0B" />
-              <Text style={styles.actionText}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
               <Ionicons name="map" size={24} color="#10B981" />
               <Text style={styles.actionText}>Location</Text>
             </TouchableOpacity>
@@ -945,11 +941,11 @@ const styles = StyleSheet.create({
   },
   actionsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   actionButton: {
-    width: (width - 64) / 4,
+    flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
