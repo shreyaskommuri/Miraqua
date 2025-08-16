@@ -295,10 +295,10 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <View style={styles.statIcon}>
-                <Ionicons name="location" size={24} color="#3B82F6" />
+                <Ionicons name="heart" size={24} color="#EF4444" />
               </View>
-              <Text style={styles.statValue}>{plot.area}m²</Text>
-              <Text style={styles.statLabel}>Plot Area</Text>
+              <Text style={styles.statValue}>{plot.healthScore}%</Text>
+              <Text style={styles.statLabel}>Health Score</Text>
             </View>
             
             <View style={styles.statItem}>
@@ -1118,7 +1118,6 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 2,
   },
-
   wateringIndicator: {
     alignItems: 'center',
     marginTop: 2,
@@ -1158,27 +1157,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     marginHorizontal: 1,
   },
-  todayDay: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  scheduledDay: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-  },
-  dayNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 2,
-  },
   todayText: {
     color: '#10B981',
     fontWeight: 'bold',
@@ -1186,14 +1164,6 @@ const styles = StyleSheet.create({
   scheduledText: {
     color: 'white',
     fontWeight: '500',
-  },
-  dayHeader: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 8,
   },
   legendCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
