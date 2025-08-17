@@ -254,10 +254,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Text style={styles.headerTitle}>{plot.name}</Text>
             <View style={styles.headerSubtitle}>
               <Text style={styles.cropText}>{plot.crop} • {plot.variety}</Text>
-              <View style={styles.healthBadge}>
-                <Ionicons name="heart" size={10} color="#EF4444" />
-                <Text style={styles.healthText}>{plot.healthScore}%</Text>
-              </View>
             </View>
           </View>
         </View>
@@ -623,22 +619,32 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             </View>
           </View>
         </View>
+
+        {/* Action Buttons */}
+        <View style={styles.bottomButtons}>
+          <TouchableOpacity 
+            style={styles.askMiraquaButton}
+            onPress={() => navigation.navigate('Chat')}
+          >
+            <Ionicons name="chatbubble" size={20} color="#6B7280" />
+            <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.waterNowBottomButton}
+            onPress={handleWaterNow}
+            disabled={watering}
+          >
+            {watering ? (
+              <Ionicons name="refresh" size={20} color="white" style={styles.spinningIcon} />
+            ) : (
+              <Ionicons name="water" size={20} color="white" />
+            )}
+            <Text style={styles.waterNowBottomText}>
+              {watering ? 'Watering...' : 'Water Now'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-      
-      {/* Bottom Action Buttons */}
-      <View style={styles.bottomButtons}>
-        <TouchableOpacity 
-          style={styles.askMiraquaButton}
-          onPress={() => navigation.navigate('Chat')}
-        >
-          <Ionicons name="chatbubble" size={20} color="#6B7280" />
-          <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.waterNowBottomButton}>
-          <Ionicons name="water" size={20} color="white" />
-          <Text style={styles.waterNowBottomText}>Water Now</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -720,19 +726,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.7)',
     marginRight: 8,
-  },
-  healthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  healthText: {
-    fontSize: 10,
-    color: 'white',
-    marginLeft: 2,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1139,23 +1132,6 @@ const styles = StyleSheet.create({
   weekGrid: {
     flexDirection: 'row',
     marginBottom: 8,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarDay: {
-    width: (width - 80) / 7,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    position: 'relative',
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 1,
   },
   todayText: {
     color: '#10B981',
