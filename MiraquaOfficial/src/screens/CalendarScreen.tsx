@@ -31,6 +31,7 @@ interface CalendarDay {
   hasWatering: boolean;
   schedule: ScheduleEntry | null;
   isCurrentMonth: boolean;
+  isAdjacentMonth: boolean;
 }
 
 interface CalendarScreenProps {
@@ -73,7 +74,33 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     
     const days: CalendarDay[] = [];
     
-    // Generate only the days that belong to the current month
+    // Get the day of week for the first day of the month (0 = Sunday, 1 = Monday, etc.)
+    const firstDayOfWeek = firstDayOfMonth.getDay();
+    
+    // Add previous month's days before the current month starts
+    if (firstDayOfWeek > 0) {
+      const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 0);
+      const daysInPrevMonth = prevMonth.getDate();
+      
+      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+        const day = daysInPrevMonth - i;
+        const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, day);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        days.push({
+          date: dateStr,
+          day: day,
+          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday: false,
+          hasWatering: false,
+          schedule: null,
+          isCurrentMonth: false,
+          isAdjacentMonth: true
+        });
+      }
+    }
+    
+    // Generate the actual days of the current month
     for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
       const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
       const dateStr = currentDate.toISOString().split('T')[0];
@@ -90,8 +117,34 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
         isToday,
         hasWatering,
         schedule,
-        isCurrentMonth: true
+        isCurrentMonth: true,
+        isAdjacentMonth: false
       });
+    }
+    
+    // Calculate how many cells we need to complete the grid
+    // We want exactly 6 rows × 7 days = 42 cells total
+    const totalCells = days.length;
+    const targetCells = 42;
+    const remainingCells = Math.max(0, targetCells - totalCells);
+    
+    // Add next month's days to complete the grid
+    if (remainingCells > 0) {
+      for (let i = 1; i <= remainingCells; i++) {
+        const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        days.push({
+          date: dateStr,
+          day: i,
+          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday: false,
+          hasWatering: false,
+          schedule: null,
+          isCurrentMonth: false,
+          isAdjacentMonth: true
+        });
+      }
     }
     
     return days;
@@ -196,46 +249,48 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
 
           {/* Calendar Days Grid */}
           <View style={styles.calendarGrid}>
-            {calendarDays.map((day) => (
-              <TouchableOpacity
-                key={day.date}
-                style={[
-                  styles.calendarDay,
-                  day.isToday && styles.todayDay,
-                  day.hasWatering && styles.scheduledDay,
-                ]}
-                onPress={() => handleDateSelect(day.date)}
-              >
-                <Text style={[
-                  styles.dayNumber,
-                  day.isToday && styles.todayText,
-                  day.hasWatering && styles.scheduledText,
-                ]}>
-                  {day.day}
-                </Text>
-                {day.hasWatering && (
-                  <View style={styles.wateringIndicator}>
-                    <Ionicons name="water" size={8} color="#3B82F6" />
+            {Array.from({ length: 6 }, (_, weekIndex) => (
+              <View key={weekIndex} style={styles.weekRow}>
+                {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
+                  <View
+                    key={dayIndex}
+                    style={[
+                      styles.calendarDay,
+                      day.isAdjacentMonth && styles.adjacentMonthDay,
+                      day.isToday && styles.todayDay,
+                      day.hasWatering && styles.scheduledDay,
+                    ]}
+                  >
+                    <Text style={[
+                      styles.dayNumber,
+                      day.isAdjacentMonth && styles.adjacentMonthText,
+                      day.isToday && styles.todayText,
+                      day.hasWatering && styles.scheduledText,
+                    ]}>
+                      {day.day}
+                    </Text>
+                    {day.hasWatering && day.isCurrentMonth && (
+                      <View style={styles.wateringIndicator}>
+                        <Ionicons name="water" size={10} color="#3B82F6" />
+                      </View>
+                    )}
                   </View>
-                )}
-              </TouchableOpacity>
+                ))}
+              </View>
             ))}
           </View>
         </View>
 
         {/* Legend */}
         <View style={styles.legendCard}>
-          <Text style={styles.legendTitle}>Legend</Text>
-          <View style={styles.legendItems}>
+          <View style={styles.legendContent}>
             <View style={styles.legendItem}>
-              <View style={styles.legendToday}>
-                <View style={styles.legendTodayDot} />
-              </View>
+              <View style={styles.legendToday} />
               <Text style={styles.legendText}>Today</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={styles.legendScheduled}>
-                <Ionicons name="water" size={12} color="#3B82F6" />
+                <Ionicons name="water" size={6} color="#3B82F6" />
               </View>
               <Text style={styles.legendText}>Scheduled</Text>
             </View>
@@ -392,109 +447,128 @@ const styles = StyleSheet.create({
   daysHeader: {
     flexDirection: 'row',
     marginBottom: 16,
+    justifyContent: 'space-between',
   },
   dayHeader: {
-    flex: 1,
+    width: (width - 80) / 7,
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.7)',
   },
   calendarGrid: {
+    flexDirection: 'column',
+  },
+  weekRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   calendarDay: {
     width: (width - 80) / 7,
-    height: 40,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
     position: 'relative',
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 1,
+    padding: 8,
   },
   todayDay: {
-    backgroundColor: '#10B981',
-    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderWidth: 2,
-    borderColor: '#059669',
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   scheduledDay: {
-    backgroundColor: '#DBEAFE',
-    borderRadius: 8,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
     borderWidth: 1,
     borderColor: '#3B82F6',
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: 'bold',
     color: 'white',
+    marginBottom: 2,
   },
   todayText: {
-    color: 'white',
+    color: '#10B981',
     fontWeight: 'bold',
   },
   scheduledText: {
-    color: '#1E40AF',
+    color: 'white',
     fontWeight: '500',
   },
   wateringIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  adjacentMonthDay: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  adjacentMonthText: {
+    color: 'rgba(255, 255, 255, 0.4)',
   },
   legendCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
-    padding: 20,
+    padding: 12,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  legendTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 16,
-  },
-  legendItems: {
+  legendContent: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   legendItem: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   legendToday: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderWidth: 2,
     borderColor: '#10B981',
-    marginBottom: 4,
-  },
-  legendTodayDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    alignSelf: 'center',
-    marginTop: 2,
+    borderRadius: 3,
+    marginRight: 4,
   },
   legendScheduled: {
-    width: 16,
-    height: 16,
+    width: 12,
+    height: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    borderRadius: 3,
+    marginRight: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
   },
   legendAvailable: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 4,
+    width: 12,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    marginRight: 4,
   },
   legendText: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   actionsCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

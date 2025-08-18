@@ -53,7 +53,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [plot, setPlot] = useState<Plot | null>(null);
   const [loading, setLoading] = useState(true);
   const [watering, setWatering] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
   const [aiSummary, setAiSummary] = useState("");
   const [generatingAI, setGeneratingAI] = useState(false);
 
@@ -429,27 +429,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           </View>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actionsCard}>
-          <Text style={styles.sectionTitle}>Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Calendar', { plotId })}
-            >
-              <Ionicons name="calendar" size={24} color="#3B82F6" />
-              <Text style={styles.actionText}>Schedule</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="analytics" size={24} color="#8B5CF6" />
-              <Text style={styles.actionText}>Analytics</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="map" size={24} color="#10B981" />
-              <Text style={styles.actionText}>Location</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+
 
         {/* Schedule Toggle */}
         <View style={styles.scheduleToggleCard}>
@@ -583,42 +563,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           </View>
         </View>
 
-        {/* Notifications Settings */}
-        <View style={styles.notificationsCard}>
-          <View style={styles.notificationsHeader}>
-            <Ionicons name="notifications" size={20} color={notificationsEnabled ? "#10B981" : "#6B7280"} />
-            <Text style={styles.sectionTitle}>Notifications</Text>
-          </View>
-          <View style={styles.notificationsList}>
-            <View style={styles.notificationItem}>
-              <Text style={styles.notificationText}>Watering reminders</Text>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                thumbColor={notificationsEnabled ? 'white' : '#9CA3AF'}
-              />
-            </View>
-            <View style={styles.notificationItem}>
-              <Text style={styles.notificationText}>Rain forecast alerts</Text>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                thumbColor={notificationsEnabled ? 'white' : '#9CA3AF'}
-              />
-            </View>
-            <View style={styles.notificationItem}>
-              <Text style={styles.notificationText}>Low moisture alerts</Text>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                thumbColor={notificationsEnabled ? 'white' : '#9CA3AF'}
-              />
-            </View>
-          </View>
-        </View>
+
 
         {/* Action Buttons */}
         <View style={styles.bottomButtons}>
@@ -942,53 +887,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
-  actionsCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  actionText: {
-    fontSize: 12,
-    color: 'white',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  notificationsCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  notificationsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  notificationsList: {
-    gap: 16,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  notificationText: {
-    fontSize: 14,
-    color: 'white',
-  },
+
+
   spinningIcon: {
     transform: [{ rotate: '360deg' }],
   },

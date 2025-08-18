@@ -560,6 +560,69 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
     </View>
   );
 
+  const renderNotificationsSettings = () => (
+    <View style={styles.section}>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="notifications" size={20} color="#3B82F6" />
+          </View>
+          <Text style={styles.cardTitle}>Notification Preferences</Text>
+        </View>
+        
+        <View style={styles.cardContent}>
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="water" size={20} color="#3B82F6" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Watering reminders</Text>
+                <Text style={styles.switchSubtitle}>Get notified when watering is needed</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.notifications}
+              onValueChange={(value) => handleFieldChange('notifications', value)}
+              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              thumbColor={plotData.notifications ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="rainy" size={20} color="#3B82F6" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Rain forecast alerts</Text>
+                <Text style={styles.switchSubtitle}>Skip watering when rain is expected</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.weatherIntegration}
+              onValueChange={(value) => handleFieldChange('weatherIntegration', value)}
+              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              thumbColor={plotData.weatherIntegration ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+
+          <View style={styles.switchCard}>
+            <View style={styles.switchContent}>
+              <Ionicons name="warning" size={20} color="#F59E0B" />
+              <View style={styles.switchText}>
+                <Text style={styles.switchTitle}>Low moisture alerts</Text>
+                <Text style={styles.switchSubtitle}>Get notified when soil is too dry</Text>
+              </View>
+            </View>
+            <Switch
+              value={plotData.notifications}
+              onValueChange={(value) => handleFieldChange('notifications', value)}
+              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              thumbColor={plotData.notifications ? '#ffffff' : '#9CA3AF'}
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
   if (isLoading && !plotData.name) {
     return (
       <View style={styles.loadingContainer}>
@@ -630,6 +693,12 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
           >
             <Text style={[styles.tabText, activeTab === 'advanced' && styles.activeTabText]}>Advanced</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
+            onPress={() => setActiveTab('notifications')}
+          >
+            <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>Notifications</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -639,6 +708,7 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
         {activeTab === 'watering' && renderWateringSettings()}
         {activeTab === 'sensors' && renderSensorSettings()}
         {activeTab === 'advanced' && renderAdvancedSettings()}
+        {activeTab === 'notifications' && renderNotificationsSettings()}
       </ScrollView>
     </View>
   );
