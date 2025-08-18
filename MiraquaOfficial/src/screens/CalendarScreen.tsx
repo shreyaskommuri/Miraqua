@@ -253,7 +253,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
               <View key={weekIndex} style={styles.weekRow}>
                 {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
                   <View
-                    key={dayIndex}
+                    key={`${weekIndex}-${dayIndex}-${day.date || 'empty'}`}
                     style={[
                       styles.calendarDay,
                       day.isAdjacentMonth && styles.adjacentMonthDay,
