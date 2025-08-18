@@ -53,9 +53,49 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [plot, setPlot] = useState<Plot | null>(null);
   const [loading, setLoading] = useState(true);
   const [watering, setWatering] = useState(false);
+  const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
 
   const [aiSummary, setAiSummary] = useState("");
   const [generatingAI, setGeneratingAI] = useState(false);
+
+  // Generate schedule data based on toggle state
+  const getScheduleData = () => {
+    const days = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 14; i++) {
+      const currentDate = new Date(today);
+      currentDate.setDate(today.getDate() + i);
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const isToday = i === 0;
+      
+      if (showOriginalSchedule) {
+        // Original schedule - more frequent, less optimized
+        const hasWatering = Math.random() > 0.4; // 60% chance
+        days.push({
+          date: dateStr,
+          day: currentDate.getDate(),
+          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday,
+          hasWatering,
+          volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
+        });
+      } else {
+        // AI optimized schedule - more efficient
+        const hasWatering = Math.random() > 0.6; // 40% chance
+        days.push({
+          date: dateStr,
+          day: currentDate.getDate(),
+          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday,
+          hasWatering,
+          volume: hasWatering ? Math.floor(Math.random() * 6) + 8 : 0, // 8-14L
+        });
+      }
+    }
+    
+    return days;
+  };
 
   const fetchPlotData = async () => {
     setLoading(true);
@@ -170,31 +210,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     navigation.navigate('PlotSettings', { plotId });
   };
 
-  const generateCalendarDays = () => {
-    const today = new Date();
-    const days = [];
-    
-    for (let i = 0; i < 14; i++) {
-      const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() + i);
-      
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const todayStr = today.toISOString().split('T')[0];
-      const isToday = dateStr === todayStr;
-      
-      const hasWatering = Math.random() > 0.6;
-      
-      days.push({
-        date: dateStr,
-        day: currentDate.getDate(),
-        dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-        isToday,
-        hasWatering,
-      });
-    }
-    
-    return days;
-  };
+
 
   const handleDayClick = (day: any) => {
     navigation.navigate('SpecificDay', { 
@@ -438,14 +454,14 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Text style={styles.scheduleToggleSubtitle}>Toggle between AI and original schedule</Text>
           </View>
           <View style={styles.scheduleToggleControls}>
-            <Text style={styles.toggleLabel}>AI Plan</Text>
+            <Text style={[styles.toggleLabel, !showOriginalSchedule && styles.activeToggleLabel]}>AI Plan</Text>
             <Switch
-              value={false}
-              onValueChange={() => {}}
+              value={showOriginalSchedule}
+              onValueChange={setShowOriginalSchedule}
               trackColor={{ false: '#D1D5DB', true: '#10B981' }}
               thumbColor={'white'}
             />
-            <Text style={styles.toggleLabel}>Original</Text>
+            <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
           </View>
         </View>
 
@@ -465,7 +481,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 </View>
                 <View style={styles.calendarHeaderInfo}>
                   <Text style={styles.calendarTitle}>Next 2 Weeks</Text>
-                  <Text style={styles.calendarSubtitle}>Tap dates for details</Text>
+                  <Text style={styles.calendarSubtitle}>
+                    {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
+                  </Text>
                 </View>
               </View>
             </LinearGradient>
@@ -481,7 +499,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
             {/* First Week */}
             <View style={styles.weekGrid}>
-              {generateCalendarDays().slice(0, 7).map((day, index) => (
+              {getScheduleData().slice(0, 7).map((day, index) => (
                 <TouchableOpacity
                   key={`week1-${index}`}
                   style={[
@@ -512,7 +530,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
             {/* Second Week */}
             <View style={styles.weekGrid}>
-              {generateCalendarDays().slice(7, 14).map((day, index) => (
+              {getScheduleData().slice(7, 14).map((day, index) => (
                 <TouchableOpacity
                   key={`week2-${index}`}
                   style={[
@@ -914,6 +932,10 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  activeToggleLabel: {
+    color: '#10B981',
+    fontWeight: '600',
   },
   calendarCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
