@@ -32,6 +32,7 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   Calendar: { plotId?: number };
   AddSchedule: { plotId?: number };
+  ScheduleSettings: { plotId?: number };
 };
 
 export type MainTabParamList = {

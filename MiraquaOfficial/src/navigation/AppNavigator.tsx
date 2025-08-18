@@ -36,6 +36,7 @@ import SubscriptionScreen from '../screens/SubscriptionScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import AddScheduleScreen from '../screens/AddScheduleScreen';
+import ScheduleSettingsScreen from '../screens/ScheduleSettingsScreen';
 
 import { RootStackParamList } from './types';
 
@@ -77,6 +78,7 @@ const AppNavigator = () => {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Calendar" component={CalendarScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ScheduleSettings" component={ScheduleSettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
