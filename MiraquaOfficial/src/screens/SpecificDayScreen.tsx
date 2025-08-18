@@ -295,21 +295,21 @@ const SpecificDayScreen = ({ route, navigation }: SpecificDayScreenProps) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ScheduleSettings', { plotId })}
+              onPress={() => navigation.navigate('PlotSettings', { plotId })}
             >
               <Ionicons name="settings" size={20} color="#3B82F6" />
               <Text style={styles.actionText}>Settings</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ScheduleAnalytics', { plotId })}
+              onPress={() => navigation.navigate('Analytics')}
             >
               <Ionicons name="analytics" size={20} color="#8B5CF6" />
               <Text style={styles.actionText}>Analytics</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ExportSchedule', { plotId })}
+              onPress={() => navigation.navigate('ExportReports')}
             >
               <Ionicons name="download" size={20} color="#F59E0B" />
               <Text style={styles.actionText}>Export</Text>

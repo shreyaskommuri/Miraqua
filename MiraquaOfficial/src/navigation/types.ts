@@ -32,9 +32,6 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   Calendar: { plotId?: number };
   AddSchedule: { plotId?: number };
-  ScheduleSettings: { plotId?: number };
-  ScheduleAnalytics: { plotId?: number };
-  ExportSchedule: { plotId?: number };
 };
 
 export type MainTabParamList = {
