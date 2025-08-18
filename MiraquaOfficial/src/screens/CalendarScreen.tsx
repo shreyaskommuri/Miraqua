@@ -314,7 +314,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('PlotSettings', { plotId })}
+              onPress={() => navigation.navigate('ScheduleSettings', { plotId })}
             >
               <Ionicons name="settings" size={20} color="#3B82F6" />
               <Text style={styles.actionText}>Settings</Text>
