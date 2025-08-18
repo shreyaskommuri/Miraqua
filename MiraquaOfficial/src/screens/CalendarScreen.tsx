@@ -319,20 +319,6 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
               <Ionicons name="settings" size={20} color="#3B82F6" />
               <Text style={styles.actionText}>Settings</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('ScheduleAnalytics', { plotId })}
-            >
-              <Ionicons name="analytics" size={20} color="#8B5CF6" />
-              <Text style={styles.actionText}>Analytics</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('ExportSchedule', { plotId })}
-            >
-              <Ionicons name="download" size={20} color="#F59E0B" />
-              <Text style={styles.actionText}>Export</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -583,22 +569,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 16,
   },
   actionButton: {
-    width: (width - 64) / 2,
+    width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   actionText: {
-    fontSize: 12,
+    fontSize: 14,
     color: 'white',
-    marginTop: 8,
+    marginTop: 12,
     textAlign: 'center',
+    fontWeight: '500',
   },
 });
 
