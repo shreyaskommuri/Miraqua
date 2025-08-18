@@ -12,6 +12,7 @@ import {
   TextInput,
   Dimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -38,6 +39,7 @@ const ScheduleSettingsScreen = ({ route, navigation }: ScheduleSettingsScreenPro
   const { plotId } = route.params;
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleEntry | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -69,42 +71,74 @@ const ScheduleSettingsScreen = ({ route, navigation }: ScheduleSettingsScreenPro
     fetchSchedules();
   }, []);
 
+  // Storage key for schedules
+  const getStorageKey = () => `schedules_plot_${plotId}`;
+
+  // Save schedules to storage
+  const saveSchedulesToStorage = async (schedulesToSave: ScheduleEntry[]) => {
+    try {
+      await AsyncStorage.setItem(getStorageKey(), JSON.stringify(schedulesToSave));
+    } catch (error) {
+      console.error('Failed to save schedules to storage:', error);
+    }
+  };
+
+  // Load schedules from storage
+  const loadSchedulesFromStorage = async (): Promise<ScheduleEntry[]> => {
+    try {
+      const stored = await AsyncStorage.getItem(getStorageKey());
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Failed to load schedules from storage:', error);
+    }
+    return [];
+  };
+
   const fetchSchedules = async () => {
     setLoading(true);
     try {
-      // Simulate API call - replace with actual API
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // First try to load from storage
+      const storedSchedules = await loadSchedulesFromStorage();
       
-      const mockSchedules: ScheduleEntry[] = [
-        {
-          id: '1',
-          name: 'Morning Watering',
-          startTime: '06:00',
-          duration: 5,
-          volume: 15,
-          frequency: 'daily',
-          days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-          isActive: true,
-          smartScheduling: true,
-          weatherIntegration: true,
-          moistureThreshold: 65,
-        },
-        {
-          id: '2',
-          name: 'Evening Boost',
-          startTime: '18:00',
-          duration: 3,
-          volume: 8,
-          frequency: 'custom',
-          days: ['monday', 'wednesday', 'friday'],
-          isActive: true,
-          smartScheduling: false,
-          weatherIntegration: true,
-          moistureThreshold: 50,
-        }
-      ];
-      
-      setSchedules(mockSchedules);
+      if (storedSchedules.length > 0) {
+        setSchedules(storedSchedules);
+      } else {
+        // If no stored schedules, load default mock data
+        const defaultSchedules: ScheduleEntry[] = [
+          {
+            id: '1',
+            name: 'Morning Watering',
+            startTime: '06:00',
+            duration: 5,
+            volume: 15,
+            frequency: 'daily',
+            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+            isActive: true,
+            smartScheduling: true,
+            weatherIntegration: true,
+            moistureThreshold: 65,
+          },
+          {
+            id: '2',
+            name: 'Evening Boost',
+            startTime: '18:00',
+            duration: 3,
+            volume: 8,
+            frequency: 'custom',
+            days: ['monday', 'wednesday', 'friday'],
+            isActive: true,
+            smartScheduling: false,
+            weatherIntegration: true,
+            moistureThreshold: 50,
+          }
+        ];
+        
+        setSchedules(defaultSchedules);
+        // Save the default schedules for future loads
+        await saveSchedulesToStorage(defaultSchedules);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch schedules');
     } finally {
@@ -146,27 +180,44 @@ const ScheduleSettingsScreen = ({ route, navigation }: ScheduleSettingsScreenPro
     setShowAddForm(true);
   };
 
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     if (!formData.name.trim()) {
       Alert.alert('Error', 'Please enter a schedule name');
       return;
     }
 
-    const newSchedule: ScheduleEntry = {
-      id: editingSchedule?.id || Date.now().toString(),
-      ...formData,
-    };
+    setSaving(true);
+    try {
+      const newSchedule: ScheduleEntry = {
+        id: editingSchedule?.id || Date.now().toString(),
+        ...formData,
+      };
 
-    if (editingSchedule) {
-      setSchedules(prev => prev.map(s => s.id === editingSchedule.id ? newSchedule : s));
-      Alert.alert('Success', 'Schedule updated successfully');
-    } else {
-      setSchedules(prev => [...prev, newSchedule]);
-      Alert.alert('Success', 'Schedule created successfully');
+      let updatedSchedules: ScheduleEntry[];
+
+      if (editingSchedule) {
+        // Update existing schedule
+        updatedSchedules = schedules.map(s => s.id === editingSchedule.id ? newSchedule : s);
+        setSchedules(updatedSchedules);
+      } else {
+        // Add new schedule
+        updatedSchedules = [...schedules, newSchedule];
+        setSchedules(updatedSchedules);
+      }
+
+      // Save to storage
+      await saveSchedulesToStorage(updatedSchedules);
+
+      // Show success message
+      Alert.alert('Success', editingSchedule ? 'Schedule updated successfully' : 'Schedule created successfully');
+
+      setShowAddForm(false);
+      setEditingSchedule(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save schedule. Please try again.');
+    } finally {
+      setSaving(false);
     }
-
-    setShowAddForm(false);
-    setEditingSchedule(null);
   };
 
   const handleDeleteSchedule = (scheduleId: string) => {
@@ -178,21 +229,31 @@ const ScheduleSettingsScreen = ({ route, navigation }: ScheduleSettingsScreenPro
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setSchedules(prev => prev.filter(s => s.id !== scheduleId));
-            Alert.alert('Success', 'Schedule deleted successfully');
+          onPress: async () => {
+            try {
+              const updatedSchedules = schedules.filter(s => s.id !== scheduleId);
+              setSchedules(updatedSchedules);
+              await saveSchedulesToStorage(updatedSchedules);
+              Alert.alert('Success', 'Schedule deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete schedule. Please try again.');
+            }
           },
         },
       ]
     );
   };
 
-  const toggleScheduleActive = (scheduleId: string) => {
-    setSchedules(prev =>
-      prev.map(s =>
+  const toggleScheduleActive = async (scheduleId: string) => {
+    try {
+      const updatedSchedules = schedules.map(s =>
         s.id === scheduleId ? { ...s, isActive: !s.isActive } : s
-      )
-    );
+      );
+      setSchedules(updatedSchedules);
+      await saveSchedulesToStorage(updatedSchedules);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update schedule status. Please try again.');
+    }
   };
 
   const toggleDay = (day: string) => {
@@ -429,11 +490,24 @@ const ScheduleSettingsScreen = ({ route, navigation }: ScheduleSettingsScreenPro
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveSchedule}>
-          <Ionicons name="checkmark" size={20} color="white" />
-          <Text style={styles.saveButtonText}>
-            {editingSchedule ? 'Update Schedule' : 'Create Schedule'}
-          </Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+          onPress={handleSaveSchedule}
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <Ionicons name="hourglass" size={20} color="white" />
+              <Text style={styles.saveButtonText}>Saving...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="checkmark" size={20} color="white" />
+              <Text style={styles.saveButtonText}>
+                {editingSchedule ? 'Update Schedule' : 'Create Schedule'}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -836,6 +910,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  saveButtonDisabled: {
+    backgroundColor: 'rgba(16, 185, 129, 0.5)',
+    shadowOpacity: 0.1,
   },
   saveButtonText: {
     color: 'white',
