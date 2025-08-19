@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarNavigation from './SidebarNavigation';
+import { signOut } from '../api/auth';
 
 interface UserProfile {
   name: string;
@@ -131,13 +132,28 @@ export default function AccountScreen({ navigation }: any) {
     setIsDirty(true);
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => navigation.navigate('SignIn') }
+        { 
+          text: 'Sign Out', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              const { error } = await signOut();
+              if (error) {
+                Alert.alert('Error', 'Failed to sign out. Please try again.');
+              } else {
+                navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+            }
+          }
+        }
       ]
     );
   };

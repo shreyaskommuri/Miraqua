@@ -2,18 +2,56 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { addPlot } from '../../api/plots';
 
 const AddPlotScreen = () => {
   const [plotName, setPlotName] = useState('');
   const [cropType, setCropType] = useState('');
   const [location, setLocation] = useState('');
 
-  const handleAddPlot = () => {
+  const handleAddPlot = async () => {
     if (!plotName || !cropType || !location) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    Alert.alert('Success', 'Plot added successfully!');
+
+    try {
+      const plotData = {
+        name: plotName.trim(),
+        crop: cropType.trim(),
+        type: cropType.trim(), // Add type field for HomeScreen compatibility
+        location: location.trim(),
+        moisture: 50, // Default values for new plots
+        temperature: 70,
+        sunlight: 80,
+        health: 85, // Default health
+        status: 'Online',
+        nextWatering: 'Tomorrow 6AM',
+        waterUsage: 0,
+        sensorStatus: 'online',
+        batteryLevel: 100,
+        soilPh: 6.5,
+        lastWatered: 'Never',
+        humidity: 80, // Default humidity
+        wifiStatus: '#10B981', // Default online status
+        area: 100, // Default area
+        zip_code: '00000', // Default ZIP
+      };
+
+      const response = await addPlot(plotData);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Plot added successfully!');
+        // Reset form
+        setPlotName('');
+        setCropType('');
+        setLocation('');
+      } else {
+        Alert.alert('Error', response.error || 'Failed to add plot');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
   };
 
   return (

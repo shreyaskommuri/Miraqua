@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,53 +11,36 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SidebarNavigation from './SidebarNavigation';
+import { getPlots, Plot } from '../api/plots';
 
 export default function HomeScreen({ navigation }: any) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [plots, setPlots] = useState<Plot[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Define plots data
-  const [plots] = useState([
-    {
-      id: 1,
-      name: 'Cherry Tomato',
-      type: 'Sweet 100',
-      location: 'Backyard Plot A',
-      health: 87,
-      moisture: 68,
-      temperature: 72,
-      humidity: 85,
-      status: 'Online',
-      nextWatering: 'Tomorrow 6AM',
-      wifiStatus: '#10B981'
-    },
-    {
-      id: 2,
-      name: 'Herb Garden',
-      type: 'Basil & Rosemary',
-      location: 'Kitchen Window',
-      health: 92,
-      moisture: 55,
-      temperature: 70,
-      humidity: 92,
-      status: 'Online',
-      nextWatering: 'Today 8PM',
-      wifiStatus: '#10B981'
-    },
-    {
-      id: 3,
-      name: 'Pepper Patch',
-      type: 'California Wonder',
-      location: 'Side Garden',
-      health: 73,
-      moisture: 42,
-      temperature: 75,
-      humidity: 78,
-      status: 'Offline',
-      nextWatering: 'In 2 hours',
-      wifiStatus: '#EF4444'
+  // Fetch plots from Supabase
+  const fetchPlots = async () => {
+    try {
+      setLoading(true);
+      const response = await getPlots();
+      if (response.success) {
+        setPlots(response.plots || []);
+      } else {
+        console.error('Failed to fetch plots:', response.error);
+        setPlots([]);
+      }
+    } catch (error) {
+      console.error('Error fetching plots:', error);
+      setPlots([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchPlots();
+  }, []);
 
   // Filter plots based on search text
   const filteredPlots = plots.filter(plot => {

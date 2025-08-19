@@ -13,6 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { signUp } from '../api/auth';
 
 const SignUpScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
@@ -21,8 +22,9 @@ const SignUpScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!name || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -31,8 +33,21 @@ const SignUpScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    // For demo purposes, just navigate to main app
-    navigation.navigate('Home');
+
+    setLoading(true);
+    try {
+      const { data, error } = await signUp(email, password);
+      if (data?.user) {
+        Alert.alert('Success', 'Account created! Please check your email for confirmation.');
+        navigation.replace('SignIn');
+      } else {
+        Alert.alert('Sign Up Failed', error?.message || 'Something went wrong.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,45 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { signIn, getCurrentUser } from '../api/auth';
 
 const SignInScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
-    // Simple sign-in - just navigate to main app
-    navigation.navigate('Home');
+  useEffect(() => {
+    const checkUser = async () => {
+      const { user } = await getCurrentUser();
+      if (user) {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
+    };
+    checkUser();
+  }, []);
+
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await signIn(email, password);
+      if (data?.session) {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      } else {
+        Alert.alert('Login Failed', error?.message || 'Invalid credentials');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
