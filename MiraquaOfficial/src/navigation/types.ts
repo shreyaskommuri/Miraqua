@@ -21,6 +21,7 @@ export type RootStackParamList = {
   SmartMap: undefined;
   Community: undefined;
   SetupPlot: undefined;
+  AddPlot: undefined;
   OnboardingLocation: { plotName?: string; selectedCrop?: string; cropDetails?: any };
   OnboardingComplete: { plotName?: string; selectedCrop?: string; cropDetails?: any; latitude?: number; longitude?: number; address?: string };
   TermsOfService: undefined;

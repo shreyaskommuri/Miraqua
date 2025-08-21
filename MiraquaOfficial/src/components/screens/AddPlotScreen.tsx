@@ -19,12 +19,12 @@ const AddPlotScreen = () => {
       const plotData = {
         name: plotName.trim(),
         crop: cropType.trim(),
-        type: cropType.trim(), // Add type field for HomeScreen compatibility
+        type: cropType.trim(),
         location: location.trim(),
-        moisture: 50, // Default values for new plots
+        moisture: 50,
         temperature: 70,
         sunlight: 80,
-        health: 85, // Default health
+        health: 85,
         status: 'Online',
         nextWatering: 'Tomorrow 6AM',
         waterUsage: 0,
@@ -32,10 +32,12 @@ const AddPlotScreen = () => {
         batteryLevel: 100,
         soilPh: 6.5,
         lastWatered: 'Never',
-        humidity: 80, // Default humidity
-        wifiStatus: '#10B981', // Default online status
-        area: 100, // Default area
-        zip_code: '00000', // Default ZIP
+        humidity: 80,
+        wifiStatus: '#10B981',
+        area: 100,
+        zip_code: '00000',
+        planting_date: new Date().toISOString().split('T')[0],
+        age_at_entry: 0,
       };
 
       const response = await addPlot(plotData);

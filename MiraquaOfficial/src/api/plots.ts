@@ -3,26 +3,18 @@ import { supabase } from '../utils/supabase';
 export interface Plot {
   id: string;
   name: string;
-  type: string; // Changed from crop to type to match HomeScreen
   crop: string;
-  moisture: number;
-  temperature: number;
-  sunlight: number;
-  health: number; // Added to match HomeScreen
-  status: string;
-  nextWatering: string;
-  location: string;
-  waterUsage: number;
-  sensorStatus: string;
-  batteryLevel: number;
-  soilPh: number;
-  lastWatered: string;
-  humidity: number; // Added to match HomeScreen
-  wifiStatus: string; // Added to match HomeScreen
-  area?: number;
-  zip_code?: string;
-  user_id: string;
+  zip_code: string;
   created_at: string;
+  area: number;
+  ph_level: number;
+  lat: number | null;
+  lon: number | null;
+  flex_type: string;
+  planting_date: string;
+  age_at_entry: number;
+  custom_constraints: string;
+  user_id: string;
   updated_at: string;
 }
 
@@ -30,8 +22,11 @@ export const getPlots = async (): Promise<{ success: boolean; plots?: Plot[]; er
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user?.id) {
+      console.log('User not authenticated:', userError);
       return { success: false, error: 'User not authenticated' };
     }
+
+    console.log('Fetching plots for user:', user.id);
 
     const { data: plots, error } = await supabase
       .from('plots')
@@ -44,6 +39,7 @@ export const getPlots = async (): Promise<{ success: boolean; plots?: Plot[]; er
       return { success: false, error: error.message };
     }
 
+    console.log('Plots fetched successfully:', plots);
     return { success: true, plots: plots || [] };
   } catch (err: any) {
     console.error('Error in getPlots:', err);
@@ -53,21 +49,25 @@ export const getPlots = async (): Promise<{ success: boolean; plots?: Plot[]; er
 
 export const addPlot = async (plotData: Omit<Plot, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<{ success: boolean; plot?: Plot; error?: string }> => {
   try {
+    console.log('🔍 addPlot called with:', plotData);
+    
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log('🔍 User auth result:', { user: user?.id, error: userError });
+    
     if (userError || !user?.id) {
+      console.log('❌ User not authenticated');
       return { success: false, error: 'User not authenticated' };
     }
 
-    // Add default values for missing fields
+    // Ensure all required fields are present with proper types
     const plotWithDefaults = {
       ...plotData,
-      type: plotData.type || plotData.crop, // Use crop as type if type is not provided
-      health: plotData.health || 85, // Default health
-      humidity: plotData.humidity || 80, // Default humidity
-      wifiStatus: plotData.wifiStatus || '#10B981', // Default online status
       user_id: user.id
     };
 
+    console.log('🔍 Final plot data to insert:', plotWithDefaults);
+
+    console.log('🔍 Attempting Supabase insert...');
     const { data: plot, error } = await supabase
       .from('plots')
       .insert([plotWithDefaults])
@@ -75,10 +75,14 @@ export const addPlot = async (plotData: Omit<Plot, 'id' | 'user_id' | 'created_a
       .single();
 
     if (error) {
-      console.error('Error adding plot:', error);
+      console.error('❌ Supabase insert error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
+    
+    console.log('✅ Plot created successfully:', plot);
 
+    console.log('Plot added successfully:', plot);
     return { success: true, plot };
   } catch (err: any) {
     console.error('Error in addPlot:', err);

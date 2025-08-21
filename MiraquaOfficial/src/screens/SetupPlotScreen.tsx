@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { addPlot } from '../api/plots';
 
 interface SetupPlotScreenProps {
   navigation: any;
@@ -21,6 +22,18 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
   const [selectedCrop, setSelectedCrop] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Additional fields for Supabase
+  const [zipCode, setZipCode] = useState('');
+  const [area, setArea] = useState('');
+  const [phLevel, setPhLevel] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [plantingDate, setPlantingDate] = useState('');
+  const [ageAtEntry, setAgeAtEntry] = useState('');
+  const [customConstraints, setCustomConstraints] = useState('');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const crops = [
     { 
@@ -122,14 +135,21 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
-    if (!plotName.trim()) {
-      newErrors.plotName = "Plot name is required";
-    } else if (plotName.length < 2) {
+    if (plotName.trim().length < 2) {
       newErrors.plotName = "Plot name must be at least 2 characters";
     }
     
     if (!selectedCrop) {
       newErrors.selectedCrop = "Please select a crop type";
+    }
+
+    if (currentStep === 2) {
+      if (!zipCode.trim()) {
+        newErrors.zipCode = "ZIP code is required";
+      }
+      if (!area.trim()) {
+        newErrors.area = "Area is required";
+      }
     }
     
     setErrors(newErrors);
@@ -139,19 +159,326 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
   const handleNext = () => {
     if (!validateForm()) return;
 
-    const cropDetails = crops.find(crop => crop.id === selectedCrop);
-    navigation.navigate('OnboardingLocation', {
-      plotName: plotName.trim(),
-      selectedCrop,
-      cropDetails
-    });
+    if (currentStep === 1) {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      handleSubmit();
+    }
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    if (currentStep === 1) {
+      navigation.goBack();
+    } else {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
-  const isFormValid = plotName.trim().length >= 2 && selectedCrop;
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      const cropDetails = crops.find(crop => crop.id === selectedCrop);
+      
+      const plotData = {
+        name: plotName.trim(),
+        crop: selectedCrop,
+        zip_code: zipCode.trim(),
+        area: parseFloat(area) || 100,
+        ph_level: parseFloat(phLevel) || 6.5,
+        lat: parseFloat(latitude) || null,
+        lon: parseFloat(longitude) || null,
+        flex_type: cropDetails?.name || 'Custom',
+        planting_date: plantingDate || new Date().toISOString().split('T')[0],
+        age_at_entry: parseFloat(ageAtEntry) || 0,
+        custom_constraints: customConstraints.trim(),
+      };
+
+      const response = await addPlot(plotData);
+      
+      if (response.success) {
+        Alert.alert('✅ Success!', 'Your plot has been created successfully!', [
+          {
+            text: 'Go to Home',
+            onPress: () => navigation.navigate('Home')
+          }
+        ]);
+      } else {
+        Alert.alert('❌ Error', response.error || 'Failed to create plot. Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('❌ Error', error.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isFormValid = plotName.trim().length >= 2 && selectedCrop && 
+    (currentStep === 1 || (currentStep === 2 && zipCode.trim() && area.trim()));
+
+  const renderStep1 = () => (
+    <>
+      {/* Intro */}
+      <View style={styles.introSection}>
+        <View style={styles.introIcon}>
+          <LinearGradient
+            colors={['#10B981', '#059669']}
+            style={styles.iconGradient}
+          >
+            <Ionicons name="leaf" size={32} color="white" />
+          </LinearGradient>
+        </View>
+        <Text style={styles.introTitle}>Let's set up your garden plot</Text>
+        <Text style={styles.introDescription}>
+          Give your plot a name and choose what you're growing for personalized care
+        </Text>
+      </View>
+
+      {/* Popular for beginners */}
+      {!selectedCrop && (
+        <View style={styles.popularSection}>
+          <View style={styles.popularHeader}>
+            <Ionicons name="sparkles" size={20} color="#10B981" />
+            <Text style={styles.popularTitle}>Popular for beginners</Text>
+          </View>
+          <View style={styles.popularCrops}>
+            {popularCrops.map((crop) => (
+              <TouchableOpacity
+                key={crop.id}
+                style={styles.popularCropButton}
+                onPress={() => setSelectedCrop(crop.id)}
+              >
+                <Text style={styles.popularCropEmoji}>{crop.emoji}</Text>
+                <Text style={styles.popularCropName}>{crop.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Plot Name */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Plot Name</Text>
+        <Text style={styles.inputDescription}>Give your plot a memorable name</Text>
+        <TextInput
+          style={[styles.textInput, errors.plotName ? styles.inputError : null]}
+          placeholder="e.g., Backyard Garden, Herb Corner"
+          placeholderTextColor="#9CA3AF"
+          value={plotName}
+          onChangeText={(text) => {
+            setPlotName(text);
+            if (errors.plotName) {
+              setErrors(prev => ({ ...prev, plotName: '' }));
+            }
+          }}
+          maxLength={50}
+        />
+        {errors.plotName && (
+          <Text style={styles.errorText}>{errors.plotName}</Text>
+        )}
+        <Text style={styles.characterCount}>{plotName.length}/50 characters</Text>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search crops (e.g., tomatoes, beginner, summer)..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+      </View>
+
+      {/* Crop Selection */}
+      <View style={styles.cropsSection}>
+        <Text style={styles.sectionTitle}>Choose your crop</Text>
+        <Text style={styles.sectionSubtitle}>
+          {filteredCrops.length} crop{filteredCrops.length !== 1 ? 's' : ''} available
+        </Text>
+        
+        <View style={styles.cropsGrid}>
+          {filteredCrops.map((crop) => (
+            <TouchableOpacity
+              key={crop.id}
+              style={[
+                styles.cropGridCard,
+                selectedCrop === crop.id && styles.cropGridCardSelected
+              ]}
+              onPress={() => setSelectedCrop(crop.id)}
+            >
+              <View style={styles.cropGridHeader}>
+                <Text style={styles.cropGridEmoji}>{crop.emoji}</Text>
+                <View style={styles.cropGridTitleContainer}>
+                  <Text style={styles.cropGridTitle}>{crop.name}</Text>
+                  {crop.popular && (
+                    <View style={styles.popularBadgeSmall}>
+                      <Text style={styles.popularBadgeText}>Popular</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              
+              <View style={styles.cropGridBadges}>
+                <View style={[
+                  styles.cropGridBadge,
+                  crop.difficulty === 'Beginner' ? styles.beginnerBadge : styles.intermediateBadge
+                ]}>
+                  <Text style={styles.cropBadgeText}>{crop.difficulty}</Text>
+                </View>
+                <View style={styles.cropGridBadge}>
+                  <Ionicons name="time" size={12} color="#3B82F6" />
+                  <Text style={[styles.cropBadgeText, { color: '#3B82F6' }]}>{crop.season}</Text>
+                </View>
+                <View style={styles.cropGridBadge}>
+                  <Ionicons name="water" size={12} color="#06B6D4" />
+                  <Text style={[styles.cropBadgeText, { color: '#06B6D4' }]}>{crop.wateringFreq}</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.cropBenefits}>{crop.benefits}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+
+  const renderStep2 = () => (
+    <>
+      {/* Location and Details Intro */}
+      <View style={styles.introSection}>
+        <View style={styles.introIcon}>
+          <LinearGradient
+            colors={['#3B82F6', '#1D4ED8']}
+            style={styles.iconGradient}
+          >
+            <Ionicons name="location" size={32} color="white" />
+          </LinearGradient>
+        </View>
+        <Text style={styles.introTitle}>Plot Location & Details</Text>
+        <Text style={styles.introDescription}>
+          Add location information and plot specifications for better care recommendations
+        </Text>
+      </View>
+
+      {/* ZIP Code */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>ZIP Code</Text>
+        <Text style={styles.inputDescription}>Your plot's location for weather data</Text>
+        <TextInput
+          style={[styles.textInput, errors.zipCode ? styles.inputError : null]}
+          placeholder="e.g., 12345"
+          placeholderTextColor="#9CA3AF"
+          value={zipCode}
+          onChangeText={(text) => {
+            setZipCode(text);
+            if (errors.zipCode) {
+              setErrors(prev => ({ ...prev, zipCode: '' }));
+            }
+          }}
+          keyboardType="numeric"
+          maxLength={5}
+        />
+        {errors.zipCode && (
+          <Text style={styles.errorText}>{errors.zipCode}</Text>
+        )}
+      </View>
+
+      {/* Area */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Plot Area (sq ft)</Text>
+        <Text style={styles.inputDescription}>Size of your growing space</Text>
+        <TextInput
+          style={[styles.textInput, errors.area ? styles.inputError : null]}
+          placeholder="e.g., 100"
+          placeholderTextColor="#9CA3AF"
+          value={area}
+          onChangeText={(text) => {
+            setArea(text);
+            if (errors.area) {
+              setErrors(prev => ({ ...prev, area: '' }));
+            }
+          }}
+          keyboardType="numeric"
+        />
+        {errors.area && (
+          <Text style={styles.errorText}>{errors.area}</Text>
+        )}
+      </View>
+
+      {/* pH Level */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Soil pH Level (Optional)</Text>
+        <Text style={styles.inputDescription}>Ideal range: 6.0-7.0 for most crops</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="e.g., 6.5"
+          placeholderTextColor="#9CA3AF"
+          value={phLevel}
+          onChangeText={setPhLevel}
+          keyboardType="numeric"
+        />
+      </View>
+
+      {/* Coordinates (Optional) */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Coordinates (Optional)</Text>
+        <Text style={styles.inputDescription}>For precise weather and soil data</Text>
+        <View style={styles.coordinatesContainer}>
+          <TextInput
+            style={[styles.textInput, styles.coordinateInput]}
+            placeholder="Latitude"
+            placeholderTextColor="#9CA3AF"
+            value={latitude}
+            onChangeText={setLatitude}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={[styles.textInput, styles.coordinateInput]}
+            placeholder="Longitude"
+            placeholderTextColor="#9CA3AF"
+            value={longitude}
+            onChangeText={setLongitude}
+            keyboardType="numeric"
+          />
+        </View>
+      </View>
+
+      {/* Planting Date */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Planting Date (Optional)</Text>
+        <Text style={styles.inputDescription}>When you plan to plant</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor="#9CA3AF"
+          value={plantingDate}
+          onChangeText={setPlantingDate}
+        />
+      </View>
+
+      {/* Custom Constraints */}
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Special Requirements (Optional)</Text>
+        <Text style={styles.inputDescription}>Any specific growing conditions or notes</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea]}
+          placeholder="e.g., Shade-loving, drought-resistant, container growing..."
+          placeholderTextColor="#9CA3AF"
+          value={customConstraints}
+          onChangeText={setCustomConstraints}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.container}>
@@ -165,7 +492,7 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
         
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Setup Your Plot</Text>
-          <Text style={styles.headerSubtitle}>Step 1 of 4</Text>
+          <Text style={styles.headerSubtitle}>Step {currentStep} of 2</Text>
         </View>
         
         <View style={styles.headerRight} />
@@ -174,140 +501,15 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: '25%' }]} />
+          <View style={[styles.progressFill, { width: `${currentStep * 50}%` }]} />
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Intro */}
-        <View style={styles.introSection}>
-          <View style={styles.introIcon}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.iconGradient}
-            >
-              <Ionicons name="leaf" size={32} color="white" />
-            </LinearGradient>
-          </View>
-          <Text style={styles.introTitle}>Let's set up your garden plot</Text>
-          <Text style={styles.introDescription}>
-            Give your plot a name and choose what you're growing for personalized care
-          </Text>
-        </View>
-
-        {/* Popular for beginners */}
-        {!selectedCrop && (
-          <View style={styles.popularSection}>
-            <View style={styles.popularHeader}>
-              <Ionicons name="sparkles" size={20} color="#10B981" />
-              <Text style={styles.popularTitle}>Popular for beginners</Text>
-            </View>
-            <View style={styles.popularCrops}>
-              {popularCrops.map((crop) => (
-                <TouchableOpacity
-                  key={crop.id}
-                  style={styles.popularCropButton}
-                  onPress={() => setSelectedCrop(crop.id)}
-                >
-                  <Text style={styles.popularCropEmoji}>{crop.emoji}</Text>
-                  <Text style={styles.popularCropName}>{crop.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Plot Name */}
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Plot Name</Text>
-          <Text style={styles.inputDescription}>Give your plot a memorable name</Text>
-          <TextInput
-            style={[styles.textInput, errors.plotName ? styles.inputError : null]}
-            placeholder="e.g., Backyard Garden, Herb Corner"
-            placeholderTextColor="#9CA3AF"
-            value={plotName}
-            onChangeText={(text) => {
-              setPlotName(text);
-              if (errors.plotName) {
-                setErrors(prev => ({ ...prev, plotName: '' }));
-              }
-            }}
-            maxLength={50}
-          />
-          {errors.plotName && (
-            <Text style={styles.errorText}>{errors.plotName}</Text>
-          )}
-          <Text style={styles.characterCount}>{plotName.length}/50 characters</Text>
-        </View>
-
-        {/* Search */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search crops (e.g., tomatoes, beginner, summer)..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-        </View>
-
-        {/* Crop Selection */}
-        <View style={styles.cropsSection}>
-          <Text style={styles.sectionTitle}>Choose your crop</Text>
-          <Text style={styles.sectionSubtitle}>
-            {filteredCrops.length} crop{filteredCrops.length !== 1 ? 's' : ''} available
-          </Text>
-          
-          <View style={styles.cropsGrid}>
-            {filteredCrops.map((crop) => (
-              <TouchableOpacity
-                key={crop.id}
-                style={[
-                  styles.cropGridCard,
-                  selectedCrop === crop.id && styles.cropGridCardSelected
-                ]}
-                onPress={() => setSelectedCrop(crop.id)}
-              >
-                <View style={styles.cropGridHeader}>
-                  <Text style={styles.cropGridEmoji}>{crop.emoji}</Text>
-                  <View style={styles.cropGridTitleContainer}>
-                    <Text style={styles.cropGridTitle}>{crop.name}</Text>
-                    {crop.popular && (
-                      <View style={styles.popularBadgeSmall}>
-                        <Text style={styles.popularBadgeText}>Popular</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                
-                <View style={styles.cropGridBadges}>
-                  <View style={[
-                    styles.cropGridBadge,
-                    crop.difficulty === 'Beginner' ? styles.beginnerBadge : styles.intermediateBadge
-                  ]}>
-                    <Text style={styles.cropBadgeText}>{crop.difficulty}</Text>
-                  </View>
-                  <View style={styles.cropGridBadge}>
-                    <Ionicons name="time" size={12} color="#3B82F6" />
-                    <Text style={[styles.cropBadgeText, { color: '#3B82F6' }]}>{crop.season}</Text>
-                  </View>
-                  <View style={styles.cropGridBadge}>
-                    <Ionicons name="water" size={12} color="#06B6D4" />
-                    <Text style={[styles.cropBadgeText, { color: '#06B6D4' }]}>{crop.wateringFreq}</Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.cropBenefits}>{crop.benefits}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {currentStep === 1 ? renderStep1() : renderStep2()}
       </ScrollView>
 
-      {/* Next Button */}
+      {/* Next/Submit Button */}
       <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={[
@@ -315,20 +517,23 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
             isFormValid ? styles.nextButtonActive : styles.nextButtonDisabled
           ]}
           onPress={handleNext}
-          disabled={!isFormValid}
+          disabled={!isFormValid || isSubmitting}
         >
           <Text style={[
             styles.nextButtonText,
             isFormValid ? styles.nextButtonTextActive : styles.nextButtonTextDisabled
           ]}>
-            Next: Choose Location
+            {isSubmitting ? 'Creating Plot...' : 
+             currentStep === 1 ? 'Next: Location & Details' : 'Create Plot'}
           </Text>
-          <Ionicons 
-            name="arrow-forward" 
-            size={16} 
-            color={isFormValid ? "white" : "#9CA3AF"} 
-            style={styles.nextButtonIcon}
-          />
+          {!isSubmitting && (
+            <Ionicons 
+              name={currentStep === 1 ? "arrow-forward" : "checkmark"} 
+              size={16} 
+              color={isFormValid ? "white" : "#9CA3AF"} 
+              style={styles.nextButtonIcon}
+            />
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -757,6 +962,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6B7280',
     lineHeight: 14,
+  },
+  coordinatesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  coordinateInput: {
+    flex: 1,
+  },
+  textArea: {
+    minHeight: 80,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
 });
 

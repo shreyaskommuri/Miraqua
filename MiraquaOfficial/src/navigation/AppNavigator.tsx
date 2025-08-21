@@ -25,6 +25,7 @@ import YieldForecastScreen from '../screens/YieldForecastScreen';
 import SmartMapScreen from '../screens/SmartMapScreen';
 import CommunityScreen from '../screens/CommunityScreen';
 import SetupPlotScreen from '../screens/SetupPlotScreen';
+import AddPlotScreen from '../components/screens/AddPlotScreen';
 import OnboardingLocationScreen from '../screens/OnboardingLocationScreen';
 import OnboardingCompleteScreen from '../screens/OnboardingCompleteScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
@@ -67,6 +68,7 @@ const AppNavigator = () => {
       <Stack.Screen name="SmartMap" component={SmartMapScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Community" component={CommunityScreen} options={{ headerShown: false }} />
       <Stack.Screen name="SetupPlot" component={SetupPlotScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddPlot" component={AddPlotScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OnboardingLocation" component={OnboardingLocationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="OnboardingComplete" component={OnboardingCompleteScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />

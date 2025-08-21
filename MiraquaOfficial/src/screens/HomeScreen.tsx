@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SidebarNavigation from './SidebarNavigation';
 import { getPlots, Plot } from '../api/plots';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen({ navigation }: any) {
   const [showSidebar, setShowSidebar] = useState(false);
@@ -42,6 +43,13 @@ export default function HomeScreen({ navigation }: any) {
     fetchPlots();
   }, []);
 
+  // Refresh plots when screen comes into focus (e.g., after adding a plot)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchPlots();
+    }, [])
+  );
+
   // Filter plots based on search text
   const filteredPlots = plots.filter(plot => {
     if (!searchText.trim()) return true;
@@ -49,8 +57,8 @@ export default function HomeScreen({ navigation }: any) {
     const searchLower = searchText.toLowerCase();
     return (
       plot.name.toLowerCase().includes(searchLower) ||
-      plot.type.toLowerCase().includes(searchLower) ||
-      plot.location.toLowerCase().includes(searchLower)
+      plot.crop.toLowerCase().includes(searchLower) ||
+      plot.zip_code.toLowerCase().includes(searchLower)
     );
   });
 
@@ -172,9 +180,9 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.bottomMetricsRow}>
             <View style={styles.bottomMetricCard}>
               <Ionicons name="wifi" size={20} color="#10B981" />
-              <Text style={styles.bottomMetricValue}>{filteredPlots.filter(p => p.status === 'Online').length}</Text>
-              <Text style={styles.bottomMetricLabel}>Online Plots</Text>
-              <Text style={styles.bottomMetricSubtext}>{filteredPlots.filter(p => p.status === 'Offline').length} offline</Text>
+              <Text style={styles.bottomMetricValue}>{filteredPlots.length}</Text>
+              <Text style={styles.bottomMetricLabel}>Total Plots</Text>
+              <Text style={styles.bottomMetricSubtext}>All active</Text>
             </View>
             
             <View style={styles.bottomMetricCard}>
@@ -199,7 +207,7 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.plotsTitle}>
               {searchText.trim() ? `Search Results (${filteredPlots.length})` : `Your Plots (${filteredPlots.length})`}
             </Text>
-            <TouchableOpacity style={styles.refreshButton}>
+            <TouchableOpacity style={styles.refreshButton} onPress={fetchPlots}>
               <Ionicons name="refresh" size={20} color="white" />
             </TouchableOpacity>
           </View>
@@ -232,48 +240,48 @@ export default function HomeScreen({ navigation }: any) {
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.plotGridHeader}>
-                    <View style={styles.plotGridTitleContainer}>
-                      <Text style={styles.plotGridTitle}>{plot.name}</Text>
-                      <Ionicons name="wifi" size={14} color={plot.wifiStatus} />
-                    </View>
-                    <View style={[styles.healthBadgeSmall, plot.health < 80 && { backgroundColor: '#F59E0B' }]}>
-                      <Ionicons name="heart" size={10} color="white" />
-                      <Text style={styles.healthPercentageSmall}>{plot.health}%</Text>
-                    </View>
-                  </View>
+                                                  <View style={styles.plotGridHeader}>
+                                  <View style={styles.plotGridTitleContainer}>
+                                    <Text style={styles.plotGridTitle}>{plot.name}</Text>
+                                    <Ionicons name="wifi" size={14} color="#10B981" />
+                                  </View>
+                                  <View style={styles.healthBadgeSmall}>
+                                    <Ionicons name="heart" size={10} color="white" />
+                                    <Text style={styles.healthPercentageSmall}>85%</Text>
+                                  </View>
+                                </View>
 
-                  <Text style={styles.plotGridType}>{plot.type}</Text>
-                  
-                  <View style={styles.plotGridLocation}>
-                    <Ionicons name="location" size={12} color="#9CA3AF" />
-                    <Text style={styles.plotGridLocationText}>{plot.location}</Text>
-                  </View>
+                                <Text style={styles.plotGridType}>{plot.crop}</Text>
+                                
+                                <View style={styles.plotGridLocation}>
+                                  <Ionicons name="location" size={12} color="#9CA3AF" />
+                                  <Text style={styles.plotGridLocationText}>{plot.zip_code}</Text>
+                                </View>
 
-                  {/* Compact Sensor Readings */}
-                  <View style={styles.plotGridSensors}>
-                    <View style={styles.plotGridSensor}>
-                      <Ionicons name="water" size={12} color="#3B82F6" />
-                      <Text style={styles.plotGridSensorValue}>{plot.moisture}%</Text>
-                    </View>
-                    <View style={styles.plotGridSensor}>
-                      <Ionicons name="thermometer" size={12} color="#F59E0B" />
-                      <Text style={styles.plotGridSensorValue}>{plot.temperature}°F</Text>
-                    </View>
-                    <View style={styles.plotGridSensor}>
-                      <Ionicons name="sunny" size={12} color="#F59E0B" />
-                      <Text style={styles.plotGridSensorValue}>{plot.humidity}%</Text>
-                    </View>
-                  </View>
+                                {/* Compact Sensor Readings */}
+                                <View style={styles.plotGridSensors}>
+                                  <View style={styles.plotGridSensor}>
+                                    <Ionicons name="water" size={12} color="#3B82F6" />
+                                    <Text style={styles.plotGridSensorValue}>50%</Text>
+                                  </View>
+                                  <View style={styles.plotGridSensor}>
+                                    <Ionicons name="thermometer" size={12} color="#F59E0B" />
+                                    <Text style={styles.plotGridSensorValue}>70°F</Text>
+                                  </View>
+                                  <View style={styles.plotGridSensor}>
+                                    <Ionicons name="sunny" size={12} color="#F59E0B" />
+                                    <Text style={styles.plotGridSensorValue}>80%</Text>
+                                  </View>
+                                </View>
 
-                  {/* Compact Status */}
-                  <View style={styles.plotGridFooter}>
-                    <View style={styles.plotGridStatus}>
-                      <View style={[styles.onlineDotSmall, plot.status === 'Offline' && { backgroundColor: '#EF4444' }]} />
-                      <Text style={styles.plotGridStatusText}>{plot.status}</Text>
-                    </View>
-                    <Text style={styles.plotGridNextWatering}>{plot.nextWatering}</Text>
-                  </View>
+                                {/* Compact Status */}
+                                <View style={styles.plotGridFooter}>
+                                  <View style={styles.plotGridStatus}>
+                                    <View style={styles.onlineDotSmall} />
+                                    <Text style={styles.plotGridStatusText}>Online</Text>
+                                  </View>
+                                  <Text style={styles.plotGridNextWatering}>Tomorrow 6AM</Text>
+                                </View>
                 </TouchableOpacity>
               ))}
             </View>
