@@ -32,8 +32,11 @@ def generate_summary(crop, lat, lon, schedule):
     highest_day = max(schedule, key=lambda x: x["liters"])
     lowest_day = min(schedule, key=lambda x: x["liters"])
 
+    lat_safe = lat if lat is not None else 0.0
+    lon_safe = lon if lon is not None else 0.0
+    
     return (
-        f"🌾 Crop: {crop}, Location: ({lat:.4f}, {lon:.4f})\n"
+        f"🌾 Crop: {crop}, Location: ({lat_safe:.4f}, {lon_safe:.4f})\n"
         f"💧 Total water needed over {len(schedule)} days: {total_liters} liters\n"
         f"📈 Average per day: {avg_liters} liters\n"
         f"🔺 Highest usage: {highest_day['liters']}L on {highest_day['date']}\n"
@@ -57,8 +60,10 @@ def generate_gem_summary(crop, lat, lon, schedule, plot_name, plot_id):
         )
 
         # Build the prompt
+        lat_safe = lat if lat is not None else 0.0
+        lon_safe = lon if lon is not None else 0.0
         prompt = f"""
-You are helping a farmer with a plot called '{plot_name}' growing {crop} at coordinates ({lat:.4f}, {lon:.4f}).
+You are helping a farmer with a plot called '{plot_name}' growing {crop} at coordinates ({lat_safe:.4f}, {lon_safe:.4f}).
 
 Here is the upcoming irrigation schedule:
 {schedule_lines}

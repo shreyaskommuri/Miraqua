@@ -60,80 +60,138 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
 
   // API base URL - update this to match your backend
-  const API_BASE_URL = 'http://localhost:5001'; // Changed from 5000 to 5001
+  const API_BASE_URL = 'http://192.168.1.239:5050'; // Updated to match working MVP backend
 
   // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
     const days = [];
     const today = new Date();
     
+    // Validate today's date
+    if (isNaN(today.getTime()) || today.getTime() <= 0) {
+      console.error('❌ Invalid today date, using fallback');
+      const fallbackDate = new Date('2024-01-01');
+      return Array.from({ length: 14 }, (_, i) => ({
+        date: new Date(fallbackDate.getTime() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        day: i + 1,
+        dayOfWeek: 'Mon',
+        isToday: false,
+        hasWatering: false,
+        volume: 0,
+      }));
+    }
+    
     // If we have real schedule data, use it
     if (realScheduleData && realScheduleData.schedule) {
       console.log('📅 Using REAL schedule data:', realScheduleData.schedule.length, 'entries');
+      console.log('📅 Schedule data structure:', realScheduleData.schedule[0]);
+      console.log('📅 Schedule keys:', Object.keys(realScheduleData.schedule[0] || {}));
+      
       const schedule = showOriginalSchedule ? 
         (realScheduleData.og_schedule || realScheduleData.schedule) : 
         realScheduleData.schedule;
       
       // Get the date range from the actual schedule data
-      const scheduleDates = schedule.map((entry: any) => entry.date).sort();
-      const startDate = scheduleDates.length > 0 ? new Date(scheduleDates[0]) : today;
-      const endDate = scheduleDates.length > 0 ? new Date(scheduleDates[scheduleDates.length - 1]) : new Date(today.getTime() + 13 * 24 * 60 * 60 * 1000);
+      // Supabase sends: date (MM/DD/YY), liters, optimal_time, explanation
+      const scheduleDates = schedule
+        .map((entry: any) => entry.date)
+        .filter((dateStr: string) => {
+          // Validate date strings before processing
+          if (!dateStr || typeof dateStr !== 'string') return false;
+          return true; // Accept MM/DD/YY format
+        })
+        .sort();
       
-      console.log('📅 Schedule date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+      console.log('📅 Raw schedule dates from Supabase:', scheduleDates);
+      console.log('📅 Schedule entries from Supabase:', schedule);
       
-      // Generate 14 days starting from the schedule start date
+      // Always start from today and generate 14 days
+      // This ensures we can match schedule entries regardless of their date range
       for (let i = 0; i < 14; i++) {
-        const currentDate = new Date(startDate);
-        currentDate.setDate(startDate.getDate() + i);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const isToday = dateStr === today.toISOString().split('T')[0];
+        try {
+          const currentDate = new Date(today);
+          currentDate.setDate(today.getDate() + i);
+          
+          // Validate the calculated date
+          if (isNaN(currentDate.getTime()) || currentDate.getTime() <= 0) {
+            console.warn(`⚠️ Invalid date calculated for day ${i}, skipping`);
+            continue;
+          }
+          
+          const dateStr = currentDate.toISOString().split('T')[0];
+          const isToday = dateStr === today.toISOString().split('T')[0];
         
-        // Find if this date has watering in the real schedule
-        const scheduleEntry = schedule.find((entry: any) => {
-          try {
-            // The backend sends 'date' field, not 'optimal_time'
-            if (!entry.date) {
-              console.warn('⚠️ Schedule entry missing date:', entry);
+          // Find if this date has watering in the real schedule
+          const scheduleEntry = schedule.find((entry: any) => {
+            try {
+              // Supabase sends date in MM/DD/YY format
+              const entryDate = entry.date;
+              if (!entryDate) {
+                console.warn('⚠️ Schedule entry missing date:', entry);
+                return false;
+              }
+              
+              // Convert MM/DD/YY to YYYY-MM-DD for comparison
+              const [month, day, year] = entryDate.split('/');
+              const formattedEntryDate = `2025-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              
+              console.log(`🔍 Comparing Supabase date ${entryDate} (${formattedEntryDate}) with frontend date ${dateStr}`);
+              
+              // Compare the formatted dates
+              return formattedEntryDate === dateStr;
+            } catch (error) {
+              console.error('❌ Error parsing schedule date:', error, entry);
               return false;
             }
-            
-            // Direct string comparison since both are in YYYY-MM-DD format
-            return entry.date === dateStr;
-          } catch (error) {
-            console.error('❌ Error parsing schedule date:', error, entry);
-            return false;
+          });
+          
+          // Check if this is a watering day based on liters > 0
+          const hasWatering = !!scheduleEntry && (scheduleEntry.liters > 0);
+          const volume = hasWatering ? scheduleEntry.liters : 0;
+          
+          if (hasWatering) {
+            console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
+            console.log(`📅 Schedule entry details:`, scheduleEntry);
+          } else {
+            console.log(`❌ No watering for ${dateStr}`);
           }
-        });
-        
-        const hasWatering = !!scheduleEntry && scheduleEntry.hasWatering === true;
-        const volume = hasWatering ? scheduleEntry.volume || 0 : 0;
-        
-        if (hasWatering) {
-          console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
+          
+          days.push({
+            date: dateStr,
+            day: currentDate.getDate(),
+            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+            isToday,
+            hasWatering,
+            volume: volume,
+            scheduleEntry: scheduleEntry // Store the full entry for details
+          });
+        } catch (error) {
+          console.error(`❌ Error processing day ${i}:`, error);
+          continue;
         }
-        
-        days.push({
-          date: dateStr,
-          day: currentDate.getDate(),
-          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isToday,
-          hasWatering,
-          volume: volume,
-          scheduleEntry: scheduleEntry // Store the full entry for details
-        });
       }
     } else {
       console.log('⚠️ No real schedule data, using mock data');
       // Fallback to mock data if no real schedule
       for (let i = 0; i < 14; i++) {
-        const currentDate = new Date(today);
-        currentDate.setDate(today.getDate() + i);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const isToday = i === 0;
+        try {
+          const currentDate = new Date(today);
+          currentDate.setDate(today.getDate() + i);
+          
+          // Validate the calculated date
+          if (isNaN(currentDate.getTime()) || currentDate.getTime() <= 0) {
+            console.warn(`⚠️ Invalid mock date calculated for day ${i}, skipping`);
+            continue;
+          }
+          
+          const dateStr = currentDate.toISOString().split('T')[0];
+          const isToday = i === 0;
         
         if (showOriginalSchedule) {
           // Original schedule - more frequent, less optimized
-          const hasWatering = Math.random() > 0.4; // 60% chance
+          // Ensure we have some watering days for demonstration
+          const hasWatering = i % 2 === 0 || Math.random() > 0.3; // 70% chance + every other day
+          
           days.push({
             date: dateStr,
             day: currentDate.getDate(),
@@ -143,8 +201,10 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
           });
         } else {
-          // AI optimized schedule - more efficient
-          const hasWatering = Math.random() > 0.6; // 40% chance
+          // AI optimized schedule - more efficient but still visible
+          // Ensure we have some watering days for demonstration
+          const hasWatering = i % 3 === 0 || Math.random() > 0.5; // 50% chance + every 3rd day
+          
           days.push({
             date: dateStr,
             day: currentDate.getDate(),
@@ -153,6 +213,10 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             hasWatering,
             volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
           });
+        }
+        } catch (error) {
+          console.error(`❌ Error processing mock day ${i}:`, error);
+          continue;
         }
       }
     }
@@ -167,7 +231,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       console.log('🔍 Fetching plot data for plotId:', plotId, 'Type:', typeof plotId);
       
       // Step 1: Get plot details
-      const plotResponse = await fetch(`${API_BASE_URL}/plots/${plotId}/details`, {
+      const plotResponse = await fetch(`${API_BASE_URL}/get_plot_by_id?plot_id=${plotId}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -241,7 +305,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         latitude: plotData.latitude,
         longitude: plotData.longitude,
         isOnline: plotData.isOnline,
-        sensors: plotData.sensors
+        sensors: plotData.sensors || []
       };
       
       setPlot(transformedPlot);
@@ -332,18 +396,29 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const generateAISummary = async () => {
     setGeneratingAI(true);
     try {
-      // Call the real backend API for AI summary
-      const response = await fetch(`${API_BASE_URL}/plots/${plotId}/ai-summary`, {
+      // Call the real backend API for AI summary - use the gem_summary from get_plan response
+      // Since we already have the schedule data, we can use the gem_summary field
+      if (realScheduleData && realScheduleData.gem_summary) {
+        setAiSummary(realScheduleData.gem_summary);
+        return;
+      }
+      
+      // Fallback: call get_plan to get AI summary
+      const response = await fetch(`${API_BASE_URL}/get_plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ plot_id: plotId })
+        body: JSON.stringify({ 
+          plot_id: plotId,
+          use_original: false,
+          force_refresh: false
+        })
       });
       
       if (response.ok) {
         const data = await response.json();
-        setAiSummary(data.summary);
+        setAiSummary(data.gem_summary || data.summary);
       } else {
         // Fallback to mock AI summary
         setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
@@ -361,12 +436,15 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     setWatering(true);
     try {
       // Call the real backend API to water the plot
-      const response = await fetch(`${API_BASE_URL}/plots/${plotId}/water`, {
+      const response = await fetch(`${API_BASE_URL}/water_now`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ duration_minutes: 5 })
+        body: JSON.stringify({ 
+          plot_id: plotId,
+          duration_minutes: 5 
+        })
       });
       
       if (response.ok) {
@@ -375,7 +453,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         // Update local state with new moisture level
         setPlot(prev => prev ? {
           ...prev,
-          moisture: data.new_moisture || 85,
+          moisture: Math.min(100, (prev.moisture || 55) + 20), // Increase moisture by 20%
           lastWatered: "Just now",
           status: 'healthy' as const,
         } : null);
@@ -464,15 +542,15 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         <View style={styles.headerContent}>
           <View style={styles.plotIcon}>
             <Text style={styles.plotEmoji}>🌿</Text>
-            <View style={[styles.onlineIndicator, { backgroundColor: plot.isOnline ? '#10B981' : '#EF4444' }]}>
+            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#10B981' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
           </View>
           
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{plot.name}</Text>
-            <View style={styles.headerSubtitle}>
-              <Text style={styles.cropText}>{plot.crop} • {plot.variety}</Text>
+                    <Text style={styles.headerTitle}>{plot.name || 'Unnamed Plot'}</Text>
+        <View style={styles.headerSubtitle}>
+          <Text style={styles.cropText}>{plot.crop || 'Unknown'} • {plot.variety || 'Standard'}</Text>
             </View>
           </View>
         </View>
@@ -512,7 +590,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.statIcon}>
                 <Ionicons name="heart" size={24} color="#EF4444" />
               </View>
-              <Text style={styles.statValue}>{plot.healthScore}%</Text>
+              <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
               <Text style={styles.statLabel}>Health Score</Text>
             </View>
             
@@ -528,7 +606,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.statIcon}>
                 <Ionicons name="water" size={24} color="#059669" />
               </View>
-              <Text style={styles.statValue}>{plot.waterSavings}%</Text>
+              <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
               <Text style={styles.statLabel}>Water Saved</Text>
             </View>
           </View>
@@ -565,7 +643,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
         {/* Sensor Status Grid */}
         <View style={styles.sensorsGrid}>
-          {plot.sensors.map((sensor) => (
+          {plot.sensors && plot.sensors.length > 0 ? plot.sensors.map((sensor) => (
             <View key={sensor.id} style={styles.sensorCard}>
               <View style={styles.sensorHeader}>
                 <View style={[
@@ -592,11 +670,13 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 <Text style={styles.sensorTime}>{sensor.lastUpdate}</Text>
               </View>
             </View>
-          ))}
+          )) : (
+            <Text style={styles.noSensorsText}>No sensors available</Text>
+          )}
         </View>
 
         {/* Water Now Button */}
-        {plot.status === 'needs-water' && (
+        {(plot.status === 'needs-water' || plot.status === 'attention') && (
           <TouchableOpacity 
             style={styles.waterButton}
             onPress={handleWaterNow}
@@ -623,27 +703,27 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <View style={styles.infoItem}>
               <Ionicons name="leaf" size={16} color="#10B981" />
               <Text style={styles.infoLabel}>Crop Type</Text>
-              <Text style={styles.infoValue}>{plot.crop}</Text>
+              <Text style={styles.infoValue}>{plot.crop || 'Unknown'}</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="location" size={16} color="#6B7280" />
               <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{plot.location}</Text>
+              <Text style={styles.infoValue}>{plot.location || 'Unknown'}</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="resize" size={16} color="#6B7280" />
               <Text style={styles.infoLabel}>Area</Text>
-              <Text style={styles.infoValue}>{plot.area} sq ft</Text>
+              <Text style={styles.infoValue}>{plot.area || 0} sq ft</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="time" size={16} color="#6B7280" />
               <Text style={styles.infoLabel}>Last Watered</Text>
-              <Text style={styles.infoValue}>{plot.lastWatered}</Text>
+              <Text style={styles.infoValue}>{plot.lastWatered || 'Not recorded'}</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="calendar" size={16} color="#6B7280" />
               <Text style={styles.infoLabel}>Next Watering</Text>
-              <Text style={styles.infoValue}>{plot.nextWatering}</Text>
+              <Text style={styles.infoValue}>{plot.nextWatering || 'Not scheduled'}</Text>
             </View>
           </View>
         </View>
@@ -687,31 +767,48 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           )}
         </View>
 
-        {/* Integrated Calendar Schedule */}
-        <View style={styles.calendarCard}>
-          <TouchableOpacity 
-            style={styles.calendarHeader}
-            onPress={() => navigation.navigate('Calendar', { plotId })}
-          >
-            <LinearGradient
-              colors={['#10B981', '#3B82F6']}
-              style={styles.calendarGradient}
+                  {/* Integrated Calendar Schedule */}
+          <View style={styles.calendarCard}>
+            <TouchableOpacity 
+              style={styles.calendarHeader}
+              onPress={() => navigation.navigate('Calendar', { plotId })}
             >
-              <View style={styles.calendarHeaderContent}>
-                <View style={styles.calendarIcon}>
-                  <Ionicons name="calendar" size={16} color="white" />
+              <LinearGradient
+                colors={['#10B981', '#3B82F6']}
+                style={styles.calendarGradient}
+              >
+                <View style={styles.calendarHeaderContent}>
+                  <View style={styles.calendarIcon}>
+                    <Ionicons name="calendar" size={16} color="white" />
+                  </View>
+                  <View style={styles.calendarHeaderInfo}>
+                    <Text style={styles.calendarTitle}>Next 2 Weeks</Text>
+                    <Text style={styles.calendarSubtitle}>
+                      {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.calendarHeaderInfo}>
-                  <Text style={styles.calendarTitle}>Next 2 Weeks</Text>
-                  <Text style={styles.calendarSubtitle}>
-                    {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
-                  </Text>
-                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+                        {/* Debug Info - Only show in development */}
+            {__DEV__ && false && (
+              <View style={styles.debugInfo}>
+                <Text style={styles.debugText}>
+                  Schedule Data: {realScheduleData ? `${realScheduleData.schedule?.length || 0} entries` : 'None'}
+                </Text>
+                <Text style={styles.debugText}>
+                  Generated Days: {getScheduleData().length} days
+                </Text>
+                <Text style={styles.debugText}>
+                  Watering Days: {getScheduleData().filter(d => d.hasWatering).length} days
+                </Text>
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
+            )}
 
-          <View style={styles.calendarContent}>
+
+
+            <View style={styles.calendarContent}>
             {/* Days of Week Header */}
             <View style={styles.daysHeader}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
@@ -738,11 +835,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}>
                     {day.day}
                   </Text>
+                  
+                  {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
                       <Ionicons name="water" size={10} color="#3B82F6" />
+                      {day.volume > 0 && (
+                        <Text style={styles.wateringVolume}>{day.volume}L</Text>
+                      )}
                     </View>
                   )}
+                  
+                  {/* Today Indicator */}
                   {day.isToday && (
                     <View style={styles.todayPulse} />
                   )}
@@ -769,11 +873,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}>
                     {day.day}
                   </Text>
+                  
+                  {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
                       <Ionicons name="water" size={10} color="#3B82F6" />
+                      {day.volume > 0 && (
+                        <Text style={styles.wateringVolume}>{day.volume}L</Text>
+                      )}
                     </View>
                   )}
+                  
+                  {/* Today Indicator */}
                   {day.isToday && (
                     <View style={styles.todayPulse} />
                   )}
@@ -800,6 +911,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.legendAvailable} />
               <Text style={styles.legendText}>Available</Text>
             </View>
+
           </View>
         </View>
 
@@ -1022,6 +1134,189 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 20,
+  },
+  noSensorsText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 20,
+  },
+  debugInfo: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 12,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
+  debugText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  weatherCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  weatherHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  weatherTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  weatherContent: {
+    gap: 12,
+  },
+  weatherItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  weatherLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginLeft: 8,
+    flex: 1,
+  },
+  weatherValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  wateringInfo: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  wateringVolume: {
+    fontSize: 10,
+    color: '#3B82F6',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  weatherIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 2,
+  },
+  forecastCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  forecastHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  forecastTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  forecastContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  forecastDay: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  forecastDayName: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  forecastIcon: {
+    marginBottom: 4,
+  },
+  forecastTemp: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '500',
+  },
+  summaryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  simpleForecastCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  simpleForecastHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  simpleForecastTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  simpleForecastContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  simpleForecastDay: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  simpleForecastDayName: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
   },
   sensorCard: {
     width: (width - 52) / 2,
@@ -1259,12 +1554,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
-  wateringVolume: {
-    fontSize: 8,
-    color: '#3B82F6',
-    fontWeight: '500',
-    marginTop: 1,
-  },
+
   todayPulse: {
     position: 'absolute',
     inset: 0,
@@ -1332,6 +1622,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 3,
     marginRight: 4,
+  },
+  legendWeather: {
+    width: 12,
+    height: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    borderRadius: 3,
+    marginRight: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   legendText: {
     fontSize: 10,
