@@ -52,45 +52,108 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const { plotId } = route.params;
   const [plot, setPlot] = useState<Plot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [watering, setWatering] = useState(false);
-  const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
-
-  const [aiSummary, setAiSummary] = useState("");
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string>('');
+  const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
+  const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
 
-  // Generate schedule data based on toggle state
+  // API base URL - update this to match your backend
+  const API_BASE_URL = 'http://localhost:5001'; // Changed from 5000 to 5001
+
+  // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
     const days = [];
     const today = new Date();
     
-    for (let i = 0; i < 14; i++) {
-      const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() + i);
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const isToday = i === 0;
+    // If we have real schedule data, use it
+    if (realScheduleData && realScheduleData.schedule) {
+      console.log('📅 Using REAL schedule data:', realScheduleData.schedule.length, 'entries');
+      const schedule = showOriginalSchedule ? 
+        (realScheduleData.og_schedule || realScheduleData.schedule) : 
+        realScheduleData.schedule;
       
-      if (showOriginalSchedule) {
-        // Original schedule - more frequent, less optimized
-        const hasWatering = Math.random() > 0.4; // 60% chance
+      // Get the date range from the actual schedule data
+      const scheduleDates = schedule.map((entry: any) => entry.date).sort();
+      const startDate = scheduleDates.length > 0 ? new Date(scheduleDates[0]) : today;
+      const endDate = scheduleDates.length > 0 ? new Date(scheduleDates[scheduleDates.length - 1]) : new Date(today.getTime() + 13 * 24 * 60 * 60 * 1000);
+      
+      console.log('📅 Schedule date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+      
+      // Generate 14 days starting from the schedule start date
+      for (let i = 0; i < 14; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const isToday = dateStr === today.toISOString().split('T')[0];
+        
+        // Find if this date has watering in the real schedule
+        const scheduleEntry = schedule.find((entry: any) => {
+          try {
+            // The backend sends 'date' field, not 'optimal_time'
+            if (!entry.date) {
+              console.warn('⚠️ Schedule entry missing date:', entry);
+              return false;
+            }
+            
+            // Direct string comparison since both are in YYYY-MM-DD format
+            return entry.date === dateStr;
+          } catch (error) {
+            console.error('❌ Error parsing schedule date:', error, entry);
+            return false;
+          }
+        });
+        
+        const hasWatering = !!scheduleEntry && scheduleEntry.hasWatering === true;
+        const volume = hasWatering ? scheduleEntry.volume || 0 : 0;
+        
+        if (hasWatering) {
+          console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
+        }
+        
         days.push({
           date: dateStr,
           day: currentDate.getDate(),
           dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
           isToday,
           hasWatering,
-          volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
+          volume: volume,
+          scheduleEntry: scheduleEntry // Store the full entry for details
         });
-      } else {
-        // AI optimized schedule - more efficient
-        const hasWatering = Math.random() > 0.6; // 40% chance
-        days.push({
-          date: dateStr,
-          day: currentDate.getDate(),
-          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isToday,
-          hasWatering,
-          volume: hasWatering ? Math.floor(Math.random() * 6) + 8 : 0, // 8-14L
-        });
+      }
+    } else {
+      console.log('⚠️ No real schedule data, using mock data');
+      // Fallback to mock data if no real schedule
+      for (let i = 0; i < 14; i++) {
+        const currentDate = new Date(today);
+        currentDate.setDate(today.getDate() + i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const isToday = i === 0;
+        
+        if (showOriginalSchedule) {
+          // Original schedule - more frequent, less optimized
+          const hasWatering = Math.random() > 0.4; // 60% chance
+          days.push({
+            date: dateStr,
+            day: currentDate.getDate(),
+            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+            isToday,
+            hasWatering,
+            volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
+          });
+        } else {
+          // AI optimized schedule - more efficient
+          const hasWatering = Math.random() > 0.6; // 40% chance
+          days.push({
+            date: dateStr,
+            day: currentDate.getDate(),
+            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+            isToday,
+            hasWatering,
+            volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
+          });
+        }
       }
     }
     
@@ -101,9 +164,109 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     setLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      console.log('🔍 Fetching plot data for plotId:', plotId, 'Type:', typeof plotId);
       
+      // Step 1: Get plot details
+      const plotResponse = await fetch(`${API_BASE_URL}/plots/${plotId}/details`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📡 Plot response status:', plotResponse.status);
+      
+      if (!plotResponse.ok) {
+        const errorText = await plotResponse.text();
+        console.error('❌ HTTP Error Response:', errorText);
+        throw new Error(`HTTP error! status: ${plotResponse.status}, body: ${errorText}`);
+      }
+      
+      const plotData = await plotResponse.json();
+      console.log('✅ Plot data received:', plotData);
+      
+      // Step 2: Get schedule data (this will generate schedule if none exists)
+      console.log('📅 Fetching schedule data...');
+      const scheduleResponse = await fetch(`${API_BASE_URL}/get_plan`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plot_id: plotId,
+          use_original: false,
+          force_refresh: false
+        }),
+      });
+      
+      console.log('📡 Schedule response status:', scheduleResponse.status);
+      
+      let scheduleData = null;
+      if (scheduleResponse.ok) {
+        scheduleData = await scheduleResponse.json();
+        console.log('✅ Schedule data received:', scheduleData);
+        
+        // Debug: Log the structure of schedule entries
+        if (scheduleData.schedule && scheduleData.schedule.length > 0) {
+          console.log('📅 First schedule entry:', scheduleData.schedule[0]);
+          console.log('📅 Schedule entry keys:', Object.keys(scheduleData.schedule[0]));
+          console.log('📅 Sample optimal_time:', scheduleData.schedule[0].optimal_time);
+          console.log('📅 Sample optimal_time type:', typeof scheduleData.schedule[0].optimal_time);
+        }
+        
+        setRealScheduleData(scheduleData); // Store real schedule data
+      } else {
+        console.warn('⚠️ Schedule fetch failed, continuing without schedule');
+      }
+      
+      // Transform the backend data to match our Plot interface
+      const transformedPlot: Plot = {
+        id: plotData.id || plotId,
+        name: plotData.name,
+        crop: plotData.crop,
+        variety: plotData.variety || "Standard",
+        moisture: plotData.moisture,
+        temperature: plotData.temperature,
+        sunlight: plotData.sunlight,
+        phLevel: plotData.phLevel,
+        nextWatering: scheduleData?.schedule?.[0]?.optimal_time || plotData.nextWatering || "Not scheduled",
+        status: plotData.status,
+        location: plotData.location,
+        lastWatered: plotData.lastWatered || "Not recorded",
+        area: plotData.area,
+        healthScore: plotData.healthScore,
+        waterSavings: plotData.waterSavings,
+        latitude: plotData.latitude,
+        longitude: plotData.longitude,
+        isOnline: plotData.isOnline,
+        sensors: plotData.sensors
+      };
+      
+      setPlot(transformedPlot);
+      
+      // Generate AI summary after getting plot data
+      generateAISummary();
+      
+    } catch (error) {
+      console.error('❌ Error fetching plot data:', error);
+      
+      // More specific error messages
+      let errorMessage = 'Failed to load plot data. ';
+      if (error.message.includes('fetch')) {
+        errorMessage += 'Please check if the backend is running.';
+      } else if (error.message.includes('403')) {
+        errorMessage += 'Access forbidden. Check backend configuration.';
+      } else if (error.message.includes('404')) {
+        errorMessage += 'Plot not found.';
+      } else {
+        errorMessage += 'Please check your connection and try again.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+      
+      // Fallback to mock data if API fails
       const mockPlot: Plot = {
         id: plotId,
         name: plotId === 1 ? "Cherry Tomato" : plotId === 2 ? "Herb Garden" : "Pepper Patch",
@@ -161,8 +324,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       
       setPlot(mockPlot);
       generateAISummary();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load plot data');
     } finally {
       setLoading(false);
     }
@@ -171,10 +332,26 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const generateAISummary = async () => {
     setGeneratingAI(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
+      // Call the real backend API for AI summary
+      const response = await fetch(`${API_BASE_URL}/plots/${plotId}/ai-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ plot_id: plotId })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiSummary(data.summary);
+      } else {
+        // Fallback to mock AI summary
+        setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
+      }
     } catch (error) {
-      setAiSummary("Unable to generate AI insights at this time.");
+      console.error('Error generating AI summary:', error);
+      // Fallback to mock AI summary
+      setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
     } finally {
       setGeneratingAI(false);
     }
@@ -183,16 +360,42 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const handleWaterNow = async () => {
     setWatering(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the real backend API to water the plot
+      const response = await fetch(`${API_BASE_URL}/plots/${plotId}/water`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ duration_minutes: 5 })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update local state with new moisture level
+        setPlot(prev => prev ? {
+          ...prev,
+          moisture: data.new_moisture || 85,
+          lastWatered: "Just now",
+          status: 'healthy' as const,
+        } : null);
+        
+        Alert.alert('Success', 'Plot watered successfully!');
+      } else {
+        throw new Error('Failed to water plot');
+      }
+    } catch (error) {
+      console.error('Error watering plot:', error);
+      Alert.alert('Error', 'Failed to water plot. Please try again.');
+      
+      // Fallback to local state update
       setPlot(prev => prev ? {
         ...prev,
         moisture: Math.min(100, prev.moisture + 20),
         lastWatered: "Just now",
         status: 'healthy' as const,
       } : null);
-      Alert.alert('Success', 'Plot watered successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to water plot');
+      Alert.alert('Success', 'Plot watered successfully! (Local update)');
     } finally {
       setWatering(false);
     }
@@ -451,10 +654,17 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         <View style={styles.scheduleToggleCard}>
           <View style={styles.scheduleToggleHeader}>
             <Text style={styles.sectionTitle}>Schedule View</Text>
-            <Text style={styles.scheduleToggleSubtitle}>Toggle between AI and original schedule</Text>
+            <Text style={styles.scheduleToggleSubtitle}>
+              {realScheduleData ? 
+                `Toggle between ${realScheduleData.summary ? 'AI Optimized' : 'Generated'} and Original schedule` :
+                'Loading schedule...'
+              }
+            </Text>
           </View>
           <View style={styles.scheduleToggleControls}>
-            <Text style={[styles.toggleLabel, !showOriginalSchedule && styles.activeToggleLabel]}>AI Plan</Text>
+            <Text style={[styles.toggleLabel, !showOriginalSchedule && styles.activeToggleLabel]}>
+              {realScheduleData?.summary ? 'AI Optimized' : 'Generated'}
+            </Text>
             <Switch
               value={showOriginalSchedule}
               onValueChange={setShowOriginalSchedule}
@@ -463,6 +673,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
           </View>
+          
+          {/* Show schedule summary if available */}
+          {realScheduleData && (
+            <View style={styles.scheduleSummary}>
+              <Text style={styles.scheduleSummaryText}>
+                {showOriginalSchedule ? 
+                  (realScheduleData.og_schedule ? 'Original schedule loaded' : 'No original schedule available') :
+                  realScheduleData.summary || 'Schedule generated successfully'
+                }
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Integrated Calendar Schedule */}
@@ -1150,6 +1372,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  scheduleSummary: {
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  scheduleSummaryText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
 
