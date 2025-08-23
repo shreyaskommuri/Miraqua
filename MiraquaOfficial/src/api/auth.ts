@@ -1,10 +1,16 @@
 // api/auth.ts
 import { supabase } from '../utils/supabase'
 
-export async function signUp(email: string, password: string) {
+export async function signUp(email: string, password: string, name?: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
-    password
+    password,
+    options: {
+      data: {
+        full_name: name,
+        display_name: name, // Save to display_name for easy access
+      }
+    }
   })
   return { data, error }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarNavigation from './SidebarNavigation';
-import { signOut } from '../api/auth';
+import { signOut, getCurrentUser } from '../api/auth';
+import { getPlots } from '../api/plots';
+import { supabase } from '../utils/supabase';
 
 interface UserProfile {
   name: string;
@@ -34,18 +36,64 @@ export default function AccountScreen({ navigation }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Profile state
   const [profile, setProfile] = useState<UserProfile>({
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@example.com',
+    name: 'Loading...',
+    email: 'Loading...',
     avatar: '',
-    memberSince: 'March 2024',
-    totalPlots: 3,
-    waterSaved: 245,
-    plan: 'Premium',
+    memberSince: 'Loading...',
+    totalPlots: 0,
+    waterSaved: 0,
+    plan: 'Free',
     timezone: 'America/New_York'
   });
+
+  // Fetch real user data on component mount
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      setIsLoading(true);
+      // Get current user from Supabase
+      const { user, error: userError } = await getCurrentUser();
+      if (userError || !user) {
+        console.log('User not authenticated');
+        return;
+      }
+
+      // Get user's plots count
+      const plotsResponse = await getPlots();
+      const totalPlots = plotsResponse.success ? (plotsResponse.plots?.length || 0) : 0;
+
+      // Calculate member since date
+      const memberSince = new Date(user.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long'
+      });
+
+      // Update profile with real data
+      setProfile({
+        name: user.user_metadata?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        email: user.email || 'No email',
+        avatar: user.user_metadata?.avatar_url || '',
+        memberSince: memberSince,
+        totalPlots: totalPlots,
+        waterSaved: totalPlots * 82, // Estimate: 82L per plot
+        plan: 'Free', // You can update this based on your subscription logic
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+
+      console.log('✅ User data loaded:', { user: user.email, plots: totalPlots });
+    } catch (error) {
+      console.error('❌ Error fetching user data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Settings state
   const [notifications, setNotifications] = useState(true);
@@ -89,11 +137,32 @@ export default function AccountScreen({ navigation }: any) {
     if (!validateForm()) return;
     
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSaving(false);
-    setIsDirty(false);
-    setIsEditing(false);
+    try {
+      // Update user metadata in Supabase
+      const { error } = await supabase.auth.updateUser({
+        data: { 
+          full_name: profile.name,
+          display_name: profile.name, // Save to display_name for easy access
+          // You can add more metadata fields here
+        }
+      });
+
+      if (error) {
+        Alert.alert('Error', 'Failed to update profile: ' + error.message);
+        return;
+      }
+
+      Alert.alert('Success', 'Profile updated successfully!');
+      setIsDirty(false);
+      setIsEditing(false);
+      
+      // Refresh user data
+      fetchUserData();
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to update profile: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -119,7 +188,9 @@ export default function AccountScreen({ navigation }: any) {
 
   const handleEditProfile = () => {
     setIsEditing(true);
-    setIsDirty(true);
+    // Reset form to current profile values
+    setProfile(prev => ({ ...prev }));
+    setIsDirty(false);
   };
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
@@ -256,18 +327,28 @@ export default function AccountScreen({ navigation }: any) {
           <View style={styles.sectionHeader}>
             <Ionicons name="person" size={20} color="white" />
             <Text style={styles.sectionTitle}>Profile Information</Text>
+            <TouchableOpacity onPress={fetchUserData} style={styles.refreshButton}>
+              <Ionicons name="refresh" size={16} color="#3B82F6" />
+            </TouchableOpacity>
           </View>
           <View style={styles.profileCard}>
-            {/* Avatar Section */}
-            <View style={styles.avatarSection}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={32} color="white" />
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <Ionicons name="refresh" size={24} color="#3B82F6" />
+                <Text style={styles.loadingText}>Loading profile...</Text>
               </View>
-              <TouchableOpacity style={styles.changePhotoButton} onPress={handleAvatarChange}>
-                <Ionicons name="camera" size={16} color="white" />
-                <Text style={styles.changePhotoText}>Change Photo</Text>
-              </TouchableOpacity>
-            </View>
+            ) : (
+              <>
+                {/* Avatar Section */}
+                <View style={styles.avatarSection}>
+                  <View style={styles.avatar}>
+                    <Ionicons name="person" size={32} color="white" />
+                  </View>
+                  <TouchableOpacity style={styles.changePhotoButton} onPress={handleAvatarChange}>
+                    <Ionicons name="camera" size={16} color="white" />
+                    <Text style={styles.changePhotoText}>Change Photo</Text>
+                  </TouchableOpacity>
+                </View>
 
             {/* Profile Form */}
             <View style={styles.formSection}>
@@ -329,8 +410,21 @@ export default function AccountScreen({ navigation }: any) {
                   <Text style={styles.statValue}>{profile.waterSaved}L</Text>
                   <Text style={styles.statLabel}>Water Saved</Text>
                 </View>
+                <TouchableOpacity 
+                  onPress={fetchUserData} 
+                  style={styles.refreshStatsButton}
+                  disabled={isLoading}
+                >
+                  <Ionicons 
+                    name="refresh" 
+                    size={14} 
+                    color={isLoading ? "#6B7280" : "#3B82F6"} 
+                  />
+                </TouchableOpacity>
               </View>
             </View>
+            </>
+            )}
           </View>
         </View>
 
@@ -661,8 +755,30 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
     gap: 8,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  refreshStatsButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   sectionTitle: {
     fontSize: 18,
@@ -884,11 +1000,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+
   spinningIcon: {
     transform: [{ rotate: '360deg' }],
   },

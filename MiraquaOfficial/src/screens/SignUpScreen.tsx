@@ -36,7 +36,7 @@ const SignUpScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const { data, error } = await signUp(email, password);
+      const { data, error } = await signUp(email, password, name);
       if (data?.user) {
         Alert.alert('Success', 'Account created! Please check your email for confirmation.');
         navigation.replace('SignIn');
