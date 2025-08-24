@@ -162,10 +162,30 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
         prompt_lower = prompt.lower().strip()
 
         # === 1. Load schedules ===
-        schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
-        schedule = schedule_res.data.get("schedule", [])
-        og_schedule = schedule_res.data.get("og_schedule", [])
-        original_schedule = json.loads(json.dumps(schedule))
+        # Handle general queries (no specific plot)
+        if plot_id == "default" or plot_id == "general" or not plot_id:
+            # Use Gemini for general gardening advice
+            prompt_template = f"""
+You are FarmerBot, an expert AI gardening assistant. The user is asking: "{prompt.strip()}"
+
+Provide helpful, accurate gardening advice. Be friendly, clear, and specific. Include practical tips and best practices.
+Avoid vague responses and focus on actionable advice.
+"""
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(prompt_template)
+            return {"schedule_updated": False, "reply": response.text.strip()}
+
+        # For specific plots, load schedules
+        try:
+            schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
+            schedule = schedule_res.data.get("schedule", [])
+            og_schedule = schedule_res.data.get("og_schedule", [])
+            original_schedule = json.loads(json.dumps(schedule))
+        except Exception as schedule_error:
+            print(f"⚠️ No schedule found for plot {plot_id}, using empty schedule: {schedule_error}")
+            schedule = []
+            og_schedule = []
+            original_schedule = []
 
         updated_schedule = [d.copy() for d in schedule]
         reply_lines = []
@@ -298,6 +318,25 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
             return {"schedule_updated": True, "reply": "\n".join(reply_lines)}
 
         # === 9. Fallback to Gemini ===
+        # Handle case where schedule is empty
+        if not schedule:
+            prompt_template = f"""
+You are FarmerBot, helping a user with their garden plot.
+
+Plot Info:
+- Crop: {crop}
+- Location: ({lat:.4f}, {lon:.4f})
+- Area: {plot.get("area", 1.0)} m²
+- Crop Age: {age} months
+
+User asked: "{prompt.strip()}"
+
+Provide helpful gardening advice based on the crop and location. Be specific and actionable.
+"""
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(prompt_template)
+            return {"schedule_updated": False, "reply": response.text.strip()}
+
         schedule_lines = "\n".join(
             f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
             for day in schedule

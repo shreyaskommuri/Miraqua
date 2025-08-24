@@ -46,6 +46,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
   const [selectedPlotId, setSelectedPlotId] = useState<string>('general');
   const [showPlotSelector, setShowPlotSelector] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [realPlots, setRealPlots] = useState<any[]>([]);
+  const [isLoadingPlots, setIsLoadingPlots] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -54,42 +57,6 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       time: 'now'
     }
   ]);
-
-  // Mock plot data
-  const mockPlots: PlotData[] = [
-    {
-      id: 1,
-      name: "Backyard Garden",
-      crop: "Tomatoes",
-      moisture: 65,
-      temperature: 78,
-      sunlight: 85,
-      status: "healthy",
-      nextWatering: "Tomorrow 6:00 AM",
-      location: "North Side",
-      waterUsage: 120,
-      sensorStatus: "online",
-      batteryLevel: 78,
-      soilPh: 6.8,
-      lastWatered: "Yesterday"
-    },
-    {
-      id: 2,
-      name: "Herb Garden",
-      crop: "Basil",
-      moisture: 45,
-      temperature: 75,
-      sunlight: 70,
-      status: "needs attention",
-      nextWatering: "Today 4:00 PM",
-      location: "Kitchen Window",
-      waterUsage: 45,
-      sensorStatus: "online",
-      batteryLevel: 65,
-      soilPh: 7.2,
-      lastWatered: "2 days ago"
-    }
-  ];
 
   const quickActions = selectedPlot ? [
     "Water now",
@@ -107,6 +74,27 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     navigation.goBack();
   };
 
+  // Fetch real plots from your database
+  const fetchRealPlots = async () => {
+    setIsLoadingPlots(true);
+    try {
+      const { getPlots } = await import('../api/plots');
+      const result = await getPlots();
+      if (result.success && result.plots) {
+        setRealPlots(result.plots);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching plots:', error);
+    } finally {
+      setIsLoadingPlots(false);
+    }
+  };
+
+  // Load plots when component mounts
+  useEffect(() => {
+    fetchRealPlots();
+  }, []);
+
   const handlePlotSelection = (plotId: string) => {
     setSelectedPlotId(plotId);
     setShowPlotSelector(false);
@@ -114,15 +102,31 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     if (plotId === 'general') {
       setSelectedPlot(null);
     } else {
-      const plot = mockPlots.find(p => p.id.toString() === plotId);
-      setSelectedPlot(plot || null);
-      
-      // Add initial message about the selected plot
-      if (plot) {
+      // Find the real plot from the fetched plots
+      const realPlot = realPlots.find(p => p.id === plotId);
+      if (realPlot) {
+        setSelectedPlot({
+          id: plotId,
+          name: realPlot.name || `Plot ${plotId.slice(0, 8)}`,
+          crop: realPlot.crop || "Unknown",
+          moisture: realPlot.moisture || 0,
+          temperature: realPlot.temperature || 0,
+          sunlight: realPlot.sunlight || 0,
+          status: realPlot.status || "unknown",
+          nextWatering: realPlot.next_watering || "Unknown",
+          location: realPlot.location || "Unknown",
+          waterUsage: realPlot.water_usage || 0,
+          sensorStatus: realPlot.sensor_status || "unknown",
+          batteryLevel: realPlot.battery_level || 0,
+          soilPh: realPlot.soil_ph || 0,
+          lastWatered: realPlot.last_watered || "Unknown"
+        });
+        
+        // Add initial message about the selected plot
         const plotMessage: Message = {
           id: Date.now(),
           sender: 'bot',
-          text: `I see you're asking about your ${plot.name}. Here's what I know: It's growing ${plot.crop} with ${plot.moisture}% soil moisture, ${plot.temperature}°F temperature, and ${plot.sunlight}% sunlight. The sensor battery is at ${plot.batteryLevel}% and pH is ${plot.soilPh}. How can I help optimize this plot?`,
+          text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
           time: 'now'
         };
         setMessages(prev => [...prev, plotMessage]);
@@ -135,7 +139,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     handleSendMessage(action);
   };
 
-  const handleSendMessage = (customMessage?: string) => {
+  const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || message;
     if (messageToSend.trim()) {
       const newMessage: Message = {
@@ -147,8 +151,55 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       setMessages(prev => [...prev, newMessage]);
       setMessage('');
       
-      // Simulate AI response with plot context
-      setTimeout(() => {
+      // Set AI processing state
+      setIsAIProcessing(true);
+      
+      // Add typing indicator
+      const typingMessage: Message = {
+        id: Date.now() + 1,
+        sender: 'bot',
+        text: '🤖 AI is thinking...',
+        time: 'now'
+      };
+      setMessages(prev => [...prev, typingMessage]);
+      
+      try {
+        // Call the real AI backend
+        const response = await fetch('http://localhost:5050/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: messageToSend,
+            plotId: selectedPlotId === 'general' ? 'default' : selectedPlotId,
+            chat_session_id: `session_${Date.now()}`
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Remove typing indicator and add real AI response
+          setMessages(prev => prev.filter(msg => msg.text !== '🤖 AI is thinking...'));
+          
+          const aiMessage: Message = {
+            id: Date.now() + 1,
+            sender: 'bot',
+            text: data.reply || 'I received your message but couldn\'t generate a response. Please try again.',
+            time: 'now'
+          };
+          setMessages(prev => [...prev, aiMessage]);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (error) {
+        console.error('❌ AI chat error:', error);
+        
+        // Remove typing indicator
+        setMessages(prev => prev.filter(msg => msg.text !== '🤖 AI is thinking...'));
+        
+        // Fallback to smart mock response
         let botResponse = "I understand your concern. Let me analyze your garden data and provide personalized recommendations.";
         
         if (selectedPlot) {
@@ -168,7 +219,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           time: 'now'
         };
         setMessages(prev => [...prev, aiMessage]);
-      }, 1000);
+      } finally {
+        setIsAIProcessing(false);
+      }
     }
   };
 
@@ -241,9 +294,17 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           <View style={styles.plotSelectorModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Plot</Text>
-              <TouchableOpacity onPress={() => setShowPlotSelector(false)}>
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity 
+                  style={{ marginRight: 16, padding: 8 }}
+                  onPress={fetchRealPlots}
+                >
+                  <Ionicons name="refresh" size={20} color="#10b981" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowPlotSelector(false)}>
+                  <Ionicons name="close" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
             </View>
             <ScrollView style={styles.plotList}>
               <TouchableOpacity
@@ -262,26 +323,48 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 </View>
               </TouchableOpacity>
               
-              {mockPlots.map((plot) => (
-                <TouchableOpacity
-                  key={plot.id}
-                  style={[
-                    styles.plotOption,
-                    selectedPlotId === plot.id.toString() && styles.selectedPlotOption
-                  ]}
-                  onPress={() => handlePlotSelection(plot.id.toString())}
-                >
+              {isLoadingPlots ? (
+                <View style={styles.plotOption}>
                   <View style={styles.plotOptionContent}>
-                    <Ionicons name="leaf" size={20} color="#10b981" />
+                    <Ionicons name="hourglass" size={20} color="#6b7280" />
                     <View style={styles.plotOptionText}>
-                      <Text style={styles.plotOptionTitle}>{plot.name}</Text>
-                      <Text style={styles.plotOptionSubtitle}>
-                        {plot.crop} • {plot.moisture}% moisture • {plot.status}
-                      </Text>
+                      <Text style={styles.plotOptionTitle}>Loading plots...</Text>
+                      <Text style={styles.plotOptionSubtitle}>Please wait</Text>
                     </View>
                   </View>
-                </TouchableOpacity>
-              ))}
+                </View>
+              ) : realPlots.length > 0 ? (
+                realPlots.map((plot) => (
+                  <TouchableOpacity
+                    key={plot.id}
+                    style={[
+                      styles.plotOption,
+                      selectedPlotId === plot.id && styles.selectedPlotOption
+                    ]}
+                    onPress={() => handlePlotSelection(plot.id)}
+                  >
+                    <View style={styles.plotOptionContent}>
+                      <Ionicons name="leaf" size={20} color="#10b981" />
+                      <View style={styles.plotOptionText}>
+                        <Text style={styles.plotOptionTitle}>{plot.name || `Plot ${plot.id.slice(0, 8)}`}</Text>
+                        <Text style={styles.plotOptionSubtitle}>
+                          {plot.crop || 'Unknown crop'} • {plot.area || 0}m²
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.plotOption}>
+                  <View style={styles.plotOptionContent}>
+                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                    <View style={styles.plotOptionText}>
+                      <Text style={styles.plotOptionTitle}>No plots found</Text>
+                      <Text style={styles.plotOptionSubtitle}>Create a plot first</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -377,21 +460,28 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             </TouchableOpacity>
             <TextInput
               style={styles.textInput}
-              placeholder={selectedPlot 
-                ? `Ask about your ${selectedPlot.name}...` 
-                : "Ask me anything about your garden..."
+              placeholder={isAIProcessing 
+                ? "AI is thinking..." 
+                : selectedPlot 
+                  ? `Ask about your ${selectedPlot.name}...` 
+                  : "Ask me anything about your garden..."
               }
               placeholderTextColor="#9CA3AF"
               value={message}
               onChangeText={setMessage}
               onSubmitEditing={() => handleSendMessage()}
+              editable={!isAIProcessing}
             />
             <TouchableOpacity 
               style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
               onPress={() => handleSendMessage()}
-              disabled={!message.trim()}
+              disabled={!message.trim() || isAIProcessing}
             >
-              <Ionicons name="paper-plane" size={20} color="white" />
+              {isAIProcessing ? (
+                <Ionicons name="hourglass" size={20} color="white" />
+              ) : (
+                <Ionicons name="paper-plane" size={20} color="white" />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -408,21 +498,28 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           </TouchableOpacity>
           <TextInput
             style={styles.textInput}
-            placeholder={selectedPlot 
-              ? `Ask about your ${selectedPlot.name}...` 
-              : "Ask me anything about your garden..."
+            placeholder={isAIProcessing 
+              ? "AI is thinking..." 
+              : selectedPlot 
+                ? `Ask about your ${selectedPlot.name}...` 
+                : "Ask me anything about your garden..."
             }
             placeholderTextColor="#9CA3AF"
             value={message}
             onChangeText={setMessage}
             onSubmitEditing={() => handleSendMessage()}
+            editable={!isAIProcessing}
           />
           <TouchableOpacity 
             style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
             onPress={() => handleSendMessage()}
-            disabled={!message.trim()}
+            disabled={!message.trim() || isAIProcessing}
           >
-            <Ionicons name="paper-plane" size={20} color="white" />
+            {isAIProcessing ? (
+              <Ionicons name="hourglass" size={20} color="white" />
+            ) : (
+              <Ionicons name="paper-plane" size={20} color="white" />
+            )}
           </TouchableOpacity>
         </View>
       )}
