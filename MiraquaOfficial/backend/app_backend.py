@@ -203,8 +203,17 @@ def add_plot():
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
     user_id = request.args.get("user_id")
-    res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
-    return jsonify(res.data), 200
+    
+    # Check if user_id is provided and valid
+    if not user_id:
+        return jsonify({"error": "user_id is required", "data": []}), 400
+    
+    try:
+        res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+        return jsonify(res.data), 200
+    except Exception as e:
+        print(f"❌ Error fetching plots: {e}")
+        return jsonify({"error": str(e), "data": []}), 500
 
 @app.route("/revert_schedule", methods=["POST"])
 def revert_schedule():

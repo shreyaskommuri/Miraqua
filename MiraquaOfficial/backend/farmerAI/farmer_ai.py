@@ -113,7 +113,30 @@ def chat():
         return jsonify({"success": False, "error": "Missing prompt"}), 400
 
     try:
-        result = process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather)
+        # Get plot data
+        plot_res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+        plot = plot_res.data if plot_res.data else {}
+        
+        # Get weather data (mock for now)
+        daily = weather.get("daily", {})
+        hourly = weather.get("hourly", {})
+        
+        # Get watering logs
+        logs_res = supabase.table("watering_log").select("*").eq("plot_id", plot_id).order("watered_at", desc=True).limit(7).execute()
+        logs = logs_res.data if logs_res.data else []
+        
+        # Calculate crop age
+        planting_date = plot.get("planting_date")
+        if planting_date:
+            try:
+                planting = datetime.strptime(planting_date, "%Y-%m-%d")
+                age = (datetime.now() - planting).days / 30.44  # months
+            except:
+                age = plot.get("age_at_entry", 0)
+        else:
+            age = plot.get("age_at_entry", 0)
+
+        result = process_chat_command(user_prompt, crop, lat, lon, plot_name, plot_id, weather, plot, daily, hourly, logs, age)
         reply = result["reply"]
 
         if result["schedule_updated"]:
@@ -124,6 +147,7 @@ def chat():
         return jsonify({"success": True, "reply": reply})
 
     except Exception as e:
+        print(f"❌ Error in chat endpoint: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
@@ -195,7 +219,7 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
             schedule_changed = True
 
         # === 4. Skip or Set ===
-        skip_cmd = any(word in prompt_lower for word in ["skip", "cancel", "don’t water", "don't water", "no watering"])
+        skip_cmd = any(word in prompt_lower for word in ["skip", "cancel", "don't water", "don't water", "no watering"])
         set_match = re.search(r"set\s*(?:to)?\s*(\d+(\.\d+)?)\s*(liters|l)?", prompt_lower)
 
         if target_indices and (skip_cmd or set_match):
@@ -255,7 +279,7 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
                 }).eq("id", plot_id).execute()
                 return {
                     "schedule_updated": False,
-                    "reply": f"✅ Constraint added: “{new_constraint}”."
+                    "reply": f"✅ Constraint added: {new_constraint}."
                 }
 
         # === Save if changed ===
@@ -283,21 +307,11 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
 You are FarmerBot, helping a user grow {crop} at ({lat:.4f}, {lon:.4f}).
 
 Plot:
-- Area: {plot.get("area")} m²
+- Area: {plot.get("area", 1.0)} m²
 - Crop Age: {age} months
-- Flex Type: {plot.get("flex_type")}
+- Flex Type: {plot.get("flex_type", "daily")}
 - Constraints: {plot.get("custom_constraints") or 'None'}
 
-this is how the schedule is:
-[
-  {{
-    "day": "Day 1",
-    "date": "06/16/25",
-    "liters": 6.5,
-    "optimal_time": "05:00 AM"
-  }},
-  ...
-]
 Schedule:
 {schedule_lines}
 

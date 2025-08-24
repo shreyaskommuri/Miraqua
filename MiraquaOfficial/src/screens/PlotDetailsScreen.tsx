@@ -60,7 +60,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
 
   // API base URL - update this to match your backend
-  const API_BASE_URL = 'http://192.168.1.239:5050'; // Updated to match working MVP backend
+  const API_BASE_URL = 'http://localhost:5050'; // Use localhost for development
 
   // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
