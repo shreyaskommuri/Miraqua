@@ -158,6 +158,14 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
     from uuid import uuid4
     import google.generativeai as genai
 
+    print(f"🤖 process_chat_command called with:")
+    print(f"   crop: {crop}")
+    print(f"   lat: {lat}")
+    print(f"   lon: {lon}")
+    print(f"   plot_name: {plot_name}")
+    print(f"   plot_id: {plot_id}")
+    print(f"   age: {age}")
+
     try:
         prompt_lower = prompt.lower().strip()
 

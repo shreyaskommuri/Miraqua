@@ -203,17 +203,8 @@ def add_plot():
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
     user_id = request.args.get("user_id")
-    
-    # Check if user_id is provided and valid
-    if not user_id:
-        return jsonify({"error": "user_id is required", "data": []}), 400
-    
-    try:
-        res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
-        return jsonify(res.data), 200
-    except Exception as e:
-        print(f"❌ Error fetching plots: {e}")
-        return jsonify({"error": str(e), "data": []}), 500
+    res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+    return jsonify(res.data), 200
 
 @app.route("/revert_schedule", methods=["POST"])
 def revert_schedule():
@@ -364,16 +355,19 @@ def water_now():
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
+    print(f"📥 Chat request received: {data}")
+    
     prompt = data.get("prompt")
     plot_id = data.get("plotId")
     chat_session_id = data.get("chat_session_id")
+    
+    print(f"🔍 Extracted: prompt='{prompt}', plot_id='{plot_id}', chat_session_id='{chat_session_id}'")
 
     if not prompt:
         return jsonify({"success": False, "error": "Missing prompt"}), 400
 
     # Handle general queries (no specific plot)
     if not plot_id or plot_id == "default" or plot_id == "general":
-        # General gardening advice without plot context
         try:
             result = process_chat_command(
                 prompt=prompt,
@@ -396,33 +390,16 @@ def chat():
             print(f"❌ Error in general chat: {e}")
             return jsonify({"success": False, "error": str(e)}), 500
 
-            # 🔍 Fetch plot for specific plot queries
-        try:
-            plot_res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
-            plot = plot_res.data
-            if not plot:
-                # Plot not found, but still provide helpful advice
-                print(f"⚠️ Plot {plot_id} not found, providing general advice")
-                result = process_chat_command(
-                    prompt=prompt,
-                    crop="general",
-                    lat=37.7749,
-                    lon=-122.4194,
-                    plot_name="General Garden",
-                    plot_id="general",
-                    weather={},
-                    plot={},
-                    daily=[],
-                    hourly=[],
-                    logs=[],
-                    age=0
-                )
-                reply = result["reply"]
-                return jsonify({"success": True, "reply": reply})
-        except Exception as e:
-            print(f"❌ Error fetching plot: {e}")
-            # Plot fetch failed, but still provide helpful advice
-            print(f"⚠️ Plot fetch failed, providing general advice")
+    # 🔍 Fetch plot for specific plot queries
+    plot = None
+    print(f"🔍 Fetching plot data for plot_id: {plot_id}")
+    try:
+        plot_res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+        plot = plot_res.data
+        print(f"✅ Plot data fetched: {plot}")
+        if not plot:
+            # Plot not found, but still provide helpful advice
+            print(f"⚠️ Plot {plot_id} not found, providing general advice")
             result = process_chat_command(
                 prompt=prompt,
                 crop="general",
@@ -439,58 +416,97 @@ def chat():
             )
             reply = result["reply"]
             return jsonify({"success": True, "reply": reply})
-
-    # 📌 Extract plot details
-    try:
-        user_id = plot.get("user_id")
-        crop = plot.get("crop")
-        area = plot.get("area", 1.0)
-        flex_type = plot.get("flex_type", "daily")
-        zip_code = plot.get("zip_code", "00000")
-        planting_date = plot.get("planting_date")
-        age_at_entry = plot.get("age_at_entry", 0.0)
-        lat, lon = plot.get("lat"), plot.get("lon")
-        plot_name = plot.get("name", f"Plot {plot_id[:5]}")
-        age = get_total_crop_age(planting_date, age_at_entry)
-
-        # 📦 Weather forecast (Open-Meteo)
-        forecast = get_forecast(lat, lon)
-        daily = forecast.get("daily", [])
-        hourly = forecast.get("hourly", [])
-        current_weather = forecast.get("current", {})
-
-        # 💧 Watering logs
-        logs_res = supabase.table("watering_log") \
-            .select("*").eq("plot_id", plot_id) \
-            .order("watered_at", desc=True).limit(7).execute()
-        logs = logs_res.data or []
-
-        # 📥 Call AI chat processor
+    except Exception as e:
+        print(f"❌ Error fetching plot: {e}")
+        # Plot fetch failed, but still provide helpful advice
+        print(f"⚠️ Plot fetch failed, providing general advice")
         result = process_chat_command(
             prompt=prompt,
-            crop=crop,
-            lat=lat,
-            lon=lon,
-            plot_name=plot_name,
-            plot_id=plot_id,
-            weather=current_weather,
-            plot=plot,
-            daily=daily,
-            hourly=hourly,
-            logs=logs,
-            age=age  # ✅ passed in
+            crop="general",
+            lat=37.7749,
+            lon=-122.4194,
+            plot_name="General Garden",
+            plot_id="general",
+            weather={},
+            plot={},
+            daily=[],
+            hourly=[],
+            logs=[],
+            age=0
         )
         reply = result["reply"]
+        return jsonify({"success": True, "reply": reply})
 
-        # 🔁 Get updated schedule (if changed)
-        refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
-        updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
+    # If we get here, we have a valid plot
+    if not plot:
+        print(f"❌ No plot data available for {plot_id}")
+        return jsonify({"success": False, "error": "Plot data not available"}), 500
 
-        # 🗓️ Get original schedule for log
-        schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-        original_schedule = schedule_res.data[0]["schedule"] if refreshed.data else []
+    # 📌 Extract plot details
+    user_id = plot.get("user_id")
+    crop = plot.get("crop")
+    area = plot.get("area", 1.0)
+    flex_type = plot.get("flex_type", "daily")
+    zip_code = plot.get("zip_code", "00000")
+    planting_date = plot.get("planting_date")
+    age_at_entry = plot.get("age_at_entry", 0.0)
+    lat, lon = plot.get("lat"), plot.get("lon")
+    plot_name = plot.get("name", f"Plot {plot_id[:5]}")
+    age = get_total_crop_age(planting_date, age_at_entry)
+    
+    # Handle missing coordinates by using zip code fallback
+    if lat is None or lon is None:
+        print(f"⚠️ Plot {plot_name} has no coordinates, using zip code fallback")
+        try:
+            lat, lon = get_lat_lon(zip_code)
+            print(f"📍 Generated coordinates from ZIP {zip_code}: lat={lat}, lon={lon}")
+        except Exception as e:
+            print(f"❌ Failed to get coordinates from ZIP {zip_code}: {e}")
+            # Use default coordinates as fallback
+            lat, lon = 37.7749, -122.4194
+            print(f"📍 Using default coordinates: lat={lat}, lon={lon}")
+    
+    print(f"🌱 Plot context: crop={crop}, lat={lat}, lon={lon}, plot_name={plot_name}, age={age}")
 
-        # 📝 Save chat history
+    # 📦 Weather forecast (Open-Meteo)
+    forecast = get_forecast(lat, lon)
+    daily = forecast.get("daily", [])
+    hourly = forecast.get("hourly", [])
+    current_weather = forecast.get("current", {})
+
+    # 💧 Watering logs
+    logs_res = supabase.table("watering_log") \
+        .select("*").eq("plot_id", plot_id) \
+        .order("watered_at", desc=True).limit(7).execute()
+    logs = logs_res.data or []
+
+    # 📥 Call AI chat processor
+    result = process_chat_command(
+        prompt=prompt,
+        crop=crop,
+        lat=lat,
+        lon=lon,
+        plot_name=plot_name,
+        plot_id=plot_id,
+        weather=current_weather,
+        plot=plot,
+        daily=daily,
+        hourly=hourly,
+        logs=logs,
+        age=age  # ✅ passed in
+    )
+    reply = result["reply"]
+
+    # 🔁 Get updated schedule (if changed)
+    refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
+    updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
+
+    # 🗓️ Get original schedule for log
+    schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
+    original_schedule = schedule_res.data[0]["schedule"] if refreshed.data else []
+
+    # 📝 Save chat history
+    try:
         supabase.table("farmerAI_chatlog").insert({
             "id": str(uuid4()),
             "plot_id": plot_id,
@@ -505,35 +521,15 @@ def chat():
             "role": "user",
             "message_index": 0,
             "context_summary": "",
-            "chat_session_id": chat_session_id,
+            "chat_session_id": str(uuid4()) if not chat_session_id else chat_session_id,
             "edited": False
         }).execute()
-
-        return jsonify({"success": True, "reply": reply})
-        
+        print("✅ Chat history saved successfully")
     except Exception as e:
-        print(f"❌ Error in plot-specific chat: {e}")
-        # Fallback to general response if plot-specific processing fails
-        try:
-            result = process_chat_command(
-                prompt=prompt,
-                crop="general",
-                lat=37.7749,
-                lon=-122.4194,
-                plot_name="General Garden",
-                plot_id="general",
-                weather={},
-                plot={},
-                daily=[],
-                hourly=[],
-                logs=[],
-                age=0
-            )
-            reply = result["reply"]
-            return jsonify({"success": True, "reply": reply})
-        except Exception as fallback_error:
-            print(f"❌ Fallback chat also failed: {fallback_error}")
-            return jsonify({"success": False, "error": "AI processing failed"}), 500
+        print(f"⚠️ Failed to save chat history: {e}")
+        # Continue without saving chat history - don't crash the chat
+
+    return jsonify({"success": True, "reply": reply})
 
 
 
