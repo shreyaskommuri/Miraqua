@@ -82,7 +82,7 @@ def get_plan():
     # 🌱 Fetch plot
     plot_res = supabase.table("plots").select("*") \
                         .eq("id", plot_id) \
-                        .single().execute()
+                        .maybe_single().execute()
     plot = plot_res.data
     if not plot:
         return jsonify({"error": "Plot not found"}), 404

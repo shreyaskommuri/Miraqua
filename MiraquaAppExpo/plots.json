@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Plot 3",
+    "crop": "Toamto",
+    "zip_code": "94582",
+    "area": 100,
+    "id": "0c0fc183-5c14-4685-aec5-94ffc33219be"
+  },
+  {
+    "name": "Tomato Plot",
+    "crop": "Tomato",
+    "zip_code": "94582",
+    "area": 50,
+    "id": "114be1be-07e5-4788-a0f3-764ffb275fba"
+  },
+  {
+    "name": "Tomato Plot",
+    "crop": "Almond",
+    "zip_code": "94582",
+    "area": 50,
+    "id": "661c2bbf-2599-492d-831f-3797a0b05369"
+  },
+  {
+    "name": "Almond Plot",
+    "crop": "Almond",
+    "zip_code": "95340",
+    "area": 50,
+    "id": "e9236ce1-f449-40d8-84b4-19f2943c9424"
+  },
+  {
+    "name": "Grape Plot",
+    "crop": "Grape",
+    "zip_code": "94582",
+    "area": 934,
+    "id": "dc05cdab-9d9d-45c1-910c-339b53c82b0c"
+  },
+  {
+    "name": "CornPlot",
+    "crop": "Corn",
+    "zip_code": "95340",
+    "area": 1000,
+    "id": "51edc923-adba-43bb-a1e2-081da1c442f2"
+  },
+  {
+    "name": "Chanu Plot",
+    "crop": "Almond",
+    "zip_code": "95340",
+    "area": 1000,
+    "id": "bf264d72-935c-4a22-bffe-f7b04b2c343b"
+  },
+  {
+    "name": "Shreyas Plot",
+    "crop": "Tomato",
+    "zip_code": "95340",
+    "area": 324,
+    "id": "1fb86967-0050-4b6c-a1bf-f9620ae79a38"
+  }
+]

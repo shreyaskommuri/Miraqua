@@ -1,0 +1,10 @@
+[
+  {
+    "email": "shreyaskommuri@gmail.com",
+    "password": "pbkdf2:sha256:260000$8AovDb2RgqZHa6oO$657c21aa3f3c01bda2f3ebfc151473aad34599a32dc0fb756b8b9e3dff26edcf"
+  },
+  {
+    "email": "test",
+    "password": "pbkdf2:sha256:260000$7RT36S2gU4FMCuJ7$3ae545fe7b700a69d83cd196bd016830fedc3dbe90d46a184b136e26ecf0e65b"
+  }
+]

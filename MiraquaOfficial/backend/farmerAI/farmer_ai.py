@@ -27,6 +27,13 @@ ai_blueprint = Blueprint("ai", __name__)
 
 # ✅ BASIC WATER USAGE SUMMARY
 def generate_summary(crop, lat, lon, schedule):
+    # Handle case where schedule is an error string instead of a list
+    if not isinstance(schedule, list):
+        return f"🌾 Crop: {crop}\n💧 Schedule generation failed - using default watering pattern"
+    
+    if not schedule:
+        return f"🌾 Crop: {crop}\n💧 No schedule data available"
+        
     total_liters = sum(day["liters"] for day in schedule)
     avg_liters = round(total_liters / len(schedule), 2)
     highest_day = max(schedule, key=lambda x: x["liters"])
@@ -47,7 +54,7 @@ def generate_summary(crop, lat, lon, schedule):
 def generate_gem_summary(crop, lat, lon, schedule, plot_name, plot_id):
     try:
         # Initialize the model
-        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
 
         # If there's no schedule data, bail out immediately
         if not schedule:
@@ -179,7 +186,7 @@ You are FarmerBot, an expert AI gardening assistant. The user is asking: "{promp
 Provide helpful, accurate gardening advice. Be friendly, clear, and specific. Include practical tips and best practices.
 Avoid vague responses and focus on actionable advice.
 """
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("models/gemini-2.5-flash")
             response = model.generate_content(prompt_template)
             return {"schedule_updated": False, "reply": response.text.strip()}
 
@@ -341,7 +348,7 @@ User asked: "{prompt.strip()}"
 
 Provide helpful gardening advice based on the crop and location. Be specific and actionable.
 """
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("models/gemini-2.5-flash")
             response = model.generate_content(prompt_template)
             return {"schedule_updated": False, "reply": response.text.strip()}
 
@@ -374,7 +381,7 @@ User asked: "{prompt.strip()}"
 Reply with accurate insights, friendly tone, and clear explanations. Avoid vague assistant talk.
 """
 
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
         response = model.generate_content(prompt_template)
         return {"schedule_updated": False, "reply": response.text.strip()}
 
@@ -492,7 +499,44 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
 
 
     try:
-        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
+        # Try multiple times with different models and timeouts
+        models_to_try = [
+            "models/gemini-2.0-flash",  # Faster model
+            "models/gemini-2.5-flash",  # Current model
+            "models/gemini-pro-latest"   # Fallback model
+        ]
+        
+        response = None
+        last_error = None
+        
+        for model_name in models_to_try:
+            try:
+                print(f"🤖 Trying AI model: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                
+                # Generate with timeout handling
+                import time
+                start_time = time.time()
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=2048,
+                        temperature=0.1,  # Lower temperature for more consistent output
+                    )
+                )
+                
+                elapsed = time.time() - start_time
+                print(f"✅ AI generation successful with {model_name} in {elapsed:.2f}s")
+                break
+                
+            except Exception as e:
+                last_error = e
+                print(f"❌ Model {model_name} failed: {str(e)[:100]}...")
+                continue
+        
+        if response is None:
+            raise last_error or Exception("All AI models failed")
+            
         text = response.text.strip()
 
         # ✅ Strip triple backticks if present
@@ -518,8 +562,53 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
             "raw": text if 'text' in locals() else "no response",
             "exception": str(e)
         })
-        return {
-            "error": "Could not parse response",
-            "raw": text if 'text' in locals() else "no response",
-            "exception": str(e)
-        }
+        
+        # Generate fallback schedule when AI fails
+        print("🔄 Generating AI-enhanced fallback schedule...")
+        
+        # Try a simpler AI prompt for fallback
+        try:
+            simple_prompt = f"""
+Generate a 7-day irrigation schedule for {crop} crop in {area}m² area.
+Today is {today}. 
+Return ONLY a JSON array with 7 objects, each with: day, date (MM/DD/YY), liters (number), optimal_time (HH:MM AM/PM).
+Keep it simple and practical.
+"""
+            
+            fallback_model = genai.GenerativeModel("models/gemini-2.0-flash")
+            fallback_response = fallback_model.generate_content(simple_prompt)
+            fallback_text = fallback_response.text.strip()
+            
+            # Try to parse the simpler AI response
+            clean_fallback = re.sub(r"^```(?:json)?\s*|\s*```$", "", fallback_text.strip(), flags=re.MULTILINE)
+            fallback_schedule = json.loads(clean_fallback)
+            
+            # Add real dates
+            for i, day in enumerate(fallback_schedule):
+                date = (datetime.utcnow() + timedelta(days=i)).strftime("%m/%d/%y")
+                day["date"] = date
+                day["reason"] = "AI-enhanced fallback schedule"
+            
+            print("✅ AI-enhanced fallback schedule generated successfully")
+            return fallback_schedule
+            
+        except Exception as fallback_error:
+            print(f"⚠️ AI fallback also failed: {fallback_error}")
+            # Ultimate fallback - basic schedule
+            print("🔄 Using basic fallback schedule...")
+            fallback_schedule = []
+            base_liters = 2.0  # Base watering amount
+            
+            for i in range(7):
+                date = (datetime.utcnow() + timedelta(days=i)).strftime("%m/%d/%y")
+                # Simple fallback: water every other day with varying amounts
+                liters = base_liters + (i % 2) * 1.0
+                fallback_schedule.append({
+                    "day": f"Day {i+1}",
+                    "date": date,
+                    "liters": round(liters, 1),
+                    "optimal_time": "06:00",
+                    "reason": "Basic fallback schedule - AI unavailable"
+                })
+            
+            return fallback_schedule
