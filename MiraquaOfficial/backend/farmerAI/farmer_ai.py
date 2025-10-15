@@ -179,12 +179,43 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
         # === 1. Load schedules ===
         # Handle general queries (no specific plot)
         if plot_id == "default" or plot_id == "general" or not plot_id:
-            # Use Gemini for general gardening advice
-            prompt_template = f"""
-You are FarmerBot, an expert AI gardening assistant. The user is asking: "{prompt.strip()}"
+            # Build user context from their plots
+            user_plots = plot.get("user_plots", [])
+            recent_chats = plot.get("recent_chats", [])
 
-Provide helpful, accurate gardening advice. Be friendly, clear, and specific. Include practical tips and best practices.
-Avoid vague responses and focus on actionable advice.
+            # Create plots summary
+            plots_summary = "No plots found"
+            if user_plots:
+                plots_list = []
+                for p in user_plots:
+                    plots_list.append(f"  - {p.get('name', 'Unnamed')}: {p.get('crop', 'Unknown crop')}, {p.get('area', 'N/A')}m²")
+                plots_summary = "\n".join(plots_list)
+
+            # Create chat history summary
+            history_summary = ""
+            if recent_chats:
+                history_lines = []
+                for chat in recent_chats[-3:]:  # Last 3 exchanges
+                    history_lines.append(f"User: {chat['prompt'][:100]}")
+                    history_lines.append(f"Bot: {chat['reply'][:100]}")
+                history_summary = f"\n\nRecent conversation:\n" + "\n".join(history_lines)
+
+            # Use Gemini for general gardening advice with user context
+            prompt_template = f"""
+You are FarmerBot, a smart irrigation and gardening assistant helping this specific user.
+
+USER'S CURRENT PLOTS:
+{plots_summary}
+{history_summary}
+
+USER QUESTION: "{prompt.strip()}"
+
+INSTRUCTIONS:
+- Give SHORT, actionable answers (2-4 sentences max)
+- Reference their specific crops when relevant
+- Be conversational and helpful, not overly formal
+- If they have no plots, suggest they add one to get personalized advice
+- Focus on practical tips they can use TODAY
 """
             model = genai.GenerativeModel("models/gemini-2.5-flash")
             response = model.generate_content(prompt_template)
@@ -357,28 +388,55 @@ Provide helpful gardening advice based on the crop and location. Be specific and
             for day in schedule
         )
 
+        # Summarize recent watering
+        watering_summary = "No recent watering"
+        if logs:
+            last_watered = logs[0].get("watered_at", "Unknown")
+            watering_summary = f"Last watered: {last_watered}"
+
+        # Summarize weather from hourly data (OpenWeather format)
+        weather_summary = "Weather data unavailable"
+        if hourly and len(hourly) > 0:
+            # Extract next 24 hours of weather
+            weather_items = []
+            for i in range(0, min(24, len(hourly)), 8):  # Every 8 hours (3 times per day)
+                item = hourly[i]
+                dt_txt = item.get('dt_txt', 'Unknown time')
+                temp = item.get('main', {}).get('temp', 'N/A')
+                weather_desc = item.get('weather', [{}])[0].get('description', 'Unknown')
+                pop = item.get('pop', 0) * 100  # Probability of precipitation
+                weather_items.append(f"{dt_txt}: {temp}°F, {weather_desc}, {pop:.0f}% rain chance")
+            weather_summary = "\n".join(weather_items)
+        elif daily:
+            # Fallback to daily if available
+            weather_items = []
+            for day in daily[:3]:
+                weather_items.append(f"{day.get('date', 'Unknown')}: Temp {day.get('temp', 'N/A')}°F")
+            weather_summary = "\n".join(weather_items) if weather_items else "Weather data unavailable"
+
         prompt_template = f"""
-You are FarmerBot, helping a user grow {crop} at ({lat:.4f}, {lon:.4f}).
+You are FarmerBot helping with a {crop} plot called "{plot_name}".
 
-Plot:
+PLOT INFO:
+- Crop: {crop} ({age} months old)
 - Area: {plot.get("area", 1.0)} m²
-- Crop Age: {age} months
-- Flex Type: {plot.get("flex_type", "daily")}
-- Constraints: {plot.get("custom_constraints") or 'None'}
+- {watering_summary}
 
-Schedule:
+IRRIGATION SCHEDULE (next 7 days):
 {schedule_lines}
 
-Weather Forecast:
-Daily: {json.dumps(daily, indent=2)}
-Hourly: {json.dumps(hourly, indent=2)}
+WEATHER FORECAST (next 24 hours):
+{weather_summary}
 
-Watering Logs:
-{json.dumps(logs, indent=2)}
+USER QUESTION: "{prompt.strip()}"
 
-User asked: "{prompt.strip()}"
-
-Reply with accurate insights, friendly tone, and clear explanations. Avoid vague assistant talk.
+INSTRUCTIONS:
+- Give SHORT, actionable answers (3-5 sentences max)
+- Reference the ACTUAL weather forecast (rain chances, temperature) when relevant
+- Focus on THEIR specific plot, schedule, and crop needs
+- Use the weather data to suggest adjustments (e.g., "skip watering if rain is coming")
+- Be conversational and direct, skip generic advice
+- If suggesting changes, be specific about what to modify
 """
 
         model = genai.GenerativeModel("models/gemini-2.5-flash")

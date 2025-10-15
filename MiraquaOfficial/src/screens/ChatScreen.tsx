@@ -50,6 +50,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [realPlots, setRealPlots] = useState<any[]>([]);
   const [isLoadingPlots, setIsLoadingPlots] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -61,6 +62,22 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
   // Generate a session ID once per chat screen instance
   const chatSessionId = useRef(uuid.v4() as string).current;
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const { supabase } = await import('../utils/supabase');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          setUserId(user.id);
+        }
+      } catch (error) {
+        console.error('Failed to get user:', error);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   const quickActions = selectedPlot ? [
     "Water now",
@@ -177,7 +194,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           body: JSON.stringify({
             prompt: messageToSend,
             plotId: selectedPlotId === 'general' ? 'default' : selectedPlotId,
-            chat_session_id: chatSessionId
+            chat_session_id: chatSessionId,
+            userId: userId
           })
         });
         

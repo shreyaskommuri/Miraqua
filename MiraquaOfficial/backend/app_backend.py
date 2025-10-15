@@ -360,6 +360,7 @@ def chat():
     prompt = data.get("prompt")
     plot_id = data.get("plotId")
     chat_session_id = data.get("chat_session_id")
+    user_id = data.get("userId")  # Get user_id from frontend
 
     # Ensure chat_session_id is a valid UUID
     if not chat_session_id:
@@ -381,6 +382,29 @@ def chat():
     # Handle general queries (no specific plot)
     if not plot_id or plot_id == "default" or plot_id == "general":
         try:
+            # Fetch user's plots for context
+            user_plots = []
+            if user_id:
+                try:
+                    plots_res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+                    user_plots = plots_res.data or []
+                    print(f"📊 Found {len(user_plots)} plots for user {user_id}")
+                except Exception as e:
+                    print(f"⚠️ Could not fetch user plots: {e}")
+
+            # Get recent chat history for context
+            recent_chats = []
+            try:
+                chats_res = supabase.table("farmerAI_chatlog") \
+                    .select("prompt, reply, created_at") \
+                    .eq("chat_session_id", chat_session_id) \
+                    .order("created_at", desc=True) \
+                    .limit(5) \
+                    .execute()
+                recent_chats = list(reversed(chats_res.data or []))  # Oldest first
+            except Exception as e:
+                print(f"⚠️ Could not fetch chat history: {e}")
+
             result = process_chat_command(
                 prompt=prompt,
                 crop="general",
@@ -389,7 +413,7 @@ def chat():
                 plot_name="General Garden",
                 plot_id="general",
                 weather={},
-                plot={},
+                plot={"user_plots": user_plots, "recent_chats": recent_chats},  # Pass user context
                 daily=[],
                 hourly=[],
                 logs=[],
@@ -397,12 +421,12 @@ def chat():
             )
             reply = result["reply"]
 
-            # 📝 Save general chat history (no user_id for general questions)
+            # 📝 Save general chat history
             try:
                 supabase.table("farmerAI_chatlog").insert({
                     "id": str(uuid4()),
                     "plot_id": "general",
-                    "user_id": None,  # No specific user for general questions
+                    "user_id": user_id,  # Save user_id if available
                     "prompt": prompt,
                     "reply": reply,
                     "created_at": datetime.utcnow().isoformat(),
