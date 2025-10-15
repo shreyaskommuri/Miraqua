@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarNavigation from './SidebarNavigation';
+import { getPlots } from '../api/plots';
+import Constants from 'expo-constants';
 
 interface Plot {
   id: string;
@@ -19,7 +21,9 @@ interface Plot {
   moisture: number;
   temperature: number;
   lastWatered: string;
-  coordinates: { lat: number; lng: number };
+  lat: number;
+  lon: number;
+  last_updated?: string;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -30,6 +34,7 @@ export default function SmartMapScreen({ navigation }: any) {
   const [isLoading, setIsLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
   const [mapView, setMapView] = useState<'satellite' | 'terrain' | 'hybrid'>('satellite');
+  const [mapLocation, setMapLocation] = useState<{lat: number, lon: number} | null>(null);
 
   useEffect(() => {
     fetchPlots();
@@ -38,56 +43,92 @@ export default function SmartMapScreen({ navigation }: any) {
   const fetchPlots = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setPlots([
-        {
-          id: 'plot-1',
-          name: 'Plot A - Tomatoes',
-          crop: 'Tomatoes',
-          status: 'healthy',
-          moisture: 68,
-          temperature: 72,
-          lastWatered: '2 min ago',
-          coordinates: { lat: 37.7749, lng: -122.4194 },
-        },
-        {
-          id: 'plot-2',
-          name: 'Plot B - Lettuce',
-          crop: 'Lettuce',
-          status: 'warning',
-          moisture: 45,
-          temperature: 75,
-          lastWatered: '5 min ago',
-          coordinates: { lat: 37.7849, lng: -122.4094 },
-        },
-        {
-          id: 'plot-3',
-          name: 'Plot C - Peppers',
-          crop: 'Peppers',
-          status: 'healthy',
-          moisture: 72,
-          temperature: 70,
-          lastWatered: '1 min ago',
-          coordinates: { lat: 37.7649, lng: -122.4294 },
-        },
-        {
-          id: 'plot-4',
-          name: 'Plot D - Herbs',
-          crop: 'Herbs',
-          status: 'critical',
-          moisture: 0,
-          temperature: 0,
-          lastWatered: 'Offline',
-          coordinates: { lat: 37.7949, lng: -122.3994 },
-        }
-      ]);
+      const response = await getPlots();
+      if (response.success && response.plots) {
+        const realPlots = response.plots.map((plot: any) => ({
+          id: plot.id,
+          name: plot.name || `Plot ${plot.id.slice(0, 8)}`,
+          crop: plot.crop || 'Unknown',
+          status: plot.status || 'healthy',
+          moisture: plot.moisture || 0,
+          temperature: plot.temperature || 0,
+          lastWatered: plot.last_watered || 'Unknown',
+          lat: plot.lat || 0,
+          lon: plot.lon || 0,
+          last_updated: plot.last_updated
+        }));
+        
+        setPlots(realPlots);
+        
+        // Determine map location based on plot logic
+        determineMapLocation(realPlots);
+      }
     } catch (error) {
-      // Handle error silently
+      console.error('Error fetching plots:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const determineMapLocation = (plots: Plot[]) => {
+    if (plots.length === 0) return;
+    
+    // Filter out plots with invalid coordinates
+    const validPlots = plots.filter(plot => plot.lat !== 0 && plot.lon !== 0);
+    
+    if (validPlots.length === 0) return;
+    
+    if (validPlots.length === 1) {
+      // Single plot - use its location
+      setMapLocation({ lat: validPlots[0].lat, lon: validPlots[0].lon });
+    } else {
+      // Multiple plots - check if they're in the same area or choose oldest
+      const locationGroups = groupPlotsByLocation(validPlots);
+      
+      if (locationGroups.length === 1) {
+        // All plots in same area - use that location
+        setMapLocation(locationGroups[0].location);
+      } else {
+        // Multiple locations - choose oldest plot
+        const oldestPlot = findOldestPlot(validPlots);
+        setMapLocation({ lat: oldestPlot.lat, lon: oldestPlot.lon });
+      }
+    }
+  };
+
+  const groupPlotsByLocation = (plots: Plot[]) => {
+    const groups: { location: { lat: number, lon: number }, plots: Plot[] }[] = [];
+    const threshold = 0.01; // ~1km threshold for "same area"
+    
+    plots.forEach(plot => {
+      const existingGroup = groups.find(group => 
+        Math.abs(group.location.lat - plot.lat) < threshold &&
+        Math.abs(group.location.lon - plot.lon) < threshold
+      );
+      
+      if (existingGroup) {
+        existingGroup.plots.push(plot);
+      } else {
+        groups.push({
+          location: { lat: plot.lat, lon: plot.lon },
+          plots: [plot]
+        });
+      }
+    });
+    
+    return groups;
+  };
+
+  const findOldestPlot = (plots: Plot[]) => {
+    return plots.reduce((oldest, current) => {
+      if (!oldest.last_updated) return current;
+      if (!current.last_updated) return oldest;
+      
+      const oldestTime = new Date(oldest.last_updated).getTime();
+      const currentTime = new Date(current.last_updated).getTime();
+      
+      return currentTime < oldestTime ? current : oldest;
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -162,6 +203,7 @@ export default function SmartMapScreen({ navigation }: any) {
     <TouchableOpacity 
       style={styles.plotCard}
       onPress={() => setSelectedPlot(plot)}
+      activeOpacity={0.7}
     >
       <View style={styles.plotHeader}>
         <View style={styles.plotInfo}>
@@ -170,15 +212,18 @@ export default function SmartMapScreen({ navigation }: any) {
             <Text style={styles.plotName}>{plot.name}</Text>
             <Text style={styles.cropType}>{plot.crop}</Text>
             <Text style={styles.lastUpdate}>{plot.lastWatered}</Text>
+            <Text style={styles.coordinates}>
+              {plot.lat.toFixed(4)}, {plot.lon.toFixed(4)}
+            </Text>
           </View>
         </View>
         <View style={styles.plotMetrics}>
           <View style={styles.metric}>
-            <Ionicons name="water" size={16} color="#3B82F6" />
+            <Ionicons name="water" size={14} color="#3B82F6" />
             <Text style={styles.metricValue}>{plot.moisture}%</Text>
           </View>
           <View style={styles.metric}>
-            <Ionicons name="thermometer" size={16} color="#F59E0B" />
+            <Ionicons name="thermometer" size={14} color="#F59E0B" />
             <Text style={styles.metricValue}>{plot.temperature}°F</Text>
           </View>
         </View>
@@ -309,7 +354,7 @@ export default function SmartMapScreen({ navigation }: any) {
           <View style={styles.logoIcon}>
             <Ionicons name="leaf" size={20} color="white" />
           </View>
-          <Text style={styles.logoText}>Miraqua</Text>
+          <Text style={styles.logoText}>SmartMap</Text>
         </View>
         
         <View style={styles.headerRight}>
@@ -320,46 +365,61 @@ export default function SmartMapScreen({ navigation }: any) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Map View Controls */}
-        <View style={styles.mapControls}>
-          <Text style={styles.sectionTitle}>Map View</Text>
-          <View style={styles.viewButtons}>
-            <TouchableOpacity
-              style={[styles.viewButton, mapView === 'satellite' && styles.activeViewButton]}
-              onPress={() => setMapView('satellite')}
-            >
-              <Ionicons name="earth" size={16} color={mapView === 'satellite' ? 'white' : 'rgba(255, 255, 255, 0.8)'} />
-              <Text style={[styles.viewButtonText, mapView === 'satellite' && styles.activeViewButtonText]}>
-                Satellite
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewButton, mapView === 'terrain' && styles.activeViewButton]}
-              onPress={() => setMapView('terrain')}
-            >
-              <Ionicons name="map" size={16} color={mapView === 'terrain' ? 'white' : 'rgba(255, 255, 255, 0.8)'} />
-              <Text style={[styles.viewButtonText, mapView === 'terrain' && styles.activeViewButtonText]}>
-                Terrain
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewButton, mapView === 'hybrid' && styles.activeViewButton]}
-              onPress={() => setMapView('hybrid')}
-            >
-              <Ionicons name="layers" size={16} color={mapView === 'hybrid' ? 'white' : 'rgba(255, 255, 255, 0.8)'} />
-              <Text style={[styles.viewButtonText, mapView === 'hybrid' && styles.activeViewButtonText]}>
-                Hybrid
-              </Text>
-            </TouchableOpacity>
+        {/* Clean Map View Section */}
+        <View style={styles.mapSection}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.sectionTitle}>Map View</Text>
+            <View style={styles.viewButtons}>
+              <TouchableOpacity
+                style={[styles.viewButton, mapView === 'satellite' && styles.activeViewButton]}
+                onPress={() => setMapView('satellite')}
+              >
+                <Ionicons name="earth" size={16} color={mapView === 'satellite' ? 'white' : 'rgba(255, 255, 255, 0.7)'} />
+                <Text style={[styles.viewButtonText, mapView === 'satellite' && styles.activeViewButtonText]}>
+                  Satellite
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewButton, mapView === 'terrain' && styles.activeViewButton]}
+                onPress={() => setMapView('terrain')}
+              >
+                <Ionicons name="map" size={16} color={mapView === 'terrain' ? 'white' : 'rgba(255, 255, 255, 0.7)'} />
+                <Text style={[styles.viewButtonText, mapView === 'terrain' && styles.activeViewButtonText]}>
+                  Terrain
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewButton, mapView === 'hybrid' && styles.activeViewButton]}
+                onPress={() => setMapView('hybrid')}
+              >
+                <Ionicons name="layers" size={16} color={mapView === 'hybrid' ? 'white' : 'rgba(255, 255, 255, 0.7)'} />
+                <Text style={[styles.viewButtonText, mapView === 'hybrid' && styles.activeViewButtonText]}>
+                  Hybrid
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        {/* Map Placeholder */}
-        <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Ionicons name="map" size={48} color="#9CA3AF" />
-            <Text style={styles.mapPlaceholderText}>Interactive Map</Text>
-            <Text style={styles.mapPlaceholderSubtext}>Tap on plots to view details</Text>
+          {/* Enhanced Map Placeholder */}
+          <View style={styles.mapContainer}>
+            {mapLocation ? (
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="map" size={40} color="#6B7280" />
+                <Text style={styles.mapPlaceholderText}>Interactive Map</Text>
+                <Text style={styles.mapPlaceholderSubtext}>
+                  Location: {mapLocation.lat.toFixed(4)}, {mapLocation.lon.toFixed(4)}
+                </Text>
+                <Text style={styles.mapPlaceholderSubtext}>
+                  {plots.length} plot{plots.length !== 1 ? 's' : ''} in view
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="map" size={40} color="#6B7280" />
+                <Text style={styles.mapPlaceholderText}>Interactive Map</Text>
+                <Text style={styles.mapPlaceholderSubtext}>No plots with valid coordinates</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -435,14 +495,18 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+  },
+  mapSection: {
+    marginBottom: 24,
   },
   mapContainer: {
-    height: 200,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    marginBottom: 20,
+    height: 180,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   mapHeader: {
     flexDirection: 'row',
@@ -516,10 +580,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   plotCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   plotHeader: {
     flexDirection: 'row',
@@ -556,6 +622,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
   },
+  coordinates: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.4)',
+    marginTop: 2,
+  },
   plotMetrics: {
     flexDirection: 'row',
     gap: 16,
@@ -566,7 +637,7 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: 'white',
     marginTop: 2,
   },
   legendSection: {
@@ -747,18 +818,21 @@ const styles = StyleSheet.create({
   },
   viewButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   activeViewButton: {
     backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
   },
   viewButtonText: {
     fontSize: 14,
