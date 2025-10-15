@@ -35,6 +35,7 @@ interface Message {
   sender: 'user' | 'bot';
   text: string;
   time: string;
+  plotId?: string | null;
 }
 
 interface ChatScreenProps {
@@ -43,7 +44,6 @@ interface ChatScreenProps {
 
 export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [message, setMessage] = useState('');
-  const [showGardenStatus, setShowGardenStatus] = useState(true);
   const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
   const [selectedPlotId, setSelectedPlotId] = useState<string>('general');
   const [showPlotSelector, setShowPlotSelector] = useState(false);
@@ -56,7 +56,17 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       id: 1,
       sender: 'bot',
       text: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
-      time: 'now'
+      time: 'now',
+      plotId: null // General message
+    }
+  ]);
+  const [filteredMessages, setFilteredMessages] = useState<Message[]>([
+    {
+      id: 1,
+      sender: 'bot',
+      text: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
+      time: 'now',
+      plotId: null // General message
     }
   ]);
 
@@ -79,15 +89,26 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     getCurrentUser();
   }, []);
 
+  // Filter messages based on selected plot
+  useEffect(() => {
+    if (selectedPlotId === 'general') {
+      // Show general messages (plotId is null or undefined)
+      setFilteredMessages(messages.filter(msg => !msg.plotId));
+    } else {
+      // Show messages for the specific plot
+      setFilteredMessages(messages.filter(msg => msg.plotId === selectedPlotId));
+    }
+  }, [selectedPlotId, messages]);
+
   const quickActions = selectedPlot ? [
-    "Water now",
-    "Skip watering", 
-    "Check health",
+    "Water",
+    "Skip", 
+    "Health",
     "Adjust"
   ] : [
-    "Water plants",
-    "Skip watering", 
-    "Plant health",
+    "Water",
+    "Skip", 
+    "Health",
     "Adjust"
   ];
 
@@ -122,6 +143,15 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     
     if (plotId === 'general') {
       setSelectedPlot(null);
+      // Add a message when switching to general mode
+      const generalMessage: Message = {
+        id: Date.now(),
+        sender: 'bot',
+        text: "I'm now in general mode. I can help you with questions about all your plots, general gardening advice, or answer any irrigation-related questions. What would you like to know?",
+        time: 'now',
+        plotId: null
+      };
+      setMessages(prev => [...prev, generalMessage]);
     } else {
       // Find the real plot from the fetched plots
       const realPlot = realPlots.find(p => p.id === plotId);
@@ -148,7 +178,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           id: Date.now(),
           sender: 'bot',
           text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
-          time: 'now'
+          time: 'now',
+          plotId: realPlot.id
         };
         setMessages(prev => [...prev, plotMessage]);
       }
@@ -167,7 +198,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         id: Date.now(),
         sender: 'user',
         text: messageToSend,
-        time: 'now'
+        time: 'now',
+        plotId: selectedPlotId === 'general' ? null : selectedPlotId
       };
       setMessages(prev => [...prev, newMessage]);
       setMessage('');
@@ -180,7 +212,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         id: Date.now() + 1,
         sender: 'bot',
         text: '🤖 AI is thinking...',
-        time: 'now'
+        time: 'now',
+        plotId: selectedPlotId === 'general' ? null : selectedPlotId
       };
       setMessages(prev => [...prev, typingMessage]);
       
@@ -209,7 +242,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             id: Date.now() + 1,
             sender: 'bot',
             text: data.reply || 'I received your message but couldn\'t generate a response. Please try again.',
-            time: 'now'
+            time: 'now',
+            plotId: selectedPlotId === 'general' ? null : selectedPlotId
           };
           setMessages(prev => [...prev, aiMessage]);
         } else {
@@ -238,7 +272,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           id: Date.now() + 1,
           sender: 'bot',
           text: botResponse,
-          time: 'now'
+          time: 'now',
+          plotId: selectedPlotId === 'general' ? null : selectedPlotId
         };
         setMessages(prev => [...prev, aiMessage]);
       } finally {
@@ -254,7 +289,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.menuButton}>
-          <Ionicons name="menu" size={24} color="white" />
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         
         <View style={styles.logoContainer}>
@@ -281,15 +316,15 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       {/* Quick Actions Section */}
       <View style={styles.quickActionsSection}>
         <View style={styles.quickActionsHeader}>
-          <Text style={styles.quickActionsTitle}>Quick actions:</Text>
+          <Text style={styles.quickActionsTitle}>Quick Actions</Text>
           <TouchableOpacity 
             style={styles.plotSelector}
             onPress={() => setShowPlotSelector(true)}
           >
             <Text style={styles.plotSelectorText}>
-              {selectedPlot ? selectedPlot.name : "General Question"}
+              {selectedPlot ? selectedPlot.name : "General Info"}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#6b7280" />
+            <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" />
           </TouchableOpacity>
         </View>
         <View style={styles.quickActionsGrid}>
@@ -339,7 +374,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 <View style={styles.plotOptionContent}>
                   <Ionicons name="leaf" size={20} color="#10b981" />
                   <View style={styles.plotOptionText}>
-                    <Text style={styles.plotOptionTitle}>General Question</Text>
+                    <Text style={styles.plotOptionTitle}>General Info</Text>
                     <Text style={styles.plotOptionSubtitle}>Ask about all plots</Text>
                   </View>
                 </View>
@@ -395,7 +430,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       {/* Messages - Scrollable Area */}
       <ScrollView style={styles.chatArea} showsVerticalScrollIndicator={false}>
         <View style={styles.messagesContainer}>
-          {messages.map((msg) => (
+          {filteredMessages.map((msg) => (
             <View
               key={msg.id}
               style={[
@@ -404,16 +439,11 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               ]}
             >
               <View style={styles.messageContent}>
-                <View style={[
-                  styles.avatar,
-                  msg.sender === 'user' ? styles.userAvatar : styles.botAvatar
-                ]}>
-                  <Ionicons 
-                    name={msg.sender === 'user' ? 'person' : 'leaf'} 
-                    size={16} 
-                    color="white" 
-                  />
-                </View>
+                {msg.sender === 'user' && (
+                  <View style={[styles.avatar, styles.userAvatar]}>
+                    <Ionicons name="person" size={16} color="white" />
+                  </View>
+                )}
                 <View style={[
                   styles.messageBubble,
                   msg.sender === 'user' ? styles.userBubble : styles.botBubble
@@ -437,114 +467,40 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         </View>
       </ScrollView>
 
-      {/* Garden Status Card */}
-      {showGardenStatus && (
-        <View style={styles.gardenStatusCard}>
-          <View style={styles.gardenStatusContent}>
-            <View style={styles.gardenStatusLeft}>
-              <View style={styles.gardenStatusIcon}>
-                <Ionicons name="water" size={20} color="white" />
-              </View>
-              <View style={styles.gardenStatusInfo}>
-                <Text style={styles.gardenStatusTitle}>
-                  {selectedPlot ? `${selectedPlot.name} Status` : 'Garden Status'}
-                </Text>
-                <Text style={styles.gardenStatusSubtitle}>
-                  {selectedPlot 
-                    ? `${selectedPlot.status.charAt(0).toUpperCase() + selectedPlot.status.slice(1)} • Next watering: ${selectedPlot.nextWatering}`
-                    : 'All plots monitored • AI optimization active'
-                  }
-                </Text>
-              </View>
-            </View>
-            <View style={styles.gardenStatusRight}>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>
-                  {selectedPlot?.status === 'healthy' ? 'Optimal' : 'Monitoring'}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.closeStatusButton}
-                onPress={() => setShowGardenStatus(false)}
-              >
-                <Ionicons name="close" size={16} color="white" />
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          {/* Input Area */}
-          <View style={styles.inputArea}>
-            <TouchableOpacity style={styles.inputButton}>
-              <Ionicons name="camera" size={20} color="#6b7280" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.inputButton}>
-              <Ionicons name="mic" size={20} color="#6b7280" />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.textInput}
-              placeholder={isAIProcessing 
-                ? "AI is thinking..." 
-                : selectedPlot 
-                  ? `Ask about your ${selectedPlot.name}...` 
-                  : "Ask me anything about your garden..."
-              }
-              placeholderTextColor="#9CA3AF"
-              value={message}
-              onChangeText={setMessage}
-              onSubmitEditing={() => handleSendMessage()}
-              editable={!isAIProcessing}
-            />
-            <TouchableOpacity 
-              style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-              onPress={() => handleSendMessage()}
-              disabled={!message.trim() || isAIProcessing}
-            >
-              {isAIProcessing ? (
-                <Ionicons name="hourglass" size={20} color="white" />
-              ) : (
-                <Ionicons name="paper-plane" size={20} color="white" />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      
-      {/* Input Area when garden status is hidden */}
-      {!showGardenStatus && (
-        <View style={styles.standaloneInputArea}>
-          <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="camera" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.inputButton}>
-            <Ionicons name="mic" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.textInput}
-            placeholder={isAIProcessing 
-              ? "AI is thinking..." 
-              : selectedPlot 
-                ? `Ask about your ${selectedPlot.name}...` 
-                : "Ask me anything about your garden..."
-            }
-            placeholderTextColor="#9CA3AF"
-            value={message}
-            onChangeText={setMessage}
-            onSubmitEditing={() => handleSendMessage()}
-            editable={!isAIProcessing}
-          />
-          <TouchableOpacity 
-            style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-            onPress={() => handleSendMessage()}
-            disabled={!message.trim() || isAIProcessing}
-          >
-            {isAIProcessing ? (
-              <Ionicons name="hourglass" size={20} color="white" />
-            ) : (
-              <Ionicons name="paper-plane" size={20} color="white" />
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Input Area */}
+      <View style={styles.standaloneInputArea}>
+        <TouchableOpacity style={styles.inputButton}>
+          <Ionicons name="camera" size={20} color="#6b7280" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.inputButton}>
+          <Ionicons name="mic" size={20} color="#6b7280" />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.textInput}
+          placeholder={isAIProcessing 
+            ? "AI is thinking..." 
+            : selectedPlot 
+              ? `Ask about your ${selectedPlot.name}...` 
+              : "Ask me anything about your garden..."
+          }
+          placeholderTextColor="#9CA3AF"
+          value={message}
+          onChangeText={setMessage}
+          onSubmitEditing={() => handleSendMessage()}
+          editable={!isAIProcessing}
+        />
+        <TouchableOpacity 
+          style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+          onPress={() => handleSendMessage()}
+          disabled={!message.trim() || isAIProcessing}
+        >
+          {isAIProcessing ? (
+            <Ionicons name="hourglass" size={20} color="white" />
+          ) : (
+            <Ionicons name="paper-plane" size={20} color="white" />
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -552,195 +508,227 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#0F172A', // Cleaner dark background
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     paddingTop: 60,
-    backgroundColor: '#374151',
+    backgroundColor: '#1E293B', // Subtle header background
   },
   menuButton: {
-    padding: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   logoText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.5,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
   },
   onlineStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   onlineText: {
-    fontSize: 12,
-    color: 'white',
-    marginLeft: 4,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#10B981',
+    marginLeft: 6,
+    fontWeight: '600',
   },
   notificationButton: {
     position: 'relative',
-    padding: 4,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 6,
+    right: 6,
     backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   notificationCount: {
     color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
   },
   quickActionsSection: {
-    padding: 12,
-    backgroundColor: '#1F2937',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: '#0F172A',
   },
   quickActionsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   quickActionsTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: 'white',
+    letterSpacing: 0.3,
   },
   plotSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    minHeight: 28,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minHeight: 40,
   },
   plotSelectorText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
   quickActionsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 8,
   },
   quickActionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: '45%',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    flex: 1,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   quickActionText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   plotSelectorModal: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    width: '80%',
-    maxHeight: '60%',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    width: '85%',
+    maxHeight: '70%',
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.3,
   },
   plotList: {
-    padding: 16,
+    padding: 24,
   },
   plotOption: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    minHeight: 56,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: 64,
   },
   selectedPlotOption: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 1,
-    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 2,
+    borderColor: '#10B981',
   },
   plotOptionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   plotOptionText: {
     flex: 1,
   },
   plotOptionTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: 'white',
-    marginBottom: 2,
+    marginBottom: 4,
+    letterSpacing: 0.2,
   },
   plotOptionSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
   },
   chatArea: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#0F172A',
   },
   messagesContainer: {
-    padding: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 20,
   },
   messageRow: {
     marginBottom: 16,
@@ -754,7 +742,7 @@ const styles = StyleSheet.create({
   messageContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    maxWidth: '80%',
+    maxWidth: '50%',
   },
   avatar: {
     width: 32,
@@ -763,29 +751,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   userAvatar: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#3B82F6',
   },
   botAvatar: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#10B981',
   },
   messageBubble: {
     padding: 16,
     borderRadius: 20,
-    maxWidth: '85%',
+    maxWidth: '100%',
   },
   userBubble: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#3B82F6',
+    borderBottomRightRadius: 8,
   },
   botBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderBottomLeftRadius: 8,
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 24,
+    fontWeight: '500',
   },
   userText: {
     color: 'white',
@@ -796,112 +792,70 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 12,
     marginTop: 8,
+    fontWeight: '500',
   },
   userTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   botTime: {
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  gardenStatusCard: {
-    backgroundColor: '#1F2937',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  gardenStatusContent: {
-    padding: 16,
-  },
-  gardenStatusLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  gardenStatusIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  gardenStatusInfo: {
-    flex: 1,
-  },
-  gardenStatusTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
-  },
-  gardenStatusSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 20,
-  },
-  gardenStatusRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusBadgeText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  closeStatusButton: {
-    padding: 8,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   inputArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   standaloneInputArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#1F2937',
-    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#1E293B',
+    gap: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   inputButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     color: 'white',
     fontSize: 16,
+    fontWeight: '500',
+    minHeight: 48,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 }); 
