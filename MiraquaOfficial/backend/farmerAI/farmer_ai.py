@@ -220,29 +220,26 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
 
             # Use Gemini for general gardening advice with user context
             prompt_template = f"""
-You are FarmerBot, a smart irrigation and gardening assistant helping this user with their garden.
+You are FarmerBot. The weather forecast and plot data is shown below. You MUST use this data in your response.
 
-USER'S LOCATION & WEATHER:
-{location_summary}
-
-CURRENT WEATHER FORECAST:
+=== WEATHER DATA (YOU MUST REFERENCE THIS) ===
 {weather_summary}
 
-USER'S CURRENT PLOTS:
+=== USER'S PLOTS ===
 {plots_summary}
-{history_summary}
 
-USER QUESTION: "{prompt.strip()}"
+=== THEIR QUESTION ===
+"{prompt.strip()}"
 
-INSTRUCTIONS:
-- Give SHORT, actionable answers (2-4 sentences max)
-- You HAVE access to their location and weather data - USE IT in your answer
-- Reference ACTUAL weather conditions (temperature, rain probability)
-- Reference their specific crops and plots when relevant
-- Be direct and helpful - DO NOT make excuses about privacy or data access
-- Focus on practical, weather-aware advice they can use TODAY
-- If suggesting watering, consider the current weather forecast
-"""
+=== YOUR RESPONSE RULES ===
+1. ALWAYS quote specific numbers from the weather data above (temperature in °F, rain %)
+2. Example BAD response: "check your local forecast" ❌
+3. Example GOOD response: "Tomorrow shows 57°F with 0% rain chance, so water as planned" ✅
+4. If they ask about watering, tell them YES/NO based on the ACTUAL rain % above
+5. Keep it SHORT (2-3 sentences max)
+6. Never say "I don't have access" - the data is literally shown above
+
+YOUR ANSWER:"""
             model = genai.GenerativeModel("models/gemini-2.5-flash")
             response = model.generate_content(prompt_template)
             return {"schedule_updated": False, "reply": response.text.strip()}
@@ -441,30 +438,32 @@ Provide helpful gardening advice based on the crop and location. Be specific and
             weather_summary = "\n".join(weather_items) if weather_items else "Weather data unavailable"
 
         prompt_template = f"""
-You are FarmerBot helping with a {crop} plot called "{plot_name}".
+You are FarmerBot. Use the data below to answer the question.
 
-PLOT INFO:
-- Crop: {crop} ({age} months old)
-- Area: {plot.get("area", 1.0)} m²
-- {watering_summary}
-
-IRRIGATION SCHEDULE (next 7 days):
-{schedule_lines}
-
-WEATHER FORECAST (next 24 hours):
+=== WEATHER FORECAST (QUOTE THESE NUMBERS) ===
 {weather_summary}
 
-USER QUESTION: "{prompt.strip()}"
+=== IRRIGATION SCHEDULE ===
+{schedule_lines}
 
-INSTRUCTIONS:
-- Give SHORT, actionable answers (3-5 sentences max)
-- You HAVE actual weather data above - ALWAYS reference specific temps and rain percentages
-- If rain chance is >40%, strongly suggest skipping/reducing watering
-- If temperatures are extreme (>85°F or <50°F), mention how it affects watering needs
-- Be direct and confident - DO NOT say "I don't have access to weather" (you DO have it above)
-- Focus on THEIR specific plot, schedule, and weather forecast
-- If suggesting changes, be specific (e.g., "Skip tomorrow's 6.5L watering due to 60% rain")
-"""
+=== PLOT INFO ===
+{crop} plot "{plot_name}" - {age} months old, {plot.get("area", 1.0)}m²
+{watering_summary}
+
+=== QUESTION ===
+"{prompt.strip()}"
+
+=== RESPONSE RULES ===
+1. QUOTE specific temps and rain % from weather data above
+2. Example BAD: "check the forecast" ❌
+3. Example GOOD: "With 57°F and 0% rain tomorrow, water the scheduled 6.5L" ✅
+4. If rain % > 40%, tell them to skip watering
+5. If rain % < 10%, confirm they should water
+6. Reference their actual schedule times/amounts
+7. Keep answer SHORT (2-3 sentences)
+8. NEVER say you don't have weather data - it's shown above
+
+YOUR ANSWER:"""
 
         model = genai.GenerativeModel("models/gemini-2.5-flash")
         response = model.generate_content(prompt_template)
