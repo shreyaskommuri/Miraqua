@@ -355,13 +355,25 @@ def water_now():
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    print(f"📥 Chat request received: {data}")
-    
+    print(f"📥 Chat request received from plot: {data.get('plotId')}")
+
     prompt = data.get("prompt")
     plot_id = data.get("plotId")
     chat_session_id = data.get("chat_session_id")
-    
-    print(f"🔍 Extracted: prompt='{prompt}', plot_id='{plot_id}', chat_session_id='{chat_session_id}'")
+
+    # Ensure chat_session_id is a valid UUID
+    if not chat_session_id:
+        chat_session_id = str(uuid4())
+    else:
+        # Try to validate/convert to UUID
+        try:
+            from uuid import UUID
+            # This will raise ValueError if not a valid UUID
+            UUID(chat_session_id)
+        except (ValueError, AttributeError):
+            # If invalid, generate a new one
+            print(f"⚠️ Invalid chat_session_id format, generating new UUID")
+            chat_session_id = str(uuid4())
 
     if not prompt:
         return jsonify({"success": False, "error": "Missing prompt"}), 400
@@ -384,7 +396,33 @@ def chat():
                 age=0
             )
             reply = result["reply"]
-            
+
+            # 📝 Save general chat history (no user_id for general questions)
+            try:
+                supabase.table("farmerAI_chatlog").insert({
+                    "id": str(uuid4()),
+                    "plot_id": "general",
+                    "user_id": None,  # No specific user for general questions
+                    "prompt": prompt,
+                    "reply": reply,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "original_schedule": [],
+                    "modified_schedule": [],
+                    "reverted": False,
+                    "is_user_message": True,
+                    "role": "user",
+                    "message_index": 0,
+                    "context_summary": "",
+                    "chat_session_id": chat_session_id,
+                    "edited": False
+                }).execute()
+                print("✅ General chat history saved successfully")
+            except Exception as save_error:
+                print(f"⚠️ Failed to save general chat history: {save_error}")
+                import traceback
+                traceback.print_exc()
+                # Continue without saving - don't crash the chat
+
             return jsonify({"success": True, "reply": reply})
         except Exception as e:
             print(f"❌ Error in general chat: {e}")
@@ -415,6 +453,30 @@ def chat():
                 age=0
             )
             reply = result["reply"]
+
+            # 📝 Save chat history even when plot not found
+            try:
+                supabase.table("farmerAI_chatlog").insert({
+                    "id": str(uuid4()),
+                    "plot_id": plot_id,
+                    "user_id": None,
+                    "prompt": prompt,
+                    "reply": reply,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "original_schedule": [],
+                    "modified_schedule": [],
+                    "reverted": False,
+                    "is_user_message": True,
+                    "role": "user",
+                    "message_index": 0,
+                    "context_summary": "",
+                    "chat_session_id": chat_session_id,
+                    "edited": False
+                }).execute()
+                print("✅ Chat history saved (plot not found case)")
+            except Exception as save_error:
+                print(f"⚠️ Failed to save chat history: {save_error}")
+
             return jsonify({"success": True, "reply": reply})
     except Exception as e:
         print(f"❌ Error fetching plot: {e}")
@@ -435,6 +497,30 @@ def chat():
             age=0
         )
         reply = result["reply"]
+
+        # 📝 Save chat history even when plot fetch fails
+        try:
+            supabase.table("farmerAI_chatlog").insert({
+                "id": str(uuid4()),
+                "plot_id": plot_id if plot_id else "general",
+                "user_id": None,
+                "prompt": prompt,
+                "reply": reply,
+                "created_at": datetime.utcnow().isoformat(),
+                "original_schedule": [],
+                "modified_schedule": [],
+                "reverted": False,
+                "is_user_message": True,
+                "role": "user",
+                "message_index": 0,
+                "context_summary": "",
+                "chat_session_id": chat_session_id,
+                "edited": False
+            }).execute()
+            print("✅ Chat history saved (plot fetch failed case)")
+        except Exception as save_error:
+            print(f"⚠️ Failed to save chat history: {save_error}")
+
         return jsonify({"success": True, "reply": reply})
 
     # If we get here, we have a valid plot
@@ -507,7 +593,7 @@ def chat():
 
     # 📝 Save chat history
     try:
-        supabase.table("farmerAI_chatlog").insert({
+        chat_log_data = {
             "id": str(uuid4()),
             "plot_id": plot_id,
             "user_id": user_id,
@@ -523,10 +609,15 @@ def chat():
             "context_summary": "",
             "chat_session_id": str(uuid4()) if not chat_session_id else chat_session_id,
             "edited": False
-        }).execute()
-        print("✅ Chat history saved successfully")
+        }
+        print(f"📝 Attempting to save chat log: plot_id={plot_id}, user_id={user_id}, session={chat_session_id}")
+        result = supabase.table("farmerAI_chatlog").insert(chat_log_data).execute()
+        print(f"✅ Chat history saved successfully: {result.data}")
     except Exception as e:
         print(f"⚠️ Failed to save chat history: {e}")
+        print(f"   Data attempted: {chat_log_data}")
+        import traceback
+        print(f"   Full traceback: {traceback.format_exc()}")
         # Continue without saving chat history - don't crash the chat
 
     return jsonify({"success": True, "reply": reply})

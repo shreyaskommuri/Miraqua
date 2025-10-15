@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import uuid from 'react-native-uuid';
 
 interface PlotData {
   id: number;
@@ -57,6 +58,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       time: 'now'
     }
   ]);
+
+  // Generate a session ID once per chat screen instance
+  const chatSessionId = useRef(uuid.v4() as string).current;
 
   const quickActions = selectedPlot ? [
     "Water now",
@@ -173,7 +177,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           body: JSON.stringify({
             prompt: messageToSend,
             plotId: selectedPlotId === 'general' ? 'default' : selectedPlotId,
-            chat_session_id: `session_${Date.now()}`
+            chat_session_id: chatSessionId
           })
         });
         
