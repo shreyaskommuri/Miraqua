@@ -182,6 +182,7 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
             # Build user context from their plots
             user_plots = plot.get("user_plots", [])
             recent_chats = plot.get("recent_chats", [])
+            user_location = plot.get("user_location")
 
             # Create plots summary
             plots_summary = "No plots found"
@@ -190,6 +191,23 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
                 for p in user_plots:
                     plots_list.append(f"  - {p.get('name', 'Unnamed')}: {p.get('crop', 'Unknown crop')}, {p.get('area', 'N/A')}m²")
                 plots_summary = "\n".join(plots_list)
+
+            # Create weather summary from hourly data
+            weather_summary = "Weather data unavailable"
+            if hourly and len(hourly) > 0:
+                # Get current and next few hours
+                weather_items = []
+                for i in range(0, min(12, len(hourly)), 4):  # Next 12 hours, every 4 hours
+                    item = hourly[i]
+                    dt_txt = item.get('dt_txt', 'Unknown')
+                    temp = item.get('main', {}).get('temp', 'N/A')
+                    desc = item.get('weather', [{}])[0].get('description', 'Unknown')
+                    pop = item.get('pop', 0) * 100
+                    weather_items.append(f"{dt_txt}: {temp}°F, {desc}, {pop:.0f}% rain")
+                weather_summary = "\n".join(weather_items)
+
+            # Create location summary
+            location_summary = f"Location: ({lat:.4f}, {lon:.4f})" if user_location else "Location: Not available"
 
             # Create chat history summary
             history_summary = ""
@@ -202,7 +220,13 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
 
             # Use Gemini for general gardening advice with user context
             prompt_template = f"""
-You are FarmerBot, a smart irrigation and gardening assistant helping this specific user.
+You are FarmerBot, a smart irrigation and gardening assistant helping this user with their garden.
+
+USER'S LOCATION & WEATHER:
+{location_summary}
+
+CURRENT WEATHER FORECAST:
+{weather_summary}
 
 USER'S CURRENT PLOTS:
 {plots_summary}
@@ -212,10 +236,12 @@ USER QUESTION: "{prompt.strip()}"
 
 INSTRUCTIONS:
 - Give SHORT, actionable answers (2-4 sentences max)
-- Reference their specific crops when relevant
-- Be conversational and helpful, not overly formal
-- If they have no plots, suggest they add one to get personalized advice
-- Focus on practical tips they can use TODAY
+- You HAVE access to their location and weather data - USE IT in your answer
+- Reference ACTUAL weather conditions (temperature, rain probability)
+- Reference their specific crops and plots when relevant
+- Be direct and helpful - DO NOT make excuses about privacy or data access
+- Focus on practical, weather-aware advice they can use TODAY
+- If suggesting watering, consider the current weather forecast
 """
             model = genai.GenerativeModel("models/gemini-2.5-flash")
             response = model.generate_content(prompt_template)
@@ -432,11 +458,12 @@ USER QUESTION: "{prompt.strip()}"
 
 INSTRUCTIONS:
 - Give SHORT, actionable answers (3-5 sentences max)
-- Reference the ACTUAL weather forecast (rain chances, temperature) when relevant
-- Focus on THEIR specific plot, schedule, and crop needs
-- Use the weather data to suggest adjustments (e.g., "skip watering if rain is coming")
-- Be conversational and direct, skip generic advice
-- If suggesting changes, be specific about what to modify
+- You HAVE actual weather data above - ALWAYS reference specific temps and rain percentages
+- If rain chance is >40%, strongly suggest skipping/reducing watering
+- If temperatures are extreme (>85°F or <50°F), mention how it affects watering needs
+- Be direct and confident - DO NOT say "I don't have access to weather" (you DO have it above)
+- Focus on THEIR specific plot, schedule, and weather forecast
+- If suggesting changes, be specific (e.g., "Skip tomorrow's 6.5L watering due to 60% rain")
 """
 
         model = genai.GenerativeModel("models/gemini-2.5-flash")

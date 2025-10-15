@@ -384,13 +384,31 @@ def chat():
         try:
             # Fetch user's plots for context
             user_plots = []
+            user_location = None
             if user_id:
                 try:
                     plots_res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
                     user_plots = plots_res.data or []
                     print(f"📊 Found {len(user_plots)} plots for user {user_id}")
+
+                    # Get location from first plot that has coordinates
+                    for p in user_plots:
+                        if p.get('lat') and p.get('lon'):
+                            user_location = (p['lat'], p['lon'])
+                            break
                 except Exception as e:
                     print(f"⚠️ Could not fetch user plots: {e}")
+
+            # Get weather for user's location
+            forecast = {}
+            hourly_data = []
+            if user_location:
+                try:
+                    forecast = get_forecast(user_location[0], user_location[1])
+                    hourly_data = forecast.get("hourly", [])
+                    print(f"🌦️ Fetched weather for location: {user_location}")
+                except Exception as e:
+                    print(f"⚠️ Could not fetch weather: {e}")
 
             # Get recent chat history for context
             recent_chats = []
@@ -408,14 +426,14 @@ def chat():
             result = process_chat_command(
                 prompt=prompt,
                 crop="general",
-                lat=37.7749,  # Default coordinates
-                lon=-122.4194,
+                lat=user_location[0] if user_location else 37.7749,
+                lon=user_location[1] if user_location else -122.4194,
                 plot_name="General Garden",
                 plot_id="general",
                 weather={},
-                plot={"user_plots": user_plots, "recent_chats": recent_chats},  # Pass user context
+                plot={"user_plots": user_plots, "recent_chats": recent_chats, "user_location": user_location},
                 daily=[],
-                hourly=[],
+                hourly=hourly_data,  # Pass weather data
                 logs=[],
                 age=0
             )
