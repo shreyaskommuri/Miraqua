@@ -334,6 +334,61 @@ YOUR ANSWER:"""
                 reply_lines.append(f"⏸️ Paused watering on {updated_schedule[i]['day']} ({updated_schedule[i]['date']}).")
             schedule_changed = True
 
+        # === 5b. Increase/Decrease All Days ===
+        # Matches: "water more", "increase by 20%", "decrease all", "reduce watering"
+        increase_match = re.search(r"(?:increase|more|add).*?(\d+)\s*%?", prompt_lower)
+        decrease_match = re.search(r"(?:decrease|less|reduce).*?(\d+)\s*%?", prompt_lower)
+
+        # Check for whole-week modifiers
+        whole_week = any(word in prompt_lower for word in ["all", "every", "week", "entire"])
+
+        if (increase_match or decrease_match) and (whole_week or not target_indices):
+            # Apply to all days if no specific days mentioned
+            if not target_indices:
+                target_indices = set(range(len(updated_schedule)))
+
+            if increase_match:
+                percent = int(increase_match.group(1))
+                for idx in target_indices:
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * (1 + percent / 100), 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = f"Increased by {percent}%"
+                    reply_lines.append(f"✅ Increased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (+{percent}%)")
+                schedule_changed = True
+
+            elif decrease_match:
+                percent = int(decrease_match.group(1))
+                for idx in target_indices:
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * (1 - percent / 100), 2)
+                    updated_schedule[idx]["liters"] = max(0, new_val)
+                    updated_schedule[idx]["note"] = f"Decreased by {percent}%"
+                    reply_lines.append(f"✅ Decreased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (-{percent}%)")
+                schedule_changed = True
+
+        # === 5c. Simple "more" or "less" without percentage ===
+        if not schedule_changed and whole_week:
+            if "more" in prompt_lower or "increase" in prompt_lower:
+                # Default to 20% increase
+                for idx in range(len(updated_schedule)):
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * 1.2, 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = "Increased by 20%"
+                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (+20%)")
+                schedule_changed = True
+
+            elif "less" in prompt_lower or "reduce" in prompt_lower:
+                # Default to 20% decrease
+                for idx in range(len(updated_schedule)):
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * 0.8, 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = "Decreased by 20%"
+                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (-20%)")
+                schedule_changed = True
+
         # === 6. Revert to Original ===
         if "revert" in prompt_lower or "reset schedule" in prompt_lower:
             if og_schedule:
