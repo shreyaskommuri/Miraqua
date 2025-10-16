@@ -292,10 +292,10 @@ export default function SmartMapScreen({ navigation }: any) {
               <Ionicons name="location" size={20} color="#6B7280" />
               <View style={styles.locationInfo}>
                 <Text style={styles.locationText}>
-                  Lat: {plot.coordinates.lat.toFixed(4)}
+                  Lat: {plot.lat.toFixed(4)}
                 </Text>
                 <Text style={styles.locationText}>
-                  Lng: {plot.coordinates.lng.toFixed(4)}
+                  Lng: {plot.lon.toFixed(4)}
                 </Text>
               </View>
             </View>
@@ -304,17 +304,17 @@ export default function SmartMapScreen({ navigation }: any) {
           <View style={styles.modalActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('PlotDetails', { plot: { id: plot.id, name: plot.name } })}
+              onPress={() => navigation.navigate('PlotDetails', { plotId: plot.id })}
             >
               <Ionicons name="eye" size={16} color="#3B82F6" />
               <Text style={styles.actionText}>View Details</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.controlButton]}
-              onPress={() => navigation.navigate('DeviceControl', { plotId: plot.id })}
+              onPress={() => navigation.navigate('PlotSettings', { plotId: plot.id })}
             >
               <Ionicons name="settings" size={16} color="#10B981" />
-              <Text style={styles.actionText}>Controls</Text>
+              <Text style={styles.actionText}>Settings</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
