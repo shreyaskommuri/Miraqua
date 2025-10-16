@@ -683,7 +683,7 @@ def get_chat_log():
             .eq("plot_id", plot_id) \
             .eq("chat_session_id", chat_session_id) \
             .order("created_at", desc=True) \
-            .limit(5) \
+            .limit(50) \
             .execute()
 
         print(f"🔍 Retrieved {len(res.data)} chat rows for user={user_id}, plot={plot_id}, session={chat_session_id}")
