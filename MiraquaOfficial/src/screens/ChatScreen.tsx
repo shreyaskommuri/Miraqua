@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
   messageContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    maxWidth: '85%',
+    maxWidth: '90%',
   },
   avatar: {
     width: 32,
@@ -824,11 +824,12 @@ const styles = StyleSheet.create({
   messageBubble: {
     padding: 16,
     borderRadius: 20,
-    maxWidth: '100%',
+    flex: 1,
   },
   userBubble: {
     backgroundColor: '#3B82F6',
     borderBottomRightRadius: 8,
+    marginLeft: 8,
   },
   botBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
