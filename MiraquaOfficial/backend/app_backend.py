@@ -608,6 +608,19 @@ def chat():
         .order("watered_at", desc=True).limit(7).execute()
     logs = logs_res.data or []
 
+    # 💬 Fetch recent chat history for conversation context
+    recent_chats = []
+    try:
+        chats_res = supabase.table("farmerAI_chatlog") \
+            .select("prompt, reply, created_at") \
+            .eq("plot_id", plot_id) \
+            .order("created_at", desc=True) \
+            .limit(6) \
+            .execute()
+        recent_chats = list(reversed(chats_res.data or []))  # Oldest first
+    except Exception as e:
+        print(f"⚠️ Could not fetch plot chat history: {e}")
+
     # 📥 Call AI chat processor
     result = process_chat_command(
         prompt=prompt,
@@ -617,7 +630,7 @@ def chat():
         plot_name=plot_name,
         plot_id=plot_id,
         weather=current_weather,
-        plot=plot,
+        plot={"recent_chats": recent_chats, **plot},  # Add chat history to plot data
         daily=daily,
         hourly=hourly,
         logs=logs,

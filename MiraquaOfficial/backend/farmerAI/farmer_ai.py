@@ -228,7 +228,9 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 === USER'S PLOTS ===
 {plots_summary}
 
-=== THEIR QUESTION ===
+{history_summary}
+
+=== THEIR CURRENT QUESTION ===
 "{prompt.strip()}"
 
 === YOUR RESPONSE RULES ===
@@ -236,8 +238,9 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 2. Example BAD response: "check your local forecast" ❌
 3. Example GOOD response: "Tomorrow shows 57°F with 0% rain chance, so water as planned" ✅
 4. If they ask about watering, tell them YES/NO based on the ACTUAL rain % above
-5. Keep it SHORT (2-3 sentences max)
-6. Never say "I don't have access" - the data is literally shown above
+5. If they ask a follow-up question (like "what about tomorrow?"), use the conversation history above to understand context
+6. Keep it SHORT (2-3 sentences max)
+7. Never say "I don't have access" - the data is literally shown above
 
 YOUR ANSWER:"""
             model = genai.GenerativeModel("models/gemini-2.5-flash")
@@ -472,6 +475,16 @@ Provide helpful gardening advice based on the crop and location. Be specific and
             last_watered = logs[0].get("watered_at", "Unknown")
             watering_summary = f"Last watered: {last_watered}"
 
+        # Create chat history summary for plot-specific queries
+        history_summary = ""
+        recent_chats = plot.get("recent_chats", [])
+        if recent_chats:
+            history_lines = []
+            for chat in recent_chats[-3:]:  # Last 3 exchanges
+                history_lines.append(f"User: {chat['prompt'][:100]}")
+                history_lines.append(f"Bot: {chat['reply'][:100]}")
+            history_summary = f"\n\n=== RECENT CONVERSATION ===\n" + "\n".join(history_lines)
+
         # Summarize weather from hourly data (OpenWeather format)
         weather_summary = "Weather data unavailable"
         if hourly and len(hourly) > 0:
@@ -504,8 +517,9 @@ You are FarmerBot. Use the data below to answer the question.
 === PLOT INFO ===
 {crop} plot "{plot_name}" - {age} months old, {plot.get("area", 1.0)}m²
 {watering_summary}
+{history_summary}
 
-=== QUESTION ===
+=== CURRENT QUESTION ===
 "{prompt.strip()}"
 
 === RESPONSE RULES ===
@@ -515,8 +529,9 @@ You are FarmerBot. Use the data below to answer the question.
 4. If rain % > 40%, tell them to skip watering
 5. If rain % < 10%, confirm they should water
 6. Reference their actual schedule times/amounts
-7. Keep answer SHORT (2-3 sentences)
-8. NEVER say you don't have weather data - it's shown above
+7. If they ask a follow-up question, use the recent conversation above for context
+8. Keep answer SHORT (2-3 sentences)
+9. NEVER say you don't have weather data - it's shown above
 
 YOUR ANSWER:"""
 
