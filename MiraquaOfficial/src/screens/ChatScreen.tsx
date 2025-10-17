@@ -73,6 +73,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   // Generate a session ID once per chat screen instance
   const chatSessionId = useRef(uuid.v4() as string).current;
 
+  // ScrollView ref for auto-scrolling to bottom
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Get current user ID
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -89,12 +92,13 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     getCurrentUser();
   }, []);
 
-  // Load previous chat history for current session
+  // Load previous chat history for current plot
   useEffect(() => {
     const loadChatHistory = async () => {
-      if (!userId || !chatSessionId) return;
+      if (!userId) return;
 
       try {
+        console.log(`📚 Loading chat history for user=${userId}, plot=${selectedPlotId}`);
         const response = await fetch('http://localhost:5050/get_chat_log', {
           method: 'POST',
           headers: {
@@ -102,8 +106,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           },
           body: JSON.stringify({
             user_id: userId,
-            plot_id: selectedPlotId === 'general' ? 'general' : selectedPlotId,
-            chat_session_id: chatSessionId
+            plot_id: selectedPlotId === 'general' ? 'general' : selectedPlotId
           })
         });
 
@@ -130,7 +133,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     };
 
     loadChatHistory();
-  }, [userId, chatSessionId, selectedPlotId]);
+  }, [userId, selectedPlotId]);
 
   // Filter messages based on selected plot
   useEffect(() => {
@@ -142,6 +145,13 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       setFilteredMessages(messages.filter(msg => msg.plotId === selectedPlotId));
     }
   }, [selectedPlotId, messages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [filteredMessages]);
 
   const quickActions = selectedPlot ? [
     "Water",
@@ -471,7 +481,11 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       </Modal>
 
       {/* Messages - Scrollable Area */}
-      <ScrollView style={styles.chatArea} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.chatArea}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.messagesContainer}>
           {filteredMessages.map((msg) => (
             <View
@@ -771,7 +785,8 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   messageRow: {
     marginBottom: 16,
@@ -785,7 +800,7 @@ const styles = StyleSheet.create({
   messageContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    maxWidth: '50%',
+    maxWidth: '85%',
   },
   avatar: {
     width: 32,
