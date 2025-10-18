@@ -6,6 +6,7 @@ from retry_requests import retry
 from datetime import datetime, timedelta
 import numpy as np
 from utils.schedule_utils import cap_liters
+from utils.advanced_irrigation_utils import AdvancedIrrigationCalculator, convert_weather_data, create_soil_data_from_plot
 
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
@@ -121,6 +122,97 @@ def find_optimal_time(hourly_day):
     return f"{hour_12:02d}:00 {am_pm}"
 
 def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_blocks=None, soil_forecast=None):
+    """
+    Calculate irrigation schedule using advanced scientific methods
+    """
+    try:
+        # Initialize advanced calculator
+        advanced_calculator = AdvancedIrrigationCalculator()
+        
+        # Convert age from months to days
+        age_days = age * 30.44
+        
+        # Create plot data
+        plot_data = {
+            'crop': crop,
+            'area': area,
+            'age_days': age_days,
+            'lat': lat,
+            'lon': lon,
+            'soil_type': 'loam',  # Default, should be provided by farmer
+            'drainage': 'moderate',  # Default, should be provided by farmer
+            'current_moisture': 0.3  # Default, should be measured
+        }
+        
+        # Create soil data
+        soil_data = create_soil_data_from_plot(plot_data)
+        
+        # Convert weather data format
+        weather_forecast = []
+        if hourly_blocks:
+            for day_blocks in hourly_blocks:
+                if day_blocks:
+                    # Convert hourly data to daily weather
+                    temps = [h.get("main", {}).get("temp", 20) for h in day_blocks]
+                    humidities = [h.get("main", {}).get("humidity", 50) for h in day_blocks]
+                    winds = [h.get("wind", {}).get("speed", 2) for h in day_blocks]
+                    pressures = [h.get("main", {}).get("pressure", 1013) for h in day_blocks]
+                    clouds = [h.get("clouds", {}).get("all", 50) for h in day_blocks]
+                    rains = [h.get("rain", {}).get("1h", 0) for h in day_blocks]
+                    
+                    daily_weather = {
+                        'temp_c': np.mean(temps) - 273.15,  # Convert Kelvin to Celsius
+                        'humidity': np.mean(humidities),
+                        'wind_speed': np.mean(winds),
+                        'pressure': np.mean(pressures) / 10.0,  # Convert hPa to kPa
+                        'solar_radiation': max(5, 20 - np.mean(clouds) * 0.2),  # Estimate from cloud cover
+                        'rainfall': np.sum(rains) / 10.0  # Convert mm/h to mm
+                    }
+                else:
+                    # Default weather if no data
+                    daily_weather = {
+                        'temp_c': 20.0,
+                        'humidity': 50.0,
+                        'wind_speed': 2.0,
+                        'pressure': 101.3,
+                        'solar_radiation': 15.0,
+                        'rainfall': 0.0
+                    }
+                weather_forecast.append(daily_weather)
+        else:
+            # Create default weather forecast
+            weather_forecast = [{
+                'temp_c': 20.0,
+                'humidity': 50.0,
+                'wind_speed': 2.0,
+                'pressure': 101.3,
+                'solar_radiation': 15.0,
+                'rainfall': 0.0
+            } for _ in range(7)]
+        
+        # Generate advanced schedule
+        schedule = advanced_calculator.generate_advanced_schedule(
+            plot_data, weather_forecast, soil_data, []
+        )
+        
+        # Calculate average Kc for reporting
+        kc = advanced_calculator.calculate_dynamic_kc(crop, age_days, weather_forecast[0], soil_data)
+        
+        print(f"[ADVANCED DEBUG] crop={crop}, age={age:.1f} months → kc={kc}")
+        print(f"[ADVANCED DEBUG] Generated {len(schedule)} days of advanced schedule")
+        
+        return schedule, kc
+        
+    except Exception as e:
+        print(f"Error in advanced schedule calculation: {e}")
+        # Fallback to original method
+        return calculate_schedule_fallback(crop, area, age, lat, lon, flex_type, hourly_blocks, soil_forecast)
+
+
+def calculate_schedule_fallback(crop, area, age, lat, lon, flex_type="daily", hourly_blocks=None, soil_forecast=None):
+    """
+    Fallback to original hardcoded method if advanced calculation fails
+    """
     if not hourly_blocks:
         hourly_blocks = [[] for _ in range(7)]
     if not soil_forecast:
@@ -128,7 +220,7 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
         soil_forecast = [0.25] * 7
 
     kc = dynamic_kc(crop, age)
-    print(f"[Kc DEBUG] crop={crop}, age={age:.1f} months → kc={kc}")
+    print(f"[FALLBACK DEBUG] crop={crop}, age={age:.1f} months → kc={kc}")
 
     today = datetime.utcnow()
     root_depth_mm = 300
@@ -146,10 +238,10 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
 
         if len(temps) >= 12:
             et0 = 0.0023 * ((avg_temp_c + 17.8) * np.sqrt(avg_temp_c - 10)) * 0.408 if avg_temp_c > 10 else 0.15
-            print(f"[DEBUG] Day {day_index + 1}: avg_temp_c={avg_temp_c:.2f} ET₀={et0:.3f}, Moisture={avg_moisture:.3f}")
+            print(f"[FALLBACK DEBUG] Day {day_index + 1}: avg_temp_c={avg_temp_c:.2f} ET₀={et0:.3f}, Moisture={avg_moisture:.3f}")
         else:
             et0 = 0.15
-            print(f"[DEBUG] Day {day_index + 1}: ET₀={et0:.3f}, Moisture={avg_moisture:.3f} (avg_temp_c not available)")
+            print(f"[FALLBACK DEBUG] Day {day_index + 1}: ET₀={et0:.3f}, Moisture={avg_moisture:.3f} (avg_temp_c not available)")
 
         if avg_moisture > moisture_threshold:
             liters = 0.0
@@ -158,7 +250,7 @@ def calculate_schedule(crop, area, age, lat, lon, flex_type="daily", hourly_bloc
             mm_needed = max(0, (target_moisture - avg_moisture) * root_depth_mm)
             base_liters = mm_needed * area * 0.1
             liters = round(base_liters * kc * et0 / 0.15, 2)
-            print(f"[DEBUG] Day {day_index + 1}: mm_needed={mm_needed:.2f}, Kc={kc:.2f}, base_liters={base_liters:.2f}, FINAL={liters}L")
+            print(f"[FALLBACK DEBUG] Day {day_index + 1}: mm_needed={mm_needed:.2f}, Kc={kc:.2f}, base_liters={base_liters:.2f}, FINAL={liters}L")
             optimal_time = find_optimal_time(hourly_day)
 
         date_obj = today + timedelta(days=day_index)

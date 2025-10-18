@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScientificIrrigationMetrics from '../components/ScientificIrrigationMetrics';
 
 interface Plot {
   id: number;
@@ -58,6 +59,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [aiSummary, setAiSummary] = useState<string>('');
   const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
   const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
+  const [scientificMetrics, setScientificMetrics] = useState<any>(null); // Store scientific metrics
 
   // API base URL - update this to match your backend
   const API_BASE_URL = 'http://localhost:5050'; // Use localhost for development
@@ -281,6 +283,23 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         }
         
         setRealScheduleData(scheduleData); // Store real schedule data
+        
+        // Extract scientific metrics from the first day of the schedule
+        if (scheduleData.schedule && scheduleData.schedule.length > 0) {
+          const firstDay = scheduleData.schedule[0];
+          if (firstDay.et0 !== undefined && firstDay.kc !== undefined) {
+            setScientificMetrics({
+              et0: firstDay.et0,
+              kc: firstDay.kc,
+              etc: firstDay.etc || (firstDay.et0 * firstDay.kc),
+              soilMoisture: firstDay.soil_moisture || 0.3,
+              irrigationNeeded: firstDay.liters > 0,
+              liters: firstDay.liters,
+              explanation: firstDay.explanation || 'Scientific irrigation calculation',
+              optimalTime: firstDay.optimal_time || '06:00 AM'
+            });
+          }
+        }
       } else {
         console.warn('⚠️ Schedule fetch failed, continuing without schedule');
       }
@@ -640,6 +659,20 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             </Text>
           </LinearGradient>
         </View>
+
+        {/* Scientific Irrigation Metrics */}
+        {scientificMetrics && (
+          <ScientificIrrigationMetrics 
+            metrics={scientificMetrics}
+            onInfoPress={() => {
+              Alert.alert(
+                'Scientific Metrics',
+                'These metrics are calculated using FAO-56 Penman-Monteith equation and dynamic crop coefficients based on your specific crop, soil, and weather conditions.',
+                [{ text: 'OK' }]
+              );
+            }}
+          />
+        )}
 
         {/* Sensor Status Grid */}
         <View style={styles.sensorsGrid}>

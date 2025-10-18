@@ -136,14 +136,44 @@ def get_plan():
             "moisture":       moisture,
             "sunlight":       sunlight,
             "total_crop_age": age,
-            "kc_used":        "AI-optimized",
+            "kc_used":        kc_used,
             "crop_stage":     get_crop_stage(plot["crop"], age)
         })
 
-    # 🚀 Generate & save new schedule
-    from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
-
-    schedule    = generate_ai_schedule(plot, daily, hourly, logs)
+    # 🚀 Generate & save new schedule using advanced scientific method
+    from utils.forecast_utils import calculate_schedule
+    from farmer_ai import generate_summary, generate_gem_summary
+    
+    # Use advanced scientific irrigation calculation
+    try:
+        # Convert hourly data to blocks for the advanced calculator
+        hourly_blocks = []
+        for i in range(7):
+            start_hour = i * 24
+            end_hour = start_hour + 24
+            day_blocks = hourly[start_hour:end_hour] if start_hour < len(hourly) else []
+            hourly_blocks.append(day_blocks)
+        
+        # Calculate schedule using advanced scientific method
+        schedule, kc_used = calculate_schedule(
+            plot["crop"], 
+            plot["area"], 
+            age, 
+            lat, 
+            lon, 
+            plot.get("flex_type", "daily"),
+            hourly_blocks
+        )
+        
+        print(f"🧠 Advanced scientific schedule generated with Kc={kc_used}")
+        
+    except Exception as e:
+        print(f"⚠️ Advanced calculation failed, using AI fallback: {e}")
+        # Fallback to AI method if advanced calculation fails
+        from farmer_ai import generate_ai_schedule
+        schedule = generate_ai_schedule(plot, daily, hourly, logs)
+        kc_used = "AI-optimized"
+    
     summary     = generate_summary(plot["crop"], lat, lon, schedule)
     gem_summary = generate_gem_summary(plot["crop"], lat, lon,schedule, plot.get("name",""), plot_id)
 
@@ -170,7 +200,7 @@ def get_plan():
         "moisture":       moisture,
         "sunlight":       sunlight,
         "total_crop_age": age,
-        "kc_used":        "AI-optimized",
+        "kc_used":        kc_used,
         "crop_stage":     get_crop_stage(plot["crop"], age)
     })
 

@@ -17,6 +17,10 @@ export interface Plot {
   custom_constraints: string;
   user_id: string;
   updated_at: string;
+  // New scientific irrigation fields
+  soil_type?: string;
+  drainage?: string;
+  current_moisture?: number;
 }
 
 export const getPlots = async (): Promise<{ success: boolean; plots?: Plot[]; error?: string }> => {
@@ -169,6 +173,78 @@ export const deletePlot = async (plotId: string): Promise<{ success: boolean; er
     return { success: true };
   } catch (err: any) {
     console.error('Error in deletePlot:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+// New scientific irrigation API functions
+export const getIrrigationMetrics = async (plotId: string): Promise<{ success: boolean; metrics?: any; error?: string }> => {
+  try {
+    console.log('🔍 Fetching irrigation metrics for plot:', plotId);
+    
+    const response = await fetch(`${environment.apiUrl}/get_irrigation_metrics?plot_id=${plotId}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Irrigation metrics API error:', errorData);
+      return { success: false, error: errorData.error || 'Failed to fetch irrigation metrics' };
+    }
+    
+    const data = await response.json();
+    console.log('✅ Irrigation metrics fetched:', data);
+    return { success: true, metrics: data };
+  } catch (err: any) {
+    console.error('Error in getIrrigationMetrics:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+export const getWeatherData = async (plotId: string): Promise<{ success: boolean; weather?: any; error?: string }> => {
+  try {
+    console.log('🔍 Fetching weather data for plot:', plotId);
+    
+    const response = await fetch(`${environment.apiUrl}/get_weather?plot_id=${plotId}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Weather API error:', errorData);
+      return { success: false, error: errorData.error || 'Failed to fetch weather data' };
+    }
+    
+    const data = await response.json();
+    console.log('✅ Weather data fetched:', data);
+    return { success: true, weather: data };
+  } catch (err: any) {
+    console.error('Error in getWeatherData:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+export const getScientificSchedule = async (plotId: string): Promise<{ success: boolean; schedule?: any; error?: string }> => {
+  try {
+    console.log('🔍 Fetching scientific schedule for plot:', plotId);
+    
+    const response = await fetch(`${environment.apiUrl}/get_plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plot_id: plotId,
+        use_original: false,
+        force_refresh: true
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Scientific schedule API error:', errorData);
+      return { success: false, error: errorData.error || 'Failed to fetch scientific schedule' };
+    }
+    
+    const data = await response.json();
+    console.log('✅ Scientific schedule fetched:', data);
+    return { success: true, schedule: data };
+  } catch (err: any) {
+    console.error('Error in getScientificSchedule:', err);
     return { success: false, error: err.message };
   }
 }; 

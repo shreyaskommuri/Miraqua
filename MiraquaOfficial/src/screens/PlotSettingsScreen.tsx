@@ -27,6 +27,8 @@ interface PlotData {
   coordinates: { lat: number; lng: number };
   area: number;
   soilType: string;
+  drainage: string;
+  currentMoisture: number;
   irrigationMethod: string;
   plantingDate: Date;
   expectedHarvest: Date;
@@ -55,6 +57,8 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
     coordinates: { lat: 37.7749, lng: -122.4194 },
     area: 25,
     soilType: "loamy",
+    drainage: "moderate",
+    currentMoisture: 0.3,
     irrigationMethod: "drip",
     plantingDate: new Date("2024-05-15"),
     expectedHarvest: new Date("2024-08-15"),
@@ -94,6 +98,13 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
     { value: "silty", label: "Silty" },
     { value: "peaty", label: "Peaty" },
     { value: "chalky", label: "Chalky" }
+  ];
+
+  const drainageOptions = [
+    { value: "poor", label: "Poor (Slow drainage)" },
+    { value: "moderate", label: "Moderate" },
+    { value: "good", label: "Good (Fast drainage)" },
+    { value: "excellent", label: "Excellent (Very fast)" }
   ];
 
   const irrigationMethods = [
@@ -136,7 +147,9 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
             lng: plot.lon || -122.4194 
           },
           area: plot.area || 25,
-          soilType: "loamy", // Default value since not in database
+          soilType: plot.soil_type || "loamy", // Use database value or default
+          drainage: plot.drainage || "moderate", // Use database value or default
+          currentMoisture: plot.current_moisture || 0.3, // Use database value or default
           irrigationMethod: "drip", // Default value since not in database
           plantingDate: new Date(plot.planting_date || "2024-05-15"),
           expectedHarvest: new Date("2024-08-15"), // Default value since not in database
@@ -185,6 +198,9 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
         name: plotData.name,
         area: plotData.area,
         crop: plotData.cropType, // Map cropType to crop
+        soil_type: plotData.soilType, // Add soil type
+        drainage: plotData.drainage, // Add drainage
+        current_moisture: plotData.currentMoisture, // Add current moisture
         // Note: Only update fields that exist in your Plot interface
         // The Plot interface has: id, name, crop, zip_code, area, ph_level, lat, lon, flex_type, planting_date, age_at_entry, custom_constraints, user_id, updated_at
       });
@@ -384,6 +400,31 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
                 value={plotData.soilType}
                 onChangeText={(text) => handleFieldChange('soilType', text)}
                 placeholder="Select soil type"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Drainage</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.drainage}
+                onChangeText={(text) => handleFieldChange('drainage', text)}
+                placeholder="Select drainage"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Current Soil Moisture (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={plotData.currentMoisture.toString()}
+                onChangeText={(text) => handleFieldChange('currentMoisture', parseFloat(text) || 0)}
+                placeholder="30"
+                keyboardType="numeric"
                 placeholderTextColor="rgba(255, 255, 255, 0.5)"
               />
             </View>
