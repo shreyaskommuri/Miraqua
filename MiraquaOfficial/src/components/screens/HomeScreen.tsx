@@ -29,15 +29,6 @@ interface Plot {
   irrigationMethod: string;
 }
 
-interface DashboardStats {
-  totalWaterUsed: number;
-  avgMoisture: number;
-  nextWateringIn: string;
-  activePlots: number;
-  waterSavings: number;
-  moistureTrend: 'up' | 'down' | 'stable';
-}
-
 // Mock data (copied from original)
 const mockPlots: Plot[] = [
   {
@@ -111,94 +102,6 @@ const getPlots = async (): Promise<Plot[]> => {
 const waterPlot = async (plotId: string): Promise<boolean> => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   return true;
-};
-
-// Dashboard stats hook (copied from original)
-const useDashboardStats = (plots: Plot[]): DashboardStats => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalWaterUsed: 0,
-    avgMoisture: 0,
-    nextWateringIn: 'No schedules',
-    activePlots: 0,
-    waterSavings: 0,
-    moistureTrend: 'stable'
-  });
-
-  useEffect(() => {
-    if (plots.length === 0) return;
-
-    const onlinePlots = plots.filter(p => p.isOnline);
-    const totalMoisture = plots.reduce((sum, plot) => sum + plot.currentMoisture, 0);
-    const avgMoisture = Math.round(totalMoisture / plots.length);
-    
-    const totalWaterUsed = plots.reduce((sum, plot) => {
-      const areaFactor = plot.area * 0.5;
-      return sum + areaFactor;
-    }, 0);
-    
-    const now = new Date();
-    const nextWaterings = plots
-      .filter(p => p.nextWatering !== 'Manual')
-      .map(p => {
-        if (p.nextWatering.includes('Tomorrow')) {
-          const tomorrow = new Date(now);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          tomorrow.setHours(6, 0, 0, 0);
-          return tomorrow;
-        } else if (p.nextWatering.includes('Today')) {
-          const today = new Date(now);
-          today.setHours(20, 0, 0, 0);
-          return today;
-        } else if (p.nextWatering.includes('hours')) {
-          const hours = parseInt(p.nextWatering.match(/(\d+)\s*hours?/)?.[1] || '2');
-          const future = new Date(now);
-          future.setHours(future.getHours() + hours);
-          return future;
-        }
-        return null;
-      })
-      .filter(Boolean) as Date[];
-    
-    const nextWatering = nextWaterings.length > 0 
-      ? nextWaterings.reduce((earliest, current) => current < earliest ? current : earliest)
-      : null;
-    
-    let nextWateringText = 'No schedules';
-    if (nextWatering) {
-      const diffMs = nextWatering.getTime() - now.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      
-      if (diffHours < 1) {
-        nextWateringText = `${diffMins}m`;
-      } else if (diffHours < 24) {
-        nextWateringText = `${diffHours}h ${diffMins}m`;
-      } else {
-        nextWateringText = nextWatering.toLocaleDateString();
-      }
-    }
-    
-    const baseSavings = 15;
-    const automationBonus = onlinePlots.length * 2;
-    const healthBonus = Math.floor(avgMoisture / 20);
-    const waterSavings = Math.min(45, baseSavings + automationBonus + healthBonus);
-    
-    const previousAvg = 65;
-    const moistureTrend: 'up' | 'down' | 'stable' = 
-      avgMoisture > previousAvg + 3 ? 'up' :
-      avgMoisture < previousAvg - 3 ? 'down' : 'stable';
-
-    setStats({
-      totalWaterUsed: Math.round(totalWaterUsed),
-      avgMoisture,
-      nextWateringIn: nextWateringText,
-      activePlots: onlinePlots.length,
-      waterSavings,
-      moistureTrend
-    });
-  }, [plots]);
-
-  return stats;
 };
 
 // HomeHeader component (copied from original)
@@ -285,113 +188,6 @@ const HomeHeader: React.FC<{ searchQuery: string; onSearchChange: (value: string
             </TouchableOpacity>
           ) : null}
         </View>
-      </View>
-    </View>
-  );
-};
-
-// HomeStats component (copied from original)
-const HomeStats: React.FC<{ plots: Plot[] }> = ({ plots }) => {
-  const onlinePlots = plots.filter(p => p.isOnline).length;
-  const avgMoisture = plots.length > 0 
-    ? Math.round(plots.reduce((sum, p) => sum + p.currentMoisture, 0) / plots.length) 
-    : 0;
-  const avgHealth = plots.length > 0 
-    ? Math.round(plots.reduce((sum, p) => sum + p.healthScore, 0) / plots.length) 
-    : 0;
-
-  return (
-    <View style={styles.statsGrid}>
-      <View style={styles.statCard}>
-        <View style={styles.statIconContainer}>
-          <Ionicons name="wifi" size={24} color="#10B981" />
-        </View>
-        <Text style={styles.statValue}>{onlinePlots}</Text>
-        <Text style={styles.statLabel}>Online Plots</Text>
-        <Text style={styles.statSubtext}>{plots.length - onlinePlots} offline</Text>
-      </View>
-
-      <View style={styles.statCard}>
-        <View style={styles.statIconContainer}>
-          <Ionicons name="water" size={24} color="#3B82F6" />
-        </View>
-        <Text style={styles.statValue}>{avgMoisture}%</Text>
-        <Text style={styles.statLabel}>Avg Moisture</Text>
-        <Text style={styles.statSubtext}>
-          {avgMoisture >= 70 ? "Excellent" : avgMoisture >= 40 ? "Good" : "Needs attention"}
-        </Text>
-      </View>
-
-      <View style={styles.statCard}>
-        <View style={styles.statIconContainer}>
-          <Ionicons name="pulse" size={24} color="#F59E0B" />
-        </View>
-        <Text style={styles.statValue}>{avgHealth}%</Text>
-        <Text style={styles.statLabel}>Avg Health</Text>
-        <Text style={styles.statSubtext}>
-          {avgHealth >= 80 ? "Thriving" : avgHealth >= 60 ? "Healthy" : "Needs care"}
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-// GlobalStatsPanel component (copied from original)
-const GlobalStatsPanel: React.FC<DashboardStats> = ({
-  totalWaterUsed,
-  avgMoisture,
-  nextWateringIn,
-  activePlots,
-  waterSavings,
-  moistureTrend
-}) => {
-  return (
-    <View style={styles.globalStatsGrid}>
-      <View style={styles.globalStatCard}>
-        <View style={styles.globalStatIcon}>
-          <Ionicons name="location" size={20} color="#3B82F6" />
-        </View>
-        <Text style={styles.globalStatValue}>{activePlots}</Text>
-        <Text style={styles.globalStatLabel}>Active Plots</Text>
-      </View>
-
-      <View style={styles.globalStatCard}>
-        <View style={styles.globalStatIcon}>
-          <Ionicons name="water" size={20} color="#3B82F6" />
-        </View>
-        <Text style={styles.globalStatValue}>{totalWaterUsed}L</Text>
-        <Text style={styles.globalStatLabel}>Water Used</Text>
-        <Text style={styles.globalStatSubtext}>This week</Text>
-      </View>
-
-      <View style={styles.globalStatCard}>
-        <View style={styles.globalStatIcon}>
-          <Ionicons 
-            name={moistureTrend === 'up' ? 'trending-up' : 'trending-down'} 
-            size={20} 
-            color={moistureTrend === 'up' ? '#10B981' : '#F59E0B'} 
-          />
-        </View>
-        <Text style={styles.globalStatValue}>{avgMoisture}%</Text>
-        <Text style={styles.globalStatLabel}>Avg Moisture</Text>
-        <Text style={styles.globalStatSubtext}>{moistureTrend === 'up' ? '+5%' : '-3%'}</Text>
-      </View>
-
-      <View style={styles.globalStatCard}>
-        <View style={styles.globalStatIcon}>
-          <Ionicons name="time" size={20} color="#8B5CF6" />
-        </View>
-        <Text style={styles.globalStatValue}>{nextWateringIn}</Text>
-        <Text style={styles.globalStatLabel}>Next Watering</Text>
-      </View>
-
-      <View style={styles.waterSavingsCard}>
-        <View style={styles.waterSavingsContent}>
-          <Text style={styles.waterSavingsLabel}>💡 Smart Savings</Text>
-          <Text style={styles.waterSavingsValue}>{waterSavings}% water saved</Text>
-          <Text style={styles.waterSavingsSubtext}>vs traditional irrigation</Text>
-        </View>
-        <Text style={styles.waterSavingsIcon}>🌱</Text>
       </View>
     </View>
   );
@@ -572,7 +368,6 @@ const HomeScreen = () => {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   
   const navigation = useNavigation();
-  const dashboardStats = useDashboardStats(plots);
 
   const fetchData = async (isRefresh = false) => {
     if (isRefresh) {
@@ -657,10 +452,6 @@ const HomeScreen = () => {
       />
 
       <View style={styles.content}>
-        <GlobalStatsPanel {...dashboardStats} />
-        
-        <HomeStats plots={filteredPlots} />
-
         <View style={styles.plotsSection}>
           <View style={styles.plotsHeader}>
             <Text style={styles.plotsTitle}>Your Plots ({filteredPlots.length})</Text>
