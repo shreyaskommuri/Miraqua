@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { environment } from '../config/environment';
 
 interface Plot {
   id: number;
@@ -59,8 +60,8 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
   const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
 
-  // API base URL - update this to match your backend
-  const API_BASE_URL = 'http://localhost:5050'; // Use localhost for development
+  // Use centralized environment config
+  const API_BASE_URL = environment.apiUrl;
 
   // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
