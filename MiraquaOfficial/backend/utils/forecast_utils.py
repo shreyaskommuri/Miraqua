@@ -42,6 +42,10 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 def get_forecast(lat, lon):
     try:
+        if not lat or not lon:
+            print(f"⚠️ Invalid coordinates: lat={lat}, lon={lon}")
+            return {"hourly": [], "daily": [], "current": {}}
+        
         url = f"https://api.openweathermap.org/data/2.5/forecast"
         params = {
             "lat": lat,
@@ -50,21 +54,70 @@ def get_forecast(lat, lon):
             "appid": OPENWEATHER_API_KEY
         }
 
+        print(f"🌤️ Fetching weather for lat={lat}, lon={lon}")
         res = requests.get(url, params=params, timeout=10)
         res.raise_for_status()
         data = res.json()
+        
+        if not data or "list" not in data:
+            print("⚠️ Invalid data structure from OpenWeather")
+            return {"hourly": [], "daily": [], "current": {}}
+        
         print("✅ OpenWeather forecast fetched successfully")
 
-        # Extract next 24 hours
+        # Extract hourly data for the next 24 hours
         hourly = data.get("list", [])[:24]
+        
+        # Validate hourly data structure
+        validated_hourly = []
+        for entry in hourly:
+            if "dt" in entry and "main" in entry:
+                validated_hourly.append(entry)
+        
+        # Extract daily summary from hourly data
+        daily = []
+        if validated_hourly:
+            # Group hourly data by day
+            daily_groups = {}
+            for entry in validated_hourly:
+                dt = entry.get("dt")
+                if dt:
+                    date_key = datetime.fromtimestamp(dt).strftime("%Y-%m-%d")
+                    if date_key not in daily_groups:
+                        daily_groups[date_key] = []
+                    daily_groups[date_key].append(entry)
+            
+            # Create daily summaries
+            for date_key, entries in daily_groups.items():
+                temps = [e.get("main", {}).get("temp") for e in entries if e.get("main", {}).get("temp")]
+                clouds = [e.get("clouds", {}).get("all", 50) if isinstance(e.get("clouds"), dict) else e.get("clouds", 50) for e in entries]
+                rains = [e.get("rain", {}).get("3h", 0) if isinstance(e.get("rain"), dict) else e.get("rain", 0) for e in entries]
+                
+                daily.append({
+                    "date": date_key,
+                    "temp_max": max(temps) if temps else 70,
+                    "temp_min": min(temps) if temps else 60,
+                    "temp_avg": np.mean(temps) if temps else 70,
+                    "clouds": int(np.mean(clouds)) if clouds else 50,
+                    "precipitation": sum(rains) if rains else 0
+                })
+        
+        current = validated_hourly[0] if validated_hourly else {}
 
         return {
-            "hourly": hourly
+            "hourly": validated_hourly,
+            "daily": daily,
+            "current": current
         }
 
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Network error fetching weather: {e}")
+        return {"hourly": [], "daily": [], "current": {}}
     except Exception as e:
-        print(f"❌ Failed to fetch OpenWeather forecast: {e}")
-        return {"hourly": []}
+        print(f"❌ Unexpected error fetching weather: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"hourly": [], "daily": [], "current": {}}
 
 
 

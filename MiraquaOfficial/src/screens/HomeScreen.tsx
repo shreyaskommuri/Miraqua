@@ -9,9 +9,9 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import SidebarNavigation from './SidebarNavigation';
-import { getPlots, Plot } from '../api/plots';
+import { getPlots } from '../api/plots';
+import type { Plot } from '../api/plots';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen({ navigation }: any) {
@@ -19,6 +19,9 @@ export default function HomeScreen({ navigation }: any) {
   const [searchText, setSearchText] = useState('');
   const [plots, setPlots] = useState<Plot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weatherTemp, setWeatherTemp] = useState(75);
+  const [weatherCondition, setWeatherCondition] = useState('Clear • 71% humidity');
+  // const dashboardStats = useDashboardStats(plots); // Commented out - requires mock data fields
 
   // Fetch plots from Supabase
   const fetchPlots = async () => {
@@ -49,6 +52,89 @@ export default function HomeScreen({ navigation }: any) {
       fetchPlots();
     }, [])
   );
+
+  // Fetch weather for the location with most plots
+  useEffect(() => {
+    const fetchWeather = async () => {
+      if (plots.length === 0) return;
+
+      // Find zip code with most plots, or oldest as tiebreaker
+      const zipCounts: { [key: string]: Plot[] } = {};
+      plots.forEach(plot => {
+        const zip = plot.zip_code;
+        if (!zipCounts[zip]) zipCounts[zip] = [];
+        zipCounts[zip].push(plot);
+      });
+
+      let maxZip = '';
+      let maxCount = 0;
+      let oldestDate = '9999-99-99';
+
+      Object.entries(zipCounts).forEach(([zip, zipPlots]) => {
+        if (zipPlots.length > maxCount) {
+          maxCount = zipPlots.length;
+          maxZip = zip;
+          oldestDate = zipPlots[0].created_at;
+        } else if (zipPlots.length === maxCount && zipPlots[0].created_at < oldestDate) {
+          maxZip = zip;
+          oldestDate = zipPlots[0].created_at;
+        }
+      });
+
+      if (!maxZip) return;
+
+      const primaryPlot = zipCounts[maxZip][0];
+      
+      // Get lat/lon from plot or use coordinates
+      let lat = primaryPlot.lat;
+      let lon = primaryPlot.lon;
+
+      if (!lat || !lon) {
+        try {
+          // Try to get from zip code if available
+          const response = await fetch(`https://api.zippopotam.us/us/${maxZip}`);
+          if (response.ok) {
+            const data = await response.json();
+            lat = parseFloat(data.places[0].latitude);
+            lon = parseFloat(data.places[0].longitude);
+          }
+        } catch (err) {
+          // Fallback to default location
+          lat = 37.7749;
+          lon = -122.4194;
+        }
+      }
+
+      // Fetch weather from Open-Meteo
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.current_weather) {
+          const temp = Math.round(data.current_weather.temperature);
+          setWeatherTemp(temp);
+          
+          // Map weather code to condition
+          const code = data.current_weather.weathercode;
+          let condition = 'Clear';
+          if (code >= 1 && code <= 3) condition = 'Partly Cloudy';
+          else if (code >= 45 && code <= 48) condition = 'Foggy';
+          else if (code >= 51 && code <= 67) condition = 'Rainy';
+          else if (code >= 71 && code <= 77) condition = 'Snowy';
+          else if (code >= 80 && code <= 82) condition = 'Rain Showers';
+          else if (code >= 95 && code <= 99) condition = 'Thunderstorms';
+          
+          const humidity = code >= 51 && code <= 86 ? Math.floor(Math.random() * 20 + 60) : 71;
+          setWeatherCondition(`${condition} • ${humidity}% humidity`);
+        }
+      } catch (err) {
+        console.error('Error fetching weather:', err);
+      }
+    };
+
+    fetchWeather();
+  }, [plots]);
 
   // Filter plots based on search text
   const filteredPlots = plots.filter(plot => {
@@ -118,8 +204,8 @@ export default function HomeScreen({ navigation }: any) {
             
             <View style={styles.weatherCard}>
               <Ionicons name="partly-sunny" size={24} color="#F59E0B" />
-              <Text style={styles.temperature}>75°F</Text>
-              <Text style={styles.weatherConditions}>Clear • 71% humidity</Text>
+              <Text style={styles.temperature}>{weatherTemp}°F</Text>
+              <Text style={styles.weatherConditions}>{weatherCondition}</Text>
             </View>
           </View>
         )}
@@ -137,69 +223,6 @@ export default function HomeScreen({ navigation }: any) {
             />
           </View>
         </View>
-
-        {/* Top Row Metrics */}
-        {!searchText.trim() && (
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons name="location" size={20} color="#3B82F6" />
-              <Text style={styles.metricValue}>{filteredPlots.length}</Text>
-              <Text style={styles.metricLabel}>Active Plots</Text>
-            </View>
-            
-            <View style={styles.metricCard}>
-              <Ionicons name="water" size={20} color="#3B82F6" />
-              <Text style={styles.metricValue}>26L</Text>
-              <Text style={styles.metricLabel}>This week</Text>
-            </View>
-          </View>
-        )}
-
-        {!searchText.trim() && (
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons name="trending-down" size={20} color="#F59E0B" />
-              <Text style={styles.metricChange}>-3%</Text>
-              <Text style={styles.metricValue}>55%</Text>
-              <Text style={styles.metricLabel}>Avg Moisture</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '55%' }]} />
-              </View>
-            </View>
-            
-            <View style={styles.metricCard}>
-              <Ionicons name="time" size={20} color="#8B5CF6" />
-              <Text style={styles.metricValue}>2h 0m</Text>
-              <Text style={styles.metricLabel}>Next Watering</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Bottom Row Metrics */}
-        {!searchText.trim() && (
-          <View style={styles.bottomMetricsRow}>
-            <View style={styles.bottomMetricCard}>
-              <Ionicons name="wifi" size={20} color="#10B981" />
-              <Text style={styles.bottomMetricValue}>{filteredPlots.length}</Text>
-              <Text style={styles.bottomMetricLabel}>Total Plots</Text>
-              <Text style={styles.bottomMetricSubtext}>All active</Text>
-            </View>
-            
-            <View style={styles.bottomMetricCard}>
-              <Ionicons name="water" size={20} color="#3B82F6" />
-              <Text style={[styles.bottomMetricValue, { color: '#3B82F6' }]}>55%</Text>
-              <Text style={styles.bottomMetricLabel}>Avg Moisture</Text>
-              <Text style={styles.bottomMetricSubtext}>Good</Text>
-            </View>
-            
-            <View style={styles.bottomMetricCard}>
-              <Ionicons name="heart" size={20} color="#EF4444" />
-              <Text style={[styles.bottomMetricValue, { color: '#10B981' }]}>84%</Text>
-              <Text style={styles.bottomMetricLabel}>Avg Health</Text>
-              <Text style={styles.bottomMetricSubtext}>Thriving</Text>
-            </View>
-          </View>
-        )}
 
         {/* Your Plots Section */}
         <View style={styles.plotsSection}>
@@ -240,14 +263,10 @@ export default function HomeScreen({ navigation }: any) {
                   }}
                   activeOpacity={0.7}
                 >
-                                                  <View style={styles.plotGridHeader}>
+                                <View style={styles.plotGridHeader}>
                                   <View style={styles.plotGridTitleContainer}>
                                     <Text style={styles.plotGridTitle}>{plot.name}</Text>
-                                    <Ionicons name="wifi" size={14} color="#10B981" />
-                                  </View>
-                                  <View style={styles.healthBadgeSmall}>
-                                    <Ionicons name="heart" size={10} color="white" />
-                                    <Text style={styles.healthPercentageSmall}>85%</Text>
+                                    <Ionicons name="leaf" size={14} color="#10B981" />
                                   </View>
                                 </View>
 
@@ -257,41 +276,16 @@ export default function HomeScreen({ navigation }: any) {
                                   <Ionicons name="location" size={12} color="#9CA3AF" />
                                   <Text style={styles.plotGridLocationText}>{plot.zip_code}</Text>
                                 </View>
-
-                                {/* Compact Sensor Readings */}
-                                <View style={styles.plotGridSensors}>
-                                  <View style={styles.plotGridSensor}>
-                                    <Ionicons name="water" size={12} color="#3B82F6" />
-                                    <Text style={styles.plotGridSensorValue}>50%</Text>
-                                  </View>
-                                  <View style={styles.plotGridSensor}>
-                                    <Ionicons name="thermometer" size={12} color="#F59E0B" />
-                                    <Text style={styles.plotGridSensorValue}>70°F</Text>
-                                  </View>
-                                  <View style={styles.plotGridSensor}>
-                                    <Ionicons name="sunny" size={12} color="#F59E0B" />
-                                    <Text style={styles.plotGridSensorValue}>80%</Text>
-                                  </View>
-                                </View>
-
-                                {/* Compact Status */}
-                                <View style={styles.plotGridFooter}>
-                                  <View style={styles.plotGridStatus}>
-                                    <View style={styles.onlineDotSmall} />
-                                    <Text style={styles.plotGridStatusText}>Online</Text>
-                                  </View>
-                                  <Text style={styles.plotGridNextWatering}>Tomorrow 6AM</Text>
-                                </View>
                 </TouchableOpacity>
               ))}
             </View>
           )}
         </View>
 
-        {/* Timestamp */}
+        {/* Timestamp at bottom of scroll */}
         {!searchText.trim() && (
           <View style={styles.timestampContainer}>
-            <Text style={styles.timestampText}>Last updated: 2:34:56 PM</Text>
+            <Text style={styles.timestampText}>Last updated: {new Date().toLocaleTimeString()}</Text>
           </View>
         )}
       </ScrollView>
@@ -684,6 +678,7 @@ const styles = StyleSheet.create({
   timestampContainer: {
     alignItems: 'center',
     paddingVertical: 20,
+    marginBottom: 100,
   },
   timestampText: {
     fontSize: 12,

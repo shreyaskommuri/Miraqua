@@ -40,12 +40,15 @@ interface Message {
 
 interface ChatScreenProps {
   navigation: any;
+  route?: any;
 }
 
-export default function ChatScreen({ navigation }: ChatScreenProps) {
+export default function ChatScreen({ navigation, route }: ChatScreenProps) {
+  const plotIdFromRoute = route?.params?.plotId;
+  
   const [message, setMessage] = useState('');
   const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
-  const [selectedPlotId, setSelectedPlotId] = useState<string>('general');
+  const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute || 'general');
   const [showPlotSelector, setShowPlotSelector] = useState(false);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [realPlots, setRealPlots] = useState<any[]>([]);
@@ -190,21 +193,65 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     fetchRealPlots();
   }, []);
 
+  // Auto-select plot when opened from a specific plot
+  useEffect(() => {
+    if (plotIdFromRoute && plotIdFromRoute !== 'general' && realPlots.length > 0) {
+      // Auto-select the plot when opened from plot details
+      const realPlot = realPlots.find(p => p.id === plotIdFromRoute);
+      if (realPlot) {
+        setSelectedPlot({
+          id: plotIdFromRoute,
+          name: realPlot.name || `Plot ${plotIdFromRoute.slice(0, 8)}`,
+          crop: realPlot.crop || "Unknown",
+          moisture: realPlot.moisture || 0,
+          temperature: realPlot.temperature || 0,
+          sunlight: realPlot.sunlight || 0,
+          status: realPlot.status || "unknown",
+          nextWatering: realPlot.next_watering || "Unknown",
+          location: realPlot.location || "Unknown",
+          waterUsage: realPlot.water_usage || 0,
+          sensorStatus: realPlot.sensor_status || "unknown",
+          batteryLevel: realPlot.battery_level || 0,
+          soilPh: realPlot.soil_ph || 0,
+          lastWatered: realPlot.last_watered || "Unknown"
+        });
+        
+        // Add initial message about the selected plot (only once)
+        const hasPlotMessage = messages.some(msg => msg.plotId === plotIdFromRoute && msg.sender === 'bot');
+        if (!hasPlotMessage) {
+          const plotMessage: Message = {
+            id: Date.now(),
+            sender: 'bot',
+            text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
+            time: 'now',
+            plotId: realPlot.id
+          };
+          setMessages(prev => [...prev, plotMessage]);
+        }
+      }
+    }
+  }, [plotIdFromRoute, realPlots.length, selectedPlotId]);
+
   const handlePlotSelection = (plotId: string) => {
+    // Update the selected plot ID
     setSelectedPlotId(plotId);
     setShowPlotSelector(false);
     
     if (plotId === 'general') {
       setSelectedPlot(null);
-      // Add a message when switching to general mode
-      const generalMessage: Message = {
-        id: Date.now(),
-        sender: 'bot',
-        text: "I'm now in general mode. I can help you with questions about all your plots, general gardening advice, or answer any irrigation-related questions. What would you like to know?",
-        time: 'now',
-        plotId: null
-      };
-      setMessages(prev => [...prev, generalMessage]);
+      // Check if we already have a general mode message
+      const hasGeneralMessage = messages.some(msg => msg.plotId === null && msg.sender === 'bot');
+      if (!hasGeneralMessage) {
+        // Add a message when switching to general mode
+        const generalMessage: Message = {
+          id: Date.now(),
+          sender: 'bot',
+          text: "I'm now in general mode. I can help you with questions about all your plots, general gardening advice, or answer any irrigation-related questions. What would you like to know?",
+          time: 'now',
+          plotId: null
+        };
+        setMessages(prev => [...prev, generalMessage]);
+      }
     } else {
       // Find the real plot from the fetched plots
       const realPlot = realPlots.find(p => p.id === plotId);
@@ -226,15 +273,19 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           lastWatered: realPlot.last_watered || "Unknown"
         });
         
-        // Add initial message about the selected plot
-        const plotMessage: Message = {
-          id: Date.now(),
-          sender: 'bot',
-          text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
-          time: 'now',
-          plotId: realPlot.id
-        };
-        setMessages(prev => [...prev, plotMessage]);
+        // Check if we already have a message for this plot
+        const hasPlotMessage = messages.some(msg => msg.plotId === plotId);
+        if (!hasPlotMessage) {
+          // Add initial message about the selected plot
+          const plotMessage: Message = {
+            id: Date.now(),
+            sender: 'bot',
+            text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
+            time: 'now',
+            plotId: realPlot.id
+          };
+          setMessages(prev => [...prev, plotMessage]);
+        }
       }
     }
   };
@@ -272,16 +323,16 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       
       try {
         // Call the real AI backend
-        const response = await fetch('http://localhost:5050/chat', {
+        const { environment } = await import('../config/environment');
+        const response = await fetch(`${environment.apiUrl}/chat`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             prompt: messageToSend,
-            plotId: selectedPlotId === 'general' ? 'default' : selectedPlotId,
+            plotId: selectedPlotId === 'general' ? null : selectedPlotId,
             chat_session_id: chatSessionId,
-            userId: userId
           })
         });
         
@@ -485,6 +536,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         ref={scrollViewRef}
         style={styles.chatArea}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.messagesContainer}>
           {filteredMessages.map((msg) => (
@@ -783,10 +835,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F172A',
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
   messagesContainer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 120, // Extra padding to prevent content being cut off by input bar
   },
   messageRow: {
     marginBottom: 16,
@@ -822,9 +878,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   messageBubble: {
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
-    flex: 1,
+    flexShrink: 1,
   },
   userBubble: {
     backgroundColor: '#3B82F6',
@@ -838,9 +894,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 8,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: '500',
+    flexShrink: 1,
   },
   userText: {
     color: 'white',
@@ -870,7 +927,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 16,
+    paddingBottom: 30, // Increased for safe area and to prevent overlap
     backgroundColor: '#1E293B',
     gap: 16,
     borderTopWidth: 1,

@@ -6,7 +6,7 @@ export type RootStackParamList = {
   PlotDetails: { plotId?: number; plot?: any };
   Weather: undefined;
   Account: undefined;
-  Chat: undefined;
+  Chat: { plotId?: string } | undefined;
   Plots: undefined;
   PlotSettings: { plotId?: string };
   SpecificDay: { plotId?: number; day?: string; date?: string };

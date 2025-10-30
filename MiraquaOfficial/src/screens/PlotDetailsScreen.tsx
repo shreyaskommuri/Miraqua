@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { environment } from '../config/environment';
 
 interface Plot {
   id: number;
@@ -59,8 +60,8 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
   const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
 
-  // API base URL - update this to match your backend
-  const API_BASE_URL = 'http://localhost:5050'; // Use localhost for development
+  // Use centralized environment config
+  const API_BASE_URL = environment.apiUrl;
 
   // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
@@ -133,7 +134,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               
               // Convert MM/DD/YY to YYYY-MM-DD for comparison
               const [month, day, year] = entryDate.split('/');
-              const formattedEntryDate = `2025-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              // Handle 2-digit year - assume 20xx for years 00-99
+              const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+              const formattedEntryDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
               
               console.log(`🔍 Comparing Supabase date ${entryDate} (${formattedEntryDate}) with frontend date ${dateStr}`);
               
@@ -153,7 +156,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
             console.log(`📅 Schedule entry details:`, scheduleEntry);
           } else {
-            console.log(`❌ No watering for ${dateStr}`);
+            console.log(`❌ No watering for ${dateStr} - no matching schedule entry found`);
           }
           
           days.push({
@@ -281,6 +284,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         }
         
         setRealScheduleData(scheduleData); // Store real schedule data
+        
+        // Debug: Log schedule data structure
+        console.log('📅 Full schedule data received:', JSON.stringify(scheduleData, null, 2));
       } else {
         console.warn('⚠️ Schedule fetch failed, continuing without schedule');
       }
@@ -753,18 +759,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
           </View>
-          
-          {/* Show schedule summary if available */}
-          {realScheduleData && (
-            <View style={styles.scheduleSummary}>
-              <Text style={styles.scheduleSummaryText}>
-                {showOriginalSchedule ? 
-                  (realScheduleData.og_schedule ? 'Original schedule loaded' : 'No original schedule available') :
-                  realScheduleData.summary || 'Schedule generated successfully'
-                }
-              </Text>
-            </View>
-          )}
         </View>
 
                   {/* Integrated Calendar Schedule */}
@@ -921,7 +915,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         <View style={styles.bottomButtons}>
           <TouchableOpacity 
             style={styles.askMiraquaButton}
-            onPress={() => navigation.navigate('Chat')}
+            onPress={() => navigation.navigate('Chat', { plotId: plot.id })}
           >
             <Ionicons name="chatbubble" size={20} color="#6B7280" />
             <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
@@ -1673,18 +1667,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
-  },
-  scheduleSummary: {
-    marginTop: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  scheduleSummaryText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
 

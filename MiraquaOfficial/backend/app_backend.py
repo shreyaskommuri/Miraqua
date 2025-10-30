@@ -32,6 +32,43 @@ from farmer_ai import generate_summary, generate_gem_summary, process_chat_comma
 app = Flask(__name__)
 CORS(app)
 
+# Health check endpoint
+@app.route("/health", methods=["GET"])
+def health_check():
+    try:
+        # Test database connection
+        test_query = supabase.table("plots").select("id").limit(1).execute()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return jsonify({
+        "status": "ok" if db_status == "connected" else "degraded",
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+# Error handler for database connection issues
+@app.errorhandler(500)
+def handle_server_error(e):
+    print(f"❌ Server error: {e}")
+    return jsonify({
+        "success": False,
+        "error": "Internal server error",
+        "message": "The server encountered an error. Please try again later."
+    }), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"❌ Unhandled exception: {e}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({
+        "success": False,
+        "error": "An unexpected error occurred",
+        "message": str(e) if app.debug else "Please try again later."
+    }), 500
+
 CROP_KC = {
     "corn": 1.15, "wheat": 1.0, "alfalfa": 1.2, "lettuce": 0.85,
     "tomato": 1.05, "almond": 1.05, "default": 0.95
@@ -65,9 +102,23 @@ def get_lat_lon(zip_code):
 
 @app.route("/get_plot_by_id", methods=["GET"])
 def get_plot_by_id():
-    plot_id = request.args.get("plot_id")
-    res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
-    return jsonify(res.data), 200
+    try:
+        plot_id = request.args.get("plot_id")
+        if not plot_id:
+            return jsonify({"error": "Missing plot_id parameter"}), 400
+        
+        res = supabase.table("plots").select("*").eq("id", plot_id).single().execute()
+        
+        if not res.data:
+            return jsonify({"error": "Plot not found"}), 404
+            
+        return jsonify(res.data), 200
+    except Exception as e:
+        print(f"❌ Error fetching plot by ID: {e}")
+        return jsonify({
+            "error": "Failed to fetch plot",
+            "message": str(e)
+        }), 500
 
 @app.route("/get_plan", methods=["POST"])
 def get_plan():
@@ -202,9 +253,19 @@ def add_plot():
 
 @app.route("/get_plots", methods=["GET"])
 def get_plots():
-    user_id = request.args.get("user_id")
-    res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
-    return jsonify(res.data), 200
+    try:
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Missing user_id parameter"}), 400
+        
+        res = supabase.table("plots").select("*").eq("user_id", user_id).execute()
+        return jsonify(res.data if res.data else []), 200
+    except Exception as e:
+        print(f"❌ Error fetching plots: {e}")
+        return jsonify({
+            "error": "Failed to fetch plots",
+            "message": str(e)
+        }), 500
 
 @app.route("/revert_schedule", methods=["POST"])
 def revert_schedule():

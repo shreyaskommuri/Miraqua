@@ -300,37 +300,6 @@ const Index = () => {
             </View>
           </View>
 
-          {/* Statistics Grid */}
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Ionicons name="location" size={20} color="#3B82F6" style={styles.statIcon} />
-              <Text style={styles.statValue}>{globalStats.activePlots}</Text>
-              <Text style={styles.statLabel}>Active Plots</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Ionicons name="water" size={20} color="#3B82F6" style={styles.statIcon} />
-              <Text style={styles.statValue}>{globalStats.totalWaterUsed}L</Text>
-              <Text style={styles.statLabel}>This week</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={styles.moistureHeader}>
-                <Ionicons name="trending-down" size={16} color="#F59E0B" />
-                <Text style={styles.moistureTrend}>-3%</Text>
-              </View>
-              <Text style={styles.statValue}>{globalStats.avgMoisture}%</Text>
-              <Text style={styles.statLabel}>Avg Moisture</Text>
-              <Progress value={globalStats.avgMoisture} style={styles.moistureProgress} />
-            </View>
-
-            <View style={styles.statCard}>
-              <Ionicons name="time" size={20} color="#8B5CF6" style={styles.statIcon} />
-              <Text style={styles.statValue}>{globalStats.nextWateringIn}</Text>
-              <Text style={styles.statLabel}>Next Watering</Text>
-            </View>
-          </View>
-
           {/* Water Savings Card */}
           <Card style={styles.waterSavingsCard}>
             <CardContent style={styles.waterSavingsContent}>
