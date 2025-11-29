@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 import google.generativeai as genai
 from utils.forecast_utils import get_forecast, CROP_KC
+from utils.schedule_utils import validate_schedule
+from utils.llm_adapter import get_adapter
 from datetime import datetime, timedelta
 import re
 from dateutil import parser as date_parser
@@ -21,7 +23,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY")) if genai else None
 
 ai_blueprint = Blueprint("ai", __name__)
 
@@ -53,20 +55,15 @@ def generate_summary(crop, lat, lon, schedule):
 # ✅ AI-GENERATED GEMINI SUMMARY
 def generate_gem_summary(crop, lat, lon, schedule, plot_name, plot_id):
     try:
-        # Initialize the model
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-
-        # If there's no schedule data, bail out immediately
+        # Use adapter for generation
         if not schedule:
             return "No irrigation schedule found for this plot."
 
-        # Format the schedule into lines for the prompt
         schedule_lines = "\n".join(
             f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
             for day in schedule
         )
 
-        # Build the prompt
         lat_safe = lat if lat is not None else 0.0
         lon_safe = lon if lon is not None else 0.0
         prompt = f"""
@@ -78,9 +75,12 @@ Here is the upcoming irrigation schedule:
 Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather or season, and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
 """
 
-        # Generate and return the summary
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        adapter = get_adapter()
+        resp = adapter.generate(prompt, model_names=["models/gemini-2.5-flash", "models/gemini-2.0-flash"])
+        if resp.get("success"):
+            return resp.get("text", "").strip()
+        else:
+            return f"Gemini summary generation failed: {resp.get('error')}"
 
     except Exception as e:
         return f"Gemini summary generation failed: {str(e)}"
@@ -240,9 +240,12 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 6. Never say "I don't have access" - the data is literally shown above
 
 YOUR ANSWER:"""
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-            response = model.generate_content(prompt_template)
-            return {"schedule_updated": False, "reply": response.text.strip()}
+            adapter = get_adapter()
+            resp = adapter.generate(prompt_template, model_names=["models/gemini-2.5-flash", "models/gemini-2.0-flash"]) 
+            if resp.get("success"):
+                return {"schedule_updated": False, "reply": resp.get("text", "").strip()}
+            else:
+                return {"schedule_updated": False, "reply": "⚠️ AI unavailable — please try again later."}
 
         # For specific plots, load schedules
         try:
@@ -373,18 +376,54 @@ YOUR ANSWER:"""
 
         # === Save if changed ===
         if schedule_changed:
-            supabase.table("plot_schedules").update({
-                "schedule": updated_schedule
-            }).eq("plot_id", plot_id).execute()
-            supabase.table("schedule_changes").insert({
-                "id": str(uuid4()),
-                "plot_id": plot_id,
-                "timestamp": datetime.utcnow().isoformat(),
-                "old_schedule": original_schedule,
-                "new_schedule": updated_schedule,
-                "reason": prompt.strip()
-            }).execute()
-            return {"schedule_updated": True, "reply": "\n".join(reply_lines)}
+            # Validate updated schedule and return as a preview (do not persist here).
+            valid, errors, sanitized = validate_schedule(updated_schedule)
+            if not valid:
+                err_msg = f"⚠️ Schedule validation failed: {errors}"
+                return {"schedule_updated": False, "reply": err_msg}
+
+            # Also provide a deterministic alternative schedule for comparison
+            try:
+                et0_forecast = []
+                for d in (daily or [])[:7]:
+                    eto = None
+                    if isinstance(d, dict):
+                        eto = d.get("et0") or d.get("eto")
+                        tavg_f = d.get("temp_avg") or d.get("temp")
+                        if eto is None and tavg_f is not None:
+                            try:
+                                t_c = (float(tavg_f) - 32.0) * 5.0 / 9.0
+                                eto = max(0.1, round(t_c * 0.15, 2))
+                            except:
+                                eto = 2.0
+                    if eto is None:
+                        eto = 2.0
+                    et0_forecast.append(float(eto))
+
+                plot_for_sched = {
+                    "area_m2": plot.get("area_m2") or plot.get("area") or 1.0,
+                    "crop_kc": plot.get("crop_kc") or CROP_K.get(crop.lower(), CROP_K.get("default", 0.95))
+                }
+
+                from scheduling.deterministic_scheduler import generate_deterministic_schedule
+
+                deterministic_alt = generate_deterministic_schedule(
+                    plot_for_sched,
+                    et0_forecast,
+                    crop_kc=plot_for_sched.get("crop_kc"),
+                    days=7,
+                    efficiency=0.8,
+                    preferred_time="06:00 AM",
+                )
+            except Exception as err:
+                print(f"⚠️ Could not create deterministic alternative: {err}")
+                deterministic_alt = None
+
+            # Return the sanitized schedule as a suggestion; the frontend should call /apply_schedule to persist.
+            resp = {"schedule_updated": True, "reply": "\n".join(reply_lines), "modified_schedule": sanitized}
+            if deterministic_alt is not None:
+                resp["deterministic_alternative"] = deterministic_alt
+            return resp
 
         # === 9. Fallback to Gemini ===
         # Handle case where schedule is empty
@@ -402,9 +441,12 @@ User asked: "{prompt.strip()}"
 
 Provide helpful gardening advice based on the crop and location. Be specific and actionable.
 """
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-            response = model.generate_content(prompt_template)
-            return {"schedule_updated": False, "reply": response.text.strip()}
+            adapter = get_adapter()
+            resp = adapter.generate(prompt_template, model_names=["models/gemini-2.5-flash", "models/gemini-2.0-flash"]) 
+            if resp.get("success"):
+                return {"schedule_updated": False, "reply": resp.get("text", "").strip()}
+            else:
+                return {"schedule_updated": False, "reply": "⚠️ AI unavailable — please try again later."}
 
         schedule_lines = "\n".join(
             f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
@@ -583,116 +625,97 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
 
 
     try:
-        # Try multiple times with different models and timeouts
-        models_to_try = [
-            "models/gemini-2.0-flash",  # Faster model
-            "models/gemini-2.5-flash",  # Current model
-            "models/gemini-pro-latest"   # Fallback model
-        ]
-        
-        response = None
-        last_error = None
-        
-        for model_name in models_to_try:
-            try:
-                print(f"🤖 Trying AI model: {model_name}")
-                model = genai.GenerativeModel(model_name)
-                
-                # Generate with timeout handling
-                import time
-                start_time = time.time()
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=2048,
-                        temperature=0.1,  # Lower temperature for more consistent output
-                    )
-                )
-                
-                elapsed = time.time() - start_time
-                print(f"✅ AI generation successful with {model_name} in {elapsed:.2f}s")
-                break
-                
-            except Exception as e:
-                last_error = e
-                print(f"❌ Model {model_name} failed: {str(e)[:100]}...")
-                continue
-        
-        if response is None:
-            raise last_error or Exception("All AI models failed")
-            
-        text = response.text.strip()
+        adapter = get_adapter()
+        resp = adapter.generate(prompt, model_names=["models/gemini-2.0-flash", "models/gemini-2.5-flash", "models/gemini-pro-latest"], max_tokens=2048)
 
-        # ✅ Strip triple backticks if present
+        if not resp.get("success"):
+            raise Exception(resp.get("error", "LLM generation failed"))
+
+        text = resp.get("text", "").strip()
         clean_text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE)
-
-        # ✅ Parse JSON
         schedule = json.loads(clean_text)
 
-        # ✅ Enforce correct dates & day names
+        # Enforce correct dates & day names
         for i in range(7):
             date_obj = datetime.utcnow().date() + timedelta(days=i)
             schedule[i]["date"] = date_obj.strftime("%m/%d/%y")
-
             schedule[i]["day"] = f"Day {i + 1}"
 
+        # Validate schedule
+        valid, errors, sanitized = validate_schedule(schedule)
+        if not valid:
+            raise Exception(f"Schedule validation failed: {errors}")
 
-        print("✅ AI schedule parsed and fixed successfully")
-        return schedule
+        print("✅ AI schedule parsed and validated successfully")
+        return sanitized
 
     except Exception as e:
         print("⚠️ AI Schedule Output:", {
-            "error": "Could not parse response",
+            "error": "Could not parse or validate response",
             "raw": text if 'text' in locals() else "no response",
             "exception": str(e)
         })
-        
-        # Generate fallback schedule when AI fails
-        print("🔄 Generating AI-enhanced fallback schedule...")
-        
-        # Try a simpler AI prompt for fallback
+
+        # Ultimate fallback - basic schedule
+        print("🔄 Using deterministic fallback scheduler...")
+
         try:
-            simple_prompt = f"""
-Generate a 7-day irrigation schedule for {crop} crop in {area}m² area.
-Today is {today}. 
-Return ONLY a JSON array with 7 objects, each with: day, date (MM/DD/YY), liters (number), optimal_time (HH:MM AM/PM).
-Keep it simple and practical.
-"""
-            
-            fallback_model = genai.GenerativeModel("models/gemini-2.0-flash")
-            fallback_response = fallback_model.generate_content(simple_prompt)
-            fallback_text = fallback_response.text.strip()
-            
-            # Try to parse the simpler AI response
-            clean_fallback = re.sub(r"^```(?:json)?\s*|\s*```$", "", fallback_text.strip(), flags=re.MULTILINE)
-            fallback_schedule = json.loads(clean_fallback)
-            
-            # Add real dates
-            for i, day in enumerate(fallback_schedule):
-                date = (datetime.utcnow() + timedelta(days=i)).strftime("%m/%d/%y")
-                day["date"] = date
-                day["reason"] = "AI-enhanced fallback schedule"
-            
-            print("✅ AI-enhanced fallback schedule generated successfully")
+            # Build an ET0 forecast from the provided `daily` data if possible
+            et0_forecast = []
+            for d in daily[:7]:
+                # Prefer explicit et0/eto fields if provided
+                eto = None
+                if isinstance(d, dict):
+                    eto = d.get("et0") or d.get("eto")
+                    # forecast_utils produces temp_avg in °F
+                    tavg_f = d.get("temp_avg") or d.get("temp") or None
+                    if eto is None and tavg_f is not None:
+                        try:
+                            t_c = (float(tavg_f) - 32.0) * 5.0 / 9.0
+                            # Simple heuristic: ET0 scales with mean temp
+                            eto = max(0.1, round(t_c * 0.15, 2))
+                        except:
+                            eto = 2.0
+                if eto is None:
+                    eto = 2.0
+                et0_forecast.append(float(eto))
+
+            # Prepare plot dict for scheduler
+            plot_for_sched = {
+                "area_m2": plot.get("area_m2") or plot.get("area") or 1.0,
+                "crop_kc": plot.get("crop_kc") or CROP_K.get(crop.lower(), CROP_K.get("default", 0.95))
+            }
+
+            from scheduling.deterministic_scheduler import generate_deterministic_schedule
+
+            fallback_schedule = generate_deterministic_schedule(
+                plot_for_sched,
+                et0_forecast,
+                crop_kc=plot_for_sched.get("crop_kc"),
+                days=7,
+                efficiency=0.8,
+                preferred_time="06:00 AM",
+            )
+
+            # Ensure day labels exist
+            for idx, entry in enumerate(fallback_schedule):
+                entry.setdefault("day", f"Day {idx+1}")
+
             return fallback_schedule
-            
-        except Exception as fallback_error:
-            print(f"⚠️ AI fallback also failed: {fallback_error}")
-            # Ultimate fallback - basic schedule
-            print("🔄 Using basic fallback schedule...")
+
+        except Exception as fallback_exc:
+            print(f"❌ Deterministic fallback failed: {fallback_exc}")
+            # Final safe fallback: simple repeating low volumes
             fallback_schedule = []
-            base_liters = 2.0  # Base watering amount
-            
+            base_liters = 2.0
             for i in range(7):
                 date = (datetime.utcnow() + timedelta(days=i)).strftime("%m/%d/%y")
-                # Simple fallback: water every other day with varying amounts
                 liters = base_liters + (i % 2) * 1.0
                 fallback_schedule.append({
                     "day": f"Day {i+1}",
                     "date": date,
                     "liters": round(liters, 1),
-                    "optimal_time": "06:00",
-                    "reason": "Basic fallback schedule - AI unavailable"
+                    "optimal_time": "06:00 AM",
+                    "reason": "Final basic fallback - deterministic failed"
                 })
-            
             return fallback_schedule

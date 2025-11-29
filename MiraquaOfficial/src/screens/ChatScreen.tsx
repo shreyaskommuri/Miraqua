@@ -51,6 +51,9 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute || 'general');
   const [showPlotSelector, setShowPlotSelector] = useState(false);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingModifiedSchedule, setPendingModifiedSchedule] = useState<any[] | null>(null);
+  const [deterministicAlternative, setDeterministicAlternative] = useState<any[] | null>(null);
   const [realPlots, setRealPlots] = useState<any[]>([]);
   const [isLoadingPlots, setIsLoadingPlots] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -297,6 +300,13 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             plotId: selectedPlotId === 'general' ? null : selectedPlotId
           };
           setMessages(prev => [...prev, aiMessage]);
+
+          // If backend indicates schedule was updated, surface a confirm modal with undo option
+          if (data.schedule_updated) {
+            setPendingModifiedSchedule(data.modified_schedule || null);
+            setDeterministicAlternative(data.deterministic_alternative || null);
+            setShowConfirmModal(true);
+          }
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -333,6 +343,36 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     }
   };
 
+  const handleUndoSchedule = async () => {
+    if (!selectedPlotId || selectedPlotId === 'general') return;
+    try {
+      const { environment } = await import('../config/environment');
+      const resp = await fetch(`${environment.apiUrl}/revert_schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plot_id: selectedPlotId })
+      });
+      if (resp.ok) {
+        // Inform user and close modal
+        setShowConfirmModal(false);
+        setPendingModifiedSchedule(null);
+        // Add a bot message confirming revert
+        const revertMsg: Message = {
+          id: Date.now() + 2,
+          sender: 'bot',
+          text: '✅ Schedule reverted to the previous version.',
+          time: 'now',
+          plotId: selectedPlotId === 'general' ? null : selectedPlotId
+        };
+        setMessages(prev => [...prev, revertMsg]);
+      } else {
+        throw new Error('Failed to revert');
+      }
+    } catch (err) {
+      console.error('Failed to revert schedule:', err);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -363,6 +403,139 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
           </TouchableOpacity>
         </View>
       </View>
+      {/* Confirm Modal for schedule updates */}
+      <Modal
+        visible={showConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.plotSelectorModal, { width: '90%', maxHeight: '60%' }] }>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Schedule Updated</Text>
+              <TouchableOpacity onPress={() => setShowConfirmModal(false)}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <Text style={{ color: 'white', marginBottom: 12 }}>Your schedule was automatically updated by the AI. Review AI suggestion and a deterministic alternative below — choose which one to apply or undo to revert.</Text>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#A7F3D0', fontWeight: '700', marginBottom: 8 }}>AI Suggestion</Text>
+                  {pendingModifiedSchedule ? (
+                    pendingModifiedSchedule.map((d: any, i: number) => (
+                      <View key={`ai-${i}`} style={{ marginBottom: 8 }}>
+                        <Text style={{ color: '#A7F3D0', fontWeight: '600' }}>{d.day} — {d.date}</Text>
+                        <Text style={{ color: 'white' }}>{d.liters} L • {d.optimal_time || 'time N/A'}</Text>
+                        {d.note && <Text style={{ color: 'rgba(255,255,255,0.7)' }}>{d.note}</Text>}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ color: 'white' }}>No AI schedule available.</Text>
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#60A5FA', fontWeight: '700', marginBottom: 8 }}>Deterministic Alternative</Text>
+                  {deterministicAlternative ? (
+                    deterministicAlternative.map((d: any, i: number) => (
+                      <View key={`det-${i}`} style={{ marginBottom: 8 }}>
+                        <Text style={{ color: '#60A5FA', fontWeight: '600' }}>{d.day} — {d.date}</Text>
+                        <Text style={{ color: 'white' }}>{d.liters} L • {d.optimal_time || 'time N/A'}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ color: 'white' }}>No deterministic alternative available.</Text>
+                  )}
+                </View>
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20 }}>
+              <View style={{ flex: 2, flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity style={[styles.quickActionButton, { flex: 1, marginRight: 4 }]} onPress={async () => {
+                  // Apply the AI suggested schedule
+                  if (pendingModifiedSchedule && selectedPlotId && selectedPlotId !== 'general') {
+                    try {
+                      const { environment } = await import('../config/environment');
+                      const resp = await fetch(`${environment.apiUrl}/apply_schedule`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ plot_id: selectedPlotId, schedule: pendingModifiedSchedule, reason: 'User accepted AI suggestion' })
+                      });
+                      if (resp.ok) {
+                        setShowConfirmModal(false);
+                        setPendingModifiedSchedule(null);
+                        setDeterministicAlternative(null);
+                        const okMsg: Message = {
+                          id: Date.now() + 3,
+                          sender: 'bot',
+                          text: '✅ AI schedule applied successfully.',
+                          time: 'now',
+                          plotId: selectedPlotId === 'general' ? null : selectedPlotId
+                        };
+                        setMessages(prev => [...prev, okMsg]);
+                      } else {
+                        console.error('Failed to apply schedule', resp.status);
+                      }
+                    } catch (err) {
+                      console.error('Error applying schedule', err);
+                    }
+                  } else {
+                    setShowConfirmModal(false);
+                    setPendingModifiedSchedule(null);
+                    setDeterministicAlternative(null);
+                  }
+                }}>
+                  <Text style={[styles.quickActionText]}>Apply AI</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.quickActionButton, { flex: 1, backgroundColor: '#0369A1' }]} onPress={async () => {
+                  // Apply deterministic alternative schedule
+                  if (deterministicAlternative && selectedPlotId && selectedPlotId !== 'general') {
+                    try {
+                      const { environment } = await import('../config/environment');
+                      const resp = await fetch(`${environment.apiUrl}/apply_schedule`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ plot_id: selectedPlotId, schedule: deterministicAlternative, reason: 'User selected deterministic alternative' })
+                      });
+                      if (resp.ok) {
+                        setShowConfirmModal(false);
+                        setPendingModifiedSchedule(null);
+                        setDeterministicAlternative(null);
+                        const okMsg: Message = {
+                          id: Date.now() + 4,
+                          sender: 'bot',
+                          text: '✅ Deterministic schedule applied successfully.',
+                          time: 'now',
+                          plotId: selectedPlotId === 'general' ? null : selectedPlotId
+                        };
+                        setMessages(prev => [...prev, okMsg]);
+                      } else {
+                        console.error('Failed to apply deterministic schedule', resp.status);
+                      }
+                    } catch (err) {
+                      console.error('Error applying deterministic schedule', err);
+                    }
+                  } else {
+                    setShowConfirmModal(false);
+                    setPendingModifiedSchedule(null);
+                    setDeterministicAlternative(null);
+                  }
+                }}>
+                  <Text style={[styles.quickActionText]}>Apply Deterministic</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={[styles.quickActionButton, { flex: 1, backgroundColor: '#EF4444' }]} onPress={handleUndoSchedule}>
+                <Text style={[styles.quickActionText]}>Undo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Quick Actions Section */}
       <View style={styles.quickActionsSection}>

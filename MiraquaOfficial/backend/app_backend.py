@@ -11,6 +11,7 @@ from dateutil import tz
 from timezonefinder import TimezoneFinder
 import resource
 from utils.forecast_utils import get_forecast, calculate_schedule, find_optimal_time, dynamic_kc
+from utils.schedule_utils import validate_schedule
 
 # Raise file/socket limits for Render
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -670,6 +671,13 @@ def chat():
     logs = logs_res.data or []
 
     # 📥 Call AI chat processor
+    # Fetch original schedule for logging BEFORE processing
+    try:
+        schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
+        original_schedule = schedule_res.data[0]["schedule"] if schedule_res.data else []
+    except Exception:
+        original_schedule = []
+
     result = process_chat_command(
         prompt=prompt,
         crop=crop,
@@ -685,14 +693,10 @@ def chat():
         age=age  # ✅ passed in
     )
     reply = result["reply"]
+    schedule_updated_flag = result.get("schedule_updated", False)
 
-    # 🔁 Get updated schedule (if changed)
-    refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
-    updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
-
-    # 🗓️ Get original schedule for log
-    schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-    original_schedule = schedule_res.data[0]["schedule"] if refreshed.data else []
+    # Use modified schedule returned by AI (preview) — do NOT persist here. Frontend will call /apply_schedule to persist.
+    updated_schedule = result.get("modified_schedule", [])
 
     # 📝 Save chat history
     try:
@@ -723,7 +727,50 @@ def chat():
         print(f"   Full traceback: {traceback.format_exc()}")
         # Continue without saving chat history - don't crash the chat
 
-    return jsonify({"success": True, "reply": reply})
+    return jsonify({"success": True, "reply": reply, "schedule_updated": schedule_updated_flag, "modified_schedule": updated_schedule})
+
+
+@app.route('/apply_schedule', methods=['POST'])
+def apply_schedule():
+    data = request.get_json()
+    plot_id = data.get('plot_id')
+    schedule = data.get('schedule')
+    reason = data.get('reason', 'Applied by user')
+
+    if not plot_id or schedule is None:
+        return jsonify({"success": False, "error": "Missing plot_id or schedule"}), 400
+
+    # Validate schedule
+    valid, errors, sanitized = validate_schedule(schedule)
+    if not valid:
+        return jsonify({"success": False, "error": "Schedule validation failed", "details": errors}), 400
+
+    try:
+        # Fetch original schedule for change log
+        sched_res = supabase.table('plot_schedules').select('schedule').eq('plot_id', plot_id).limit(1).execute()
+        original_schedule = sched_res.data[0]['schedule'] if sched_res.data else []
+
+        # Upsert the new schedule
+        supabase.table('plot_schedules').upsert({
+            'plot_id': plot_id,
+            'schedule': sanitized
+        }, on_conflict=['plot_id']).execute()
+
+        # Log schedule change
+        supabase.table('schedule_changes').insert({
+            'id': str(uuid4()),
+            'plot_id': plot_id,
+            'timestamp': datetime.utcnow().isoformat(),
+            'old_schedule': original_schedule,
+            'new_schedule': sanitized,
+            'reason': reason
+        }).execute()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print(f"❌ Failed to apply schedule: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 
