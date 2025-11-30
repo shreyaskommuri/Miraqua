@@ -259,6 +259,8 @@ YOUR ANSWER:"""
             og_schedule = []
             original_schedule = []
 
+        # schedule loaded (no debug print)
+
         updated_schedule = [d.copy() for d in schedule]
         reply_lines = []
         schedule_changed = False
@@ -291,6 +293,8 @@ YOUR ANSWER:"""
             if 0 <= idx < len(schedule):
                 target_indices.add(idx)
 
+        # parsing results recorded (no debug print)
+
         date_matches = re.findall(r"\b(\d{1,2}/\d{1,2}(?:/\d{2})?)\b", prompt_lower)
         for match in date_matches:
             try:
@@ -312,7 +316,11 @@ YOUR ANSWER:"""
 
         # === 4. Skip or Set ===
         skip_cmd = any(word in prompt_lower for word in ["skip", "cancel", "don't water", "don't water", "no watering"])
+        # Try to capture explicit 'set X liters' patterns. Also allow the number to appear elsewhere
         set_match = re.search(r"set\s*(?:to)?\s*(\d+(\.\d+)?)\s*(liters|l)?", prompt_lower)
+        if not set_match:
+            # fallback: find any '<number> liters' mention in the prompt
+            set_match = re.search(r"(\d+(?:\.\d+)?)\s*(liters|l)\b", prompt_lower)
 
         if target_indices and (skip_cmd or set_match):
             for idx in target_indices:
@@ -402,9 +410,9 @@ YOUR ANSWER:"""
 
                 plot_for_sched = {
                     "area_m2": plot.get("area_m2") or plot.get("area") or 1.0,
-                    "crop_kc": plot.get("crop_kc") or CROP_K.get(crop.lower(), CROP_K.get("default", 0.95))
+                    "crop_kc": plot.get("crop_kc") or CROP_KC.get(crop.lower(), CROP_KC.get("default", 0.95))
                 }
-
+                # inputs prepared for deterministic scheduler
                 from scheduling.deterministic_scheduler import generate_deterministic_schedule
 
                 deterministic_alt = generate_deterministic_schedule(
@@ -415,6 +423,7 @@ YOUR ANSWER:"""
                     efficiency=0.8,
                     preferred_time="06:00 AM",
                 )
+                # deterministic alternative generated
             except Exception as err:
                 print(f"⚠️ Could not create deterministic alternative: {err}")
                 deterministic_alt = None

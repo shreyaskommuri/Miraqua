@@ -718,8 +718,8 @@ def chat():
             "edited": False
         }
         print(f"📝 Attempting to save chat log: plot_id={plot_id}, user_id={user_id}, session={chat_session_id}")
-        result = supabase.table("farmerAI_chatlog").insert(chat_log_data).execute()
-        print(f"✅ Chat history saved successfully: {result.data}")
+        insert_res = supabase.table("farmerAI_chatlog").insert(chat_log_data).execute()
+        print(f"✅ Chat history saved successfully: {insert_res.data}")
     except Exception as e:
         print(f"⚠️ Failed to save chat history: {e}")
         print(f"   Data attempted: {chat_log_data}")
@@ -727,7 +727,17 @@ def chat():
         print(f"   Full traceback: {traceback.format_exc()}")
         # Continue without saving chat history - don't crash the chat
 
-    return jsonify({"success": True, "reply": reply, "schedule_updated": schedule_updated_flag, "modified_schedule": updated_schedule})
+    resp_payload = {
+        "success": True,
+        "reply": reply,
+        "schedule_updated": schedule_updated_flag,
+        "modified_schedule": updated_schedule
+    }
+    # Include deterministic alternative when provided by AI processor
+    if isinstance(result.get("deterministic_alternative"), list):
+        resp_payload["deterministic_alternative"] = result.get("deterministic_alternative")
+
+    return jsonify(resp_payload)
 
 
 @app.route('/apply_schedule', methods=['POST'])
