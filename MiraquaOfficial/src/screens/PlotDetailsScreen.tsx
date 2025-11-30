@@ -106,6 +106,65 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       console.log('📅 Raw schedule dates from Supabase:', scheduleDates);
       console.log('📅 Schedule entries from Supabase:', schedule);
       
+      // Helper: normalize many date formats to YYYY-MM-DD
+      const normalize = (d: any) => {
+        if (d === null || d === undefined) return null;
+        let s = String(d).trim();
+        // If ISO-ish already
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
+        // If MM/DD/YY or MM/DD/YYYY
+        if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) {
+          const parts = s.split('/');
+          let [m, dayPart, y] = parts;
+          m = m.padStart(2, '0');
+          dayPart = dayPart.padStart(2, '0');
+          if (y.length === 2) {
+            const yy = parseInt(y, 10);
+            y = yy < 50 ? `20${y}` : `19${y}`;
+          }
+          return `${y}-${m}-${dayPart}`;
+        }
+        // Fallback: try Date parsing
+        const parsed = new Date(s);
+        if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+        return null;
+      };
+
+      // Helper: extract liters/volume from a schedule entry (supports nested blocks/arrays)
+      const extractLiters = (entry: any) => {
+        if (!entry) return 0;
+        const tryNumber = (v: any) => {
+          if (v === null || v === undefined) return 0;
+          if (typeof v === 'number') return v;
+          const s = String(v).replace(/[^0-9.\-]/g, '');
+          const n = parseFloat(s);
+          return isNaN(n) ? 0 : n;
+        };
+
+        // Common top-level keys
+        const candidates = ['liters','liter','l','amount','volume','water_liters','ml'];
+        for (const key of candidates) {
+          if (entry[key] !== undefined) return tryNumber(entry[key]);
+        }
+
+        // Nested blocks (e.g., hourly blocks)
+        if (Array.isArray(entry.blocks) && entry.blocks.length > 0) {
+          return entry.blocks.reduce((acc: number, b: any) => acc + tryNumber(b.liters ?? b.amount ?? b.volume ?? b.ml), 0);
+        }
+
+        // If the entry itself is an array of sub-entries
+        if (Array.isArray(entry)) {
+          return entry.reduce((acc: number, e: any) => acc + extractLiters(e), 0);
+        }
+
+        // Some schedules embed a `schedule` or `daily` array
+        if (Array.isArray(entry.schedule) && entry.schedule.length > 0) {
+          return entry.schedule.reduce((acc: number, e: any) => acc + extractLiters(e), 0);
+        }
+
+        return 0;
+      };
+
       // Always start from today and generate 14 days
       // This ensures we can match schedule entries regardless of their date range
       for (let i = 0; i < 14; i++) {
@@ -125,54 +184,45 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           // Find if this date has watering in the real schedule
           const scheduleEntry = schedule.find((entry: any) => {
             try {
-              const entryDate = entry.date || entry.date_str || entry.date_iso || entry.day_date;
-              if (!entryDate) {
-                console.warn('⚠️ Schedule entry missing date:', entry);
-                return false;
+              // Possible date keys
+              const entryDateRaw = entry?.date || entry?.date_str || entry?.date_iso || entry?.day_date || entry?.start || entry?.datetime || entry?.timestamp || entry?.day;
+              // If the entry is an object with nested arrays (e.g., blocks), it may not have a top-level date - try common nested fields
+              let formattedEntryDate = normalize(entryDateRaw);
+
+              // If not found, try to infer from nested sub-entries
+              if (!formattedEntryDate && Array.isArray(entry)) {
+                for (const sub of entry) {
+                  const fd = normalize(sub?.date || sub?.date_str || sub?.date_iso || sub?.day_date || sub?.start || sub?.datetime);
+                  if (fd) { formattedEntryDate = fd; break; }
+                }
               }
 
-              // Helper: try to normalize several common formats to YYYY-MM-DD
-              const normalize = (d: string) => {
-                d = String(d).trim();
-                // If ISO-ish already
-                if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
-                // If MM/DD/YY or MM/DD/YYYY
-                if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(d)) {
-                  const parts = d.split('/');
-                  let [m, dayPart, y] = parts;
-                  m = m.padStart(2, '0');
-                  dayPart = dayPart.padStart(2, '0');
-                  if (y.length === 2) {
-                    const yy = parseInt(y, 10);
-                    y = yy < 50 ? `20${y}` : `19${y}`;
+              if (!formattedEntryDate && entry && typeof entry === 'object') {
+                if (Array.isArray(entry.schedule)) {
+                  for (const sub of entry.schedule) {
+                    const fd = normalize(sub?.date || sub?.date_str || sub?.date_iso || sub?.start);
+                    if (fd) { formattedEntryDate = fd; break; }
                   }
-                  return `${y}-${m}-${dayPart}`;
                 }
-                // Fallback: try Date parsing
-                const parsed = new Date(d);
-                if (!isNaN(parsed.getTime())) {
-                  return parsed.toISOString().split('T')[0];
-                }
-                return null;
-              };
+              }
 
-              const formattedEntryDate = normalize(entryDate);
               if (!formattedEntryDate) {
-                console.warn('⚠️ Could not normalize schedule date:', entryDate, entry);
+                console.warn('⚠️ Schedule entry missing/unknown date:', entry);
                 return false;
               }
 
-              console.log(`🔍 Comparing Supabase date ${entryDate} (${formattedEntryDate}) with frontend date ${dateStr}`);
+              console.log(`🔍 Comparing Supabase date ${String(entryDateRaw)} (${formattedEntryDate}) with frontend date ${dateStr}`);
               return formattedEntryDate === dateStr;
             } catch (error) {
               console.error('❌ Error parsing schedule date:', error, entry);
               return false;
             }
           });
-          
-          // Check if this is a watering day based on liters > 0
-          const hasWatering = !!scheduleEntry && (scheduleEntry.liters > 0);
-          const volume = hasWatering ? scheduleEntry.liters : 0;
+
+          // Check if this is a watering day based on extracted liters > 0
+          const liters = extractLiters(scheduleEntry);
+          const hasWatering = !!scheduleEntry && liters > 0;
+          const volume = hasWatering ? liters : 0;
           
           if (hasWatering) {
             console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
@@ -783,7 +833,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             </TouchableOpacity>
             
                         {/* Debug Info - Only show in development */}
-            {__DEV__ && false && (
+            {__DEV__ && (
               <View style={styles.debugInfo}>
                 <Text style={styles.debugText}>
                   Schedule Data: {realScheduleData ? `${realScheduleData.schedule?.length || 0} entries` : 'None'}
@@ -794,6 +844,13 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 <Text style={styles.debugText}>
                   Watering Days: {getScheduleData().filter(d => d.hasWatering).length} days
                 </Text>
+                {realScheduleData?.schedule && (
+                  <ScrollView style={{ maxHeight: 160, marginTop: 8 }}>
+                    <Text style={[styles.debugText, { fontFamily: 'monospace' }]}> 
+                      {JSON.stringify(realScheduleData.schedule, null, 2)}
+                    </Text>
+                  </ScrollView>
+                )}
               </View>
             )}
 
