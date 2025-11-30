@@ -125,22 +125,44 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           // Find if this date has watering in the real schedule
           const scheduleEntry = schedule.find((entry: any) => {
             try {
-              // Supabase sends date in MM/DD/YY format
-              const entryDate = entry.date;
+              const entryDate = entry.date || entry.date_str || entry.date_iso || entry.day_date;
               if (!entryDate) {
                 console.warn('⚠️ Schedule entry missing date:', entry);
                 return false;
               }
-              
-              // Convert MM/DD/YY to YYYY-MM-DD for comparison
-              const [month, day, year] = entryDate.split('/');
-              // Handle 2-digit year - assume 20xx for years 00-99
-              const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
-              const formattedEntryDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              
+
+              // Helper: try to normalize several common formats to YYYY-MM-DD
+              const normalize = (d: string) => {
+                d = String(d).trim();
+                // If ISO-ish already
+                if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
+                // If MM/DD/YY or MM/DD/YYYY
+                if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(d)) {
+                  const parts = d.split('/');
+                  let [m, dayPart, y] = parts;
+                  m = m.padStart(2, '0');
+                  dayPart = dayPart.padStart(2, '0');
+                  if (y.length === 2) {
+                    const yy = parseInt(y, 10);
+                    y = yy < 50 ? `20${y}` : `19${y}`;
+                  }
+                  return `${y}-${m}-${dayPart}`;
+                }
+                // Fallback: try Date parsing
+                const parsed = new Date(d);
+                if (!isNaN(parsed.getTime())) {
+                  return parsed.toISOString().split('T')[0];
+                }
+                return null;
+              };
+
+              const formattedEntryDate = normalize(entryDate);
+              if (!formattedEntryDate) {
+                console.warn('⚠️ Could not normalize schedule date:', entryDate, entry);
+                return false;
+              }
+
               console.log(`🔍 Comparing Supabase date ${entryDate} (${formattedEntryDate}) with frontend date ${dateStr}`);
-              
-              // Compare the formatted dates
               return formattedEntryDate === dateStr;
             } catch (error) {
               console.error('❌ Error parsing schedule date:', error, entry);
