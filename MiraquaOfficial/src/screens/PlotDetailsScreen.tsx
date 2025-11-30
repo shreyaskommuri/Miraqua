@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { environment } from '../config/environment';
 
 interface Plot {
-  id: number;
+  id: string;
   name: string;
   crop: string;
   variety: string;
@@ -292,26 +292,28 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       }
       
       // Transform the backend data to match our Plot interface
+      // Normalize fields from backend (accept multiple possible key names)
+      const toStr = (v: any) => (v === undefined || v === null) ? String(plotId) : String(v);
       const transformedPlot: Plot = {
-        id: plotData.id || plotId,
-        name: plotData.name,
-        crop: plotData.crop,
-        variety: plotData.variety || "Standard",
-        moisture: plotData.moisture,
-        temperature: plotData.temperature,
-        sunlight: plotData.sunlight,
-        phLevel: plotData.phLevel,
-        nextWatering: scheduleData?.schedule?.[0]?.optimal_time || plotData.nextWatering || "Not scheduled",
-        status: plotData.status,
-        location: plotData.location,
-        lastWatered: plotData.lastWatered || "Not recorded",
-        area: plotData.area,
-        healthScore: plotData.healthScore,
-        waterSavings: plotData.waterSavings,
-        latitude: plotData.latitude,
-        longitude: plotData.longitude,
-        isOnline: plotData.isOnline,
-        sensors: plotData.sensors || []
+        id: toStr(plotData.id || plotData.plot_id || plotId),
+        name: plotData.name || plotData.plot_name || `Plot ${String(plotId).slice(0, 8)}` ,
+        crop: plotData.crop || plotData.crop_type || 'Unknown',
+        variety: plotData.variety || plotData.variety_name || "Standard",
+        moisture: Number(plotData.moisture ?? plotData.soil_moisture ?? 0),
+        temperature: Number(plotData.temperature ?? plotData.temp ?? 0),
+        sunlight: Number(plotData.sunlight ?? plotData.light ?? 0),
+        phLevel: Number(plotData.phLevel ?? plotData.soil_ph ?? plotData.ph_level ?? 0),
+        nextWatering: scheduleData?.schedule?.[0]?.optimal_time || plotData.next_watering || plotData.nextWatering || "Not scheduled",
+        status: plotData.status || plotData.plot_status || 'healthy',
+        location: plotData.location || plotData.address || 'Unknown',
+        lastWatered: plotData.lastWatered || plotData.last_watered || 'Not recorded',
+        area: plotData.area ?? plotData.size ?? 0,
+        healthScore: Number(plotData.healthScore ?? plotData.health_score ?? 0),
+        waterSavings: Number(plotData.waterSavings ?? plotData.water_savings ?? 0),
+        latitude: Number(plotData.latitude ?? plotData.lat ?? 0),
+        longitude: Number(plotData.longitude ?? plotData.lon ?? plotData.lng ?? 0),
+        isOnline: plotData.isOnline ?? plotData.online ?? true,
+        sensors: plotData.sensors || plotData.sensor_list || []
       };
       
       setPlot(transformedPlot);
@@ -337,58 +339,31 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       Alert.alert('Error', errorMessage);
       
       // Fallback to mock data if API fails
+      // Simplified mock plot if backend fails - avoid numeric id comparisons
       const mockPlot: Plot = {
-        id: plotId,
-        name: plotId === 1 ? "Cherry Tomato" : plotId === 2 ? "Herb Garden" : "Pepper Patch",
-        crop: plotId === 1 ? "Tomatoes" : plotId === 2 ? "Herbs" : "Peppers",
-        variety: plotId === 1 ? "Sweet 100" : plotId === 2 ? "Basil & Rosemary" : "California Wonder",
-        moisture: plotId === 1 ? 68 : plotId === 2 ? 55 : 42,
-        temperature: plotId === 1 ? 72 : plotId === 2 ? 70 : 75,
-        sunlight: plotId === 1 ? 85 : plotId === 2 ? 92 : 78,
+        id: String(plotId),
+        name: `Plot ${String(plotId).slice(0, 8)}`,
+        crop: 'Mixed Vegetables',
+        variety: 'Standard',
+        moisture: 60,
+        temperature: 72,
+        sunlight: 80,
         phLevel: 6.8,
-        nextWatering: plotId === 1 ? "Tomorrow 6AM" : plotId === 2 ? "Today 8PM" : "In 2 hours",
-        status: plotId === 1 ? 'healthy' : plotId === 2 ? 'healthy' : 'attention',
-        location: plotId === 1 ? "Backyard Plot A" : plotId === 2 ? "Kitchen Window" : "Side Garden",
-        lastWatered: plotId === 1 ? "Yesterday" : plotId === 2 ? "2 days ago" : "3 days ago",
-        area: plotId === 1 ? 25 : plotId === 2 ? 12 : 18,
-        healthScore: plotId === 1 ? 87 : plotId === 2 ? 92 : 73,
-        waterSavings: plotId === 1 ? 23 : plotId === 2 ? 18 : 15,
+        nextWatering: 'Tomorrow 6AM',
+        status: 'healthy',
+        location: 'Backyard',
+        lastWatered: 'Yesterday',
+        area: 20,
+        healthScore: 85,
+        waterSavings: 20,
         latitude: 37.7749,
         longitude: -122.4194,
-        isOnline: plotId !== 3,
+        isOnline: true,
         sensors: [
-          {
-            id: 'moisture',
-            name: 'Soil Moisture',
-            value: plotId === 1 ? 68 : plotId === 2 ? 55 : 42,
-            unit: '%',
-            status: 'optimal',
-            lastUpdate: '2 min ago'
-          },
-          {
-            id: 'temperature',
-            name: 'Temperature',
-            value: plotId === 1 ? 72 : plotId === 2 ? 70 : 75,
-            unit: '°F',
-            status: 'optimal',
-            lastUpdate: '1 min ago'
-          },
-          {
-            id: 'sunlight',
-            name: 'Light',
-            value: plotId === 1 ? 85 : plotId === 2 ? 92 : 78,
-            unit: '%',
-            status: 'optimal',
-            lastUpdate: '5 min ago'
-          },
-          {
-            id: 'ph',
-            name: 'pH Level',
-            value: 6.8,
-            unit: '',
-            status: 'optimal',
-            lastUpdate: '1 hour ago'
-          }
+          { id: 'moisture', name: 'Soil Moisture', value: 60, unit: '%', status: 'optimal', lastUpdate: '2 min ago' },
+          { id: 'temperature', name: 'Temperature', value: 72, unit: '°F', status: 'optimal', lastUpdate: '1 min ago' },
+          { id: 'sunlight', name: 'Light', value: 80, unit: '%', status: 'optimal', lastUpdate: '5 min ago' },
+          { id: 'ph', name: 'pH Level', value: 6.8, unit: '', status: 'optimal', lastUpdate: '1 hour ago' }
         ]
       };
       
