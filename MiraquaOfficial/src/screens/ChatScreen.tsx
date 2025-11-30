@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import uuid from 'react-native-uuid';
 
 interface PlotData {
-  id: number;
+  id: string;
   name: string;
   crop: string;
   moisture: number;
@@ -48,7 +48,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   
   const [message, setMessage] = useState('');
   const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
-  const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute || 'general');
+  const [selectedPlotId, setSelectedPlotId] = useState<string>(String(plotIdFromRoute || 'general'));
   const [showPlotSelector, setShowPlotSelector] = useState(false);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -79,6 +79,9 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   // Generate a session ID once per chat screen instance
   const chatSessionId = useRef(uuid.v4() as string).current;
 
+  // Ref to the messages scroll view so we can auto-scroll to bottom
+  const messagesScrollRef = useRef<ScrollView | null>(null);
+
   // Get current user ID
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -101,10 +104,23 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
       // Show general messages (plotId is null or undefined)
       setFilteredMessages(messages.filter(msg => !msg.plotId));
     } else {
-      // Show messages for the specific plot
-      setFilteredMessages(messages.filter(msg => msg.plotId === selectedPlotId));
+      // Show messages for the specific plot - normalize comparisons to string
+      setFilteredMessages(messages.filter(msg => msg.plotId && String(msg.plotId) === String(selectedPlotId)));
     }
   }, [selectedPlotId, messages]);
+
+  // Scroll to bottom when filtered messages change
+  useEffect(() => {
+    // give RN a tick to layout new content
+    const t = setTimeout(() => {
+      try {
+        messagesScrollRef.current?.scrollToEnd({ animated: true });
+      } catch (e) {
+        // ignore scroll errors
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [filteredMessages]);
 
   const quickActions = selectedPlot ? [
     "Water",
@@ -454,7 +470,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             </ScrollView>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20 }}>
               <View style={{ flex: 2, flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity style={[styles.quickActionButton, { flex: 1, marginRight: 4 }]} onPress={async () => {
+                <TouchableOpacity accessibilityLabel="Apply AI suggested schedule" accessibilityRole="button" style={[styles.quickActionButton, { flex: 1, marginRight: 4 }]} onPress={async () => {
                   // Apply the AI suggested schedule
                   if (pendingModifiedSchedule && selectedPlotId && selectedPlotId !== 'general') {
                     try {
@@ -491,7 +507,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
                   <Text style={[styles.quickActionText]}>Apply AI</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.quickActionButton, { flex: 1, backgroundColor: '#0369A1' }]} onPress={async () => {
+                <TouchableOpacity accessibilityLabel="Apply deterministic alternative schedule" accessibilityRole="button" style={[styles.quickActionButton, { flex: 1, backgroundColor: '#0369A1' }]} onPress={async () => {
                   // Apply deterministic alternative schedule
                   if (deterministicAlternative && selectedPlotId && selectedPlotId !== 'general') {
                     try {
@@ -529,7 +545,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={[styles.quickActionButton, { flex: 1, backgroundColor: '#EF4444' }]} onPress={handleUndoSchedule}>
+              <TouchableOpacity accessibilityLabel="Undo last schedule change" accessibilityRole="button" style={[styles.quickActionButton, { flex: 1, backgroundColor: '#EF4444' }]} onPress={handleUndoSchedule}>
                 <Text style={[styles.quickActionText]}>Undo</Text>
               </TouchableOpacity>
             </View>
@@ -552,9 +568,10 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
           </TouchableOpacity>
         </View>
         <View style={styles.quickActionsGrid}>
-          {quickActions.map((action, index) => (
+          {quickActions.map((action) => (
             <TouchableOpacity
-              key={index}
+              key={action}
+              accessibilityLabel={`Quick action ${action}`}
               style={styles.quickActionButton}
               onPress={() => handleQuickAction(action)}
             >
@@ -653,6 +670,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
 
       {/* Messages - Scrollable Area */}
       <ScrollView 
+        ref={messagesScrollRef}
         style={styles.chatArea} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -660,7 +678,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         <View style={styles.messagesContainer}>
           {filteredMessages.map((msg) => (
             <View
-              key={msg.id}
+              key={String(msg.id)}
               style={[
                 styles.messageRow,
                 msg.sender === 'user' ? styles.userMessageRow : styles.botMessageRow
