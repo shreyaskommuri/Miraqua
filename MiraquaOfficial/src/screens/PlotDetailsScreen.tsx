@@ -586,110 +586,155 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header */}
+      {/* Header with glassmorphism */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <View style={styles.backButtonInner}>
+            <Ionicons name="arrow-back" size={22} color="white" />
+          </View>
         </TouchableOpacity>
         
         <View style={styles.headerContent}>
-          <View style={styles.plotIcon}>
-            <Text style={styles.plotEmoji}>🌿</Text>
+          <View style={styles.plotIconContainer}>
+            <LinearGradient
+              colors={['#10B981', '#059669']}
+              style={styles.plotIconGradient}
+            >
+              <Text style={styles.plotEmoji}>🌿</Text>
+            </LinearGradient>
             <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#10B981' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
           </View>
           
           <View style={styles.headerInfo}>
-                    <Text style={styles.headerTitle}>{plot.name || 'Unnamed Plot'}</Text>
-        <View style={styles.headerSubtitle}>
-          <Text style={styles.cropText}>{plot.crop || 'Unknown'} • {plot.variety || 'Standard'}</Text>
+            <Text style={styles.headerTitle}>{plot.name || 'Unnamed Plot'}</Text>
+            <View style={styles.headerSubtitle}>
+              <View style={styles.cropBadge}>
+                <Ionicons name="leaf" size={12} color="#10B981" />
+                <Text style={styles.cropText}>{plot.crop || 'Unknown'}</Text>
+              </View>
+              <View style={styles.varietyBadge}>
+                <Text style={styles.varietyText}>{plot.variety || 'Standard'}</Text>
+              </View>
             </View>
           </View>
         </View>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerAction} onPress={handleExport}>
-            <Ionicons name="download" size={20} color="white" />
+          <TouchableOpacity style={styles.headerActionButton} onPress={handleExport}>
+            <Ionicons name="download-outline" size={20} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerAction} onPress={handleShare}>
-            <Ionicons name="share-outline" size={20} color="white" />
+          <TouchableOpacity style={styles.headerActionButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={20} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerAction} onPress={handleSettings}>
-            <Ionicons name="settings" size={20} color="white" />
+          <TouchableOpacity style={styles.headerActionButton} onPress={handleSettings}>
+            <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Photo/Map Header */}
+        {/* Hero Photo Card */}
         <View style={styles.photoCard}>
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={['#10B981', '#059669', '#047857']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.photoGradient}
           >
+            <View style={styles.photoOverlay} />
             <View style={styles.photoContent}>
-              <Ionicons name="camera" size={64} color="rgba(255, 255, 255, 0.6)" />
-              <Text style={styles.photoText}>Tap to add plot photo</Text>
-              <Text style={styles.photoSubtext}>Show off your beautiful garden</Text>
+              <View style={styles.cameraIconContainer}>
+                <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.8)" />
+              </View>
+              <Text style={styles.photoText}>Add Plot Photo</Text>
+              <Text style={styles.photoSubtext}>Capture your garden's progress</Text>
             </View>
             <TouchableOpacity style={styles.maximizeButton}>
-              <Ionicons name="expand" size={16} color="white" />
+              <View style={styles.maximizeButtonInner}>
+                <Ionicons name="expand" size={14} color="white" />
+              </View>
             </TouchableOpacity>
           </LinearGradient>
           
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <View style={styles.statIcon}>
-                <Ionicons name="heart" size={24} color="#EF4444" />
-              </View>
-              <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
-              <Text style={styles.statLabel}>Health Score</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']}
+                style={styles.statGradient}
+              >
+                <View style={styles.statIconWrapper}>
+                  <Ionicons name="heart" size={20} color="#EF4444" />
+                </View>
+                <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
+                <Text style={styles.statLabel}>Health</Text>
+              </LinearGradient>
             </View>
             
-            <View style={styles.statItem}>
-              <View style={styles.statIcon}>
-                <Ionicons name="calendar" size={24} color="#10B981" />
-              </View>
-              <Text style={styles.statValue}>2 months</Text>
-              <Text style={styles.statLabel}>Crop Age</Text>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']}
+                style={styles.statGradient}
+              >
+                <View style={styles.statIconWrapper}>
+                  <Ionicons name="calendar-outline" size={20} color="#10B981" />
+                </View>
+                <Text style={styles.statValue}>2mo</Text>
+                <Text style={styles.statLabel}>Age</Text>
+              </LinearGradient>
             </View>
             
-            <View style={styles.statItem}>
-              <View style={styles.statIcon}>
-                <Ionicons name="water" size={24} color="#059669" />
-              </View>
-              <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
-              <Text style={styles.statLabel}>Water Saved</Text>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.05)']}
+                style={styles.statGradient}
+              >
+                <View style={styles.statIconWrapper}>
+                  <Ionicons name="water-outline" size={20} color="#3B82F6" />
+                </View>
+                <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
+                <Text style={styles.statLabel}>Saved</Text>
+              </LinearGradient>
             </View>
           </View>
         </View>
 
-        {/* AI Summary */}
+        {/* AI Insights Card */}
         <View style={styles.aiCard}>
           <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
+            colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.aiGradient}
           >
+            <View style={styles.aiShine} />
             <View style={styles.aiHeader}>
-              <View style={styles.aiTitle}>
-                <Ionicons name="sparkles" size={20} color="white" />
+              <View style={styles.aiTitleContainer}>
+                <View style={styles.aiIconWrapper}>
+                  <Ionicons name="sparkles" size={18} color="#FFF" />
+                </View>
                 <Text style={styles.aiTitleText}>AI Insights</Text>
+                <View style={styles.aiBadge}>
+                  <Text style={styles.aiBadgeText}>SMART</Text>
+                </View>
               </View>
               <TouchableOpacity 
                 style={styles.aiRefreshButton}
                 onPress={generateAISummary}
                 disabled={generatingAI}
               >
-                {generatingAI ? (
-                  <Ionicons name="refresh" size={16} color="white" style={styles.spinningIcon} />
-                ) : (
-                  <Ionicons name="refresh" size={16} color="white" />
-                )}
+                <View style={styles.aiRefreshInner}>
+                  {generatingAI ? (
+                    <Ionicons name="sync" size={16} color="white" style={styles.spinningIcon} />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={16} color="white" />
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
             <Text style={styles.aiSummary}>
-              {aiSummary || "Generating personalized insights for your plot..."}
+              {aiSummary || "Analyzing your plot conditions and generating personalized recommendations..."}
             </Text>
           </LinearGradient>
         </View>
@@ -1028,154 +1073,301 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingTop: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backdropFilter: 'blur(10px)',
   },
   backButton: {
-    padding: 8,
+    marginRight: 12,
+  },
+  backButtonInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  plotIcon: {
+  plotIconContainer: {
     position: 'relative',
     marginRight: 12,
   },
+  plotIconGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
   plotEmoji: {
-    fontSize: 32,
+    fontSize: 24,
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#111827',
   },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.3,
   },
   headerSubtitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
+    gap: 6,
+  },
+  cropBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   cropText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginRight: 8,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10B981',
+    marginLeft: 4,
+  },
+  varietyBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  varietyText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -20,
+    gap: 8,
   },
-  headerAction: {
-    padding: 8,
-    marginLeft: 4,
+  headerActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
   photoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
+    borderRadius: 20,
     marginBottom: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   photoGradient: {
-    height: 200,
+    height: 220,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
   photoContent: {
     alignItems: 'center',
+    zIndex: 1,
+  },
+  cameraIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   photoText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: 'white',
-    marginTop: 16,
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   photoSubtext: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
   },
   maximizeButton: {
     position: 'absolute',
     top: 16,
     right: 16,
-    padding: 8,
+    zIndex: 2,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    padding: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  statItem: {
-    flex: 1,
+  maximizeButtonInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  statsContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  statGradient: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     color: 'white',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   statLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.75)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   aiCard: {
     marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   aiGradient: {
-    padding: 20,
+    padding: 24,
+    position: 'relative',
+  },
+  aiShine: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    opacity: 0.5,
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
+    zIndex: 1,
   },
-  aiTitle: {
+  aiTitleContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  aiIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   aiTitleText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: 'white',
-    marginLeft: 8,
+    letterSpacing: 0.3,
+  },
+  aiBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  aiBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'white',
+    letterSpacing: 1,
   },
   aiRefreshButton: {
-    padding: 8,
+    marginLeft: 8,
+  },
+  aiRefreshInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   aiSummary: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 20,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 22,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    zIndex: 1,
   },
   sensorsGrid: {
     flexDirection: 'row',
@@ -1368,59 +1560,78 @@ const styles = StyleSheet.create({
   },
   sensorCard: {
     width: (width - 52) / 2,
+    borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sensorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    padding: 16,
+    paddingBottom: 12,
   },
   sensorIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   blueIcon: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   orangeIcon: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
   },
   yellowIcon: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
   },
   greenIcon: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   sensorStatus: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   sensorStatusText: {
-    fontSize: 10,
-    color: 'white',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#10B981',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   sensorValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     color: 'white',
-    marginBottom: 4,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
   sensorFooter: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   sensorTime: {
-    fontSize: 10,
-    color: '#6B7280',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
     marginLeft: 4,
+    fontWeight: '500',
   },
   waterButton: {
     backgroundColor: '#10B981',
@@ -1441,160 +1652,174 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
     color: 'white',
-    marginBottom: 16,
+    marginBottom: 20,
+    letterSpacing: 0.3,
   },
   infoList: {
-    gap: 12,
+    gap: 14,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 10,
   },
   infoLabel: {
     flex: 1,
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginLeft: 8,
+    marginLeft: 12,
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: 14,
     color: 'white',
-    fontWeight: '500',
-  },
-
-
-  spinningIcon: {
-    transform: [{ rotate: '360deg' }],
+    fontWeight: '600',
   },
   scheduleToggleCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   scheduleToggleHeader: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   scheduleToggleSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 6,
+    lineHeight: 18,
   },
   scheduleToggleControls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 12,
+    borderRadius: 12,
   },
   toggleLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   activeToggleLabel: {
     color: '#10B981',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   calendarCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   calendarHeader: {
     overflow: 'hidden',
   },
   calendarGradient: {
-    padding: 16,
+    padding: 20,
   },
   calendarHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   calendarIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   calendarHeaderInfo: {
     flex: 1,
   },
   calendarTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.3,
   },
   calendarSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 3,
+    fontWeight: '500',
   },
   calendarContent: {
-    padding: 16,
+    padding: 20,
   },
   daysHeader: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   dayHeader: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   calendarDay: {
-    width: (width - 80) / 7,
-    height: 50,
+    width: (width - 88) / 7,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
     position: 'relative',
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 1,
-    padding: 8,
+    marginHorizontal: 2,
   },
   todayDay: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
     borderWidth: 2,
     borderColor: '#10B981',
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
   },
   scheduledDay: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(59, 130, 246, 0.25)',
+    borderWidth: 1.5,
     borderColor: '#3B82F6',
   },
   dayNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
     color: 'white',
     marginBottom: 2,
   },
@@ -1602,110 +1827,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
-
+  wateringVolume: {
+    fontSize: 9,
+    color: '#3B82F6',
+    marginTop: 2,
+    fontWeight: '700',
+  },
   todayPulse: {
     position: 'absolute',
     inset: 0,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#10B981',
     opacity: 0.3,
   },
   weekGrid: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 10,
+    justifyContent: 'space-between',
   },
   todayText: {
     color: '#10B981',
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   scheduledText: {
-    color: 'white',
-    fontWeight: '500',
+    color: '#3B82F6',
+    fontWeight: '700',
   },
   legendCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 14,
+    padding: 16,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   legendContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   legendToday: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    width: 14,
+    height: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
     borderWidth: 2,
     borderColor: '#10B981',
-    borderRadius: 3,
-    marginRight: 4,
+    borderRadius: 4,
+    marginRight: 6,
   },
   legendScheduled: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    width: 14,
+    height: 14,
+    backgroundColor: 'rgba(59, 130, 246, 0.25)',
     borderWidth: 2,
     borderColor: '#3B82F6',
-    borderRadius: 3,
-    marginRight: 4,
+    borderRadius: 4,
+    marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
   legendAvailable: {
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    marginRight: 4,
-  },
-  legendWeather: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-    borderRadius: 3,
-    marginRight: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    marginRight: 6,
   },
   legendText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.8)',
   },
   bottomButtons: {
     flexDirection: 'row',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     gap: 12,
-    backgroundColor: '#111827',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   askMiraquaButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#374151',
+    backgroundColor: 'rgba(107, 114, 128, 0.3)',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   askMiraquaText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.3,
   },
   waterNowBottomButton: {
     flex: 1,
@@ -1714,13 +1938,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#3B82F6',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   waterNowBottomText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.3,
+  },
+  spinningIcon: {
+    transform: [{ rotate: '360deg' }],
   },
 });
 
