@@ -825,28 +825,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               </LinearGradient>
             </TouchableOpacity>
             
-                        {/* Debug Info - Only show in development */}
-            {__DEV__ && (
-              <View style={styles.debugInfo}>
-                <Text style={styles.debugText}>
-                  Schedule Data: {realScheduleData ? `${realScheduleData.schedule?.length || 0} entries` : 'None'}
-                </Text>
-                <Text style={styles.debugText}>
-                  Generated Days: {getScheduleData().length} days
-                </Text>
-                <Text style={styles.debugText}>
-                  Watering Days: {getScheduleData().filter(d => d.hasWatering).length} days
-                </Text>
-                {realScheduleData?.schedule && (
-                  <ScrollView style={{ maxHeight: 160, marginTop: 8 }}>
-                    <Text style={[styles.debugText, { fontFamily: 'monospace' }]}> 
-                      {JSON.stringify(realScheduleData.schedule, null, 2)}
-                    </Text>
-                  </ScrollView>
-                )}
-              </View>
-            )}
-
 
 
             <View style={styles.calendarContent}>
@@ -1176,18 +1154,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     padding: 20,
-  },
-  debugInfo: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 12,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 8,
-  },
-  debugText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    marginBottom: 4,
   },
   weatherCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
