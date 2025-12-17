@@ -586,22 +586,15 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header with glassmorphism */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <View style={styles.backButtonInner}>
-            <Ionicons name="arrow-back" size={22} color="white" />
-          </View>
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         
         <View style={styles.headerContent}>
-          <View style={styles.plotIconContainer}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.plotIconGradient}
-            >
-              <Text style={styles.plotEmoji}>🌿</Text>
-            </LinearGradient>
+          <View style={styles.plotIcon}>
+            <Text style={styles.plotEmoji}>🌿</Text>
             <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#10B981' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
@@ -609,132 +602,85 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>{plot.name || 'Unnamed Plot'}</Text>
-            <View style={styles.headerSubtitle}>
-              <View style={styles.cropBadge}>
-                <Ionicons name="leaf" size={12} color="#10B981" />
-                <Text style={styles.cropText}>{plot.crop || 'Unknown'}</Text>
-              </View>
-              <View style={styles.varietyBadge}>
-                <Text style={styles.varietyText}>{plot.variety || 'Standard'}</Text>
-              </View>
-            </View>
+            <Text style={styles.headerSubtitle}>{plot.crop || 'Unknown'} • {plot.variety || 'Standard'}</Text>
           </View>
         </View>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerActionButton} onPress={handleExport}>
-            <Ionicons name="download-outline" size={20} color="rgba(255,255,255,0.9)" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={20} color="rgba(255,255,255,0.9)" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionButton} onPress={handleSettings}>
-            <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.9)" />
+          <TouchableOpacity style={styles.headerAction} onPress={handleSettings}>
+            <Ionicons name="settings-outline" size={22} color="white" />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Photo Card */}
+        {/* Photo Card */}
         <View style={styles.photoCard}>
           <LinearGradient
-            colors={['#10B981', '#059669', '#047857']}
+            colors={['#10B981', '#059669']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.photoGradient}
           >
-            <View style={styles.photoOverlay} />
             <View style={styles.photoContent}>
-              <View style={styles.cameraIconContainer}>
-                <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.8)" />
-              </View>
+              <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.8)" />
               <Text style={styles.photoText}>Add Plot Photo</Text>
-              <Text style={styles.photoSubtext}>Capture your garden's progress</Text>
+              <Text style={styles.photoSubtext}>Tap to capture your garden</Text>
             </View>
-            <TouchableOpacity style={styles.maximizeButton}>
-              <View style={styles.maximizeButtonInner}>
-                <Ionicons name="expand" size={14} color="white" />
-              </View>
-            </TouchableOpacity>
           </LinearGradient>
           
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']}
-                style={styles.statGradient}
-              >
-                <View style={styles.statIconWrapper}>
-                  <Ionicons name="heart" size={20} color="#EF4444" />
-                </View>
-                <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
-                <Text style={styles.statLabel}>Health</Text>
-              </LinearGradient>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <View style={[styles.statIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                <Ionicons name="heart" size={22} color="#EF4444" />
+              </View>
+              <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
+              <Text style={styles.statLabel}>Health</Text>
             </View>
             
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']}
-                style={styles.statGradient}
-              >
-                <View style={styles.statIconWrapper}>
-                  <Ionicons name="calendar-outline" size={20} color="#10B981" />
-                </View>
-                <Text style={styles.statValue}>2mo</Text>
-                <Text style={styles.statLabel}>Age</Text>
-              </LinearGradient>
+            <View style={styles.statItem}>
+              <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <Ionicons name="calendar" size={22} color="#10B981" />
+              </View>
+              <Text style={styles.statValue}>2mo</Text>
+              <Text style={styles.statLabel}>Age</Text>
             </View>
             
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.05)']}
-                style={styles.statGradient}
-              >
-                <View style={styles.statIconWrapper}>
-                  <Ionicons name="water-outline" size={20} color="#3B82F6" />
-                </View>
-                <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
-                <Text style={styles.statLabel}>Saved</Text>
-              </LinearGradient>
+            <View style={styles.statItem}>
+              <View style={[styles.statIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                <Ionicons name="water" size={22} color="#3B82F6" />
+              </View>
+              <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
+              <Text style={styles.statLabel}>Saved</Text>
             </View>
           </View>
         </View>
 
-        {/* AI Insights Card */}
+        {/* AI Insights */}
         <View style={styles.aiCard}>
           <LinearGradient
-            colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            colors={['#8B5CF6', '#7C3AED']}
             style={styles.aiGradient}
           >
-            <View style={styles.aiShine} />
             <View style={styles.aiHeader}>
-              <View style={styles.aiTitleContainer}>
-                <View style={styles.aiIconWrapper}>
-                  <Ionicons name="sparkles" size={18} color="#FFF" />
-                </View>
+              <View style={styles.aiTitle}>
+                <Ionicons name="sparkles" size={20} color="white" />
                 <Text style={styles.aiTitleText}>AI Insights</Text>
-                <View style={styles.aiBadge}>
-                  <Text style={styles.aiBadgeText}>SMART</Text>
-                </View>
               </View>
               <TouchableOpacity 
                 style={styles.aiRefreshButton}
                 onPress={generateAISummary}
                 disabled={generatingAI}
               >
-                <View style={styles.aiRefreshInner}>
-                  {generatingAI ? (
-                    <Ionicons name="sync" size={16} color="white" style={styles.spinningIcon} />
-                  ) : (
-                    <Ionicons name="refresh-outline" size={16} color="white" />
-                  )}
-                </View>
+                {generatingAI ? (
+                  <Ionicons name="refresh" size={18} color="white" style={styles.spinningIcon} />
+                ) : (
+                  <Ionicons name="refresh-outline" size={18} color="white" />
+                )}
               </TouchableOpacity>
             </View>
             <Text style={styles.aiSummary}>
-              {aiSummary || "Analyzing your plot conditions and generating personalized recommendations..."}
+              {aiSummary || "Generating personalized insights for your plot..."}
             </Text>
           </LinearGradient>
         </View>
@@ -861,16 +807,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             >
               <LinearGradient
                 colors={['#10B981', '#3B82F6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
                 style={styles.calendarGradient}
               >
                 <View style={styles.calendarHeaderContent}>
                   <View style={styles.calendarIcon}>
-                    <Ionicons name="calendar" size={16} color="white" />
+                    <Ionicons name="calendar" size={20} color="white" />
                   </View>
                   <View style={styles.calendarHeaderInfo}>
                     <Text style={styles.calendarTitle}>Next 2 Weeks</Text>
                     <Text style={styles.calendarSubtitle}>
-                      {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
+                      {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized'}
                     </Text>
                   </View>
                 </View>
@@ -1073,42 +1021,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingTop: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    backdropFilter: 'blur(10px)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   backButton: {
+    padding: 8,
     marginRight: 12,
-  },
-  backButtonInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  plotIconContainer: {
+  plotIcon: {
     position: 'relative',
     marginRight: 12,
   },
-  plotIconGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
   plotEmoji: {
-    fontSize: 24,
+    fontSize: 36,
   },
   onlineIndicator: {
     position: 'absolute',
@@ -1126,248 +1055,114 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: 'white',
-    letterSpacing: 0.3,
   },
   headerSubtitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
-  },
-  cropBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  cropText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#10B981',
-    marginLeft: 4,
-  },
-  varietyBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  varietyText: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  headerActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
+  headerAction: {
+    padding: 10,
   },
   photoCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 20,
     marginBottom: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  photoGradient: {
-    height: 220,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  photoContent: {
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  cameraIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  photoText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 6,
-    letterSpacing: 0.5,
-  },
-  photoSubtext: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '500',
-  },
-  maximizeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 2,
-  },
-  maximizeButtonInner: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  statGradient: {
-    padding: 16,
-    alignItems: 'center',
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  statIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  photoGradient: {
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  photoContent: {
+    alignItems: 'center',
+  },
+  photoText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 12,
+  },
+  photoSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 6,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: 'white',
     marginBottom: 4,
-    letterSpacing: 0.5,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.75)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
   },
   aiCard: {
     marginBottom: 20,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   aiGradient: {
     padding: 24,
-    position: 'relative',
-  },
-  aiShine: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    opacity: 0.5,
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    zIndex: 1,
   },
-  aiTitleContainer: {
+  aiTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  aiIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 10,
   },
   aiTitleText: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: 'white',
-    letterSpacing: 0.3,
-  },
-  aiBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  aiBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: 'white',
-    letterSpacing: 1,
   },
   aiRefreshButton: {
-    marginLeft: 8,
-  },
-  aiRefreshInner: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 6,
   },
   aiSummary: {
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.95)',
     lineHeight: 22,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-    zIndex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   sensorsGrid: {
     flexDirection: 'row',
