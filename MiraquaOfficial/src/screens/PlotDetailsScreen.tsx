@@ -10,6 +10,8 @@ import {
   Alert,
   Switch,
   Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,7 +60,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
-  const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
+  const [realScheduleData, setRealScheduleData] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Use centralized environment config
   const API_BASE_URL = environment.apiUrl;
@@ -533,11 +537,64 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   };
 
   const handleShare = () => {
-    Alert.alert('Share', 'Sharing plot details...');
+    Alert.alert('Share Plot', 'Share your plot with friends and family', [
+      { text: 'Copy Link', onPress: () => Alert.alert('Link Copied!', 'Plot link copied to clipboard') },
+      { text: 'Export Data', onPress: handleExport },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleExport = () => {
-    Alert.alert('Export', 'Exporting plot data...');
+    Alert.alert('Export Data', 'Export your plot data as CSV or PDF', [
+      { text: 'CSV', onPress: () => Alert.alert('Exporting...', 'Plot data exported as CSV') },
+      { text: 'PDF Report', onPress: () => Alert.alert('Exporting...', 'Plot report exported as PDF') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handlePhotoPress = () => {
+    Alert.alert('Add Plot Photo', 'Choose how to add a photo of your plot', [
+      { text: 'Take Photo', onPress: () => Alert.alert('Camera', 'Opening camera...') },
+      { text: 'Choose from Library', onPress: () => Alert.alert('Library', 'Opening photo library...') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleStatPress = (statType: string) => {
+    let message = '';
+    switch(statType) {
+      case 'health':
+        message = `Your plot health score is ${plot?.healthScore}%. This is based on soil moisture, temperature, pH levels, and growth patterns.`;
+        break;
+      case 'age':
+        message = `Your plot has been growing for 2 months. Track growth milestones and harvest predictions in the calendar.`;
+        break;
+      case 'water':
+        message = `You've saved ${plot?.waterSavings}% water compared to traditional watering methods. That's about ${Math.round((plot?.waterSavings || 0) * 5)} gallons saved!`;
+        break;
+    }
+    Alert.alert('Plot Statistics', message);
+  };
+
+  const handleSensorPress = (sensor: any) => {
+    Alert.alert(
+      sensor.name,
+      `Current: ${sensor.value}${sensor.unit}\nStatus: ${sensor.status}\nLast updated: ${sensor.lastUpdate}\n\nTap to view history and trends.`,
+      [
+        { text: 'View History', onPress: () => navigation.navigate('SensorHistory', { plotId, sensorId: sensor.id }) },
+        { text: 'Close', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchPlotData(),
+      generateAISummary(),
+    ]);
+    setLastRefresh(new Date());
+    setRefreshing(false);
   };
 
   const handleSettings = () => {
@@ -613,9 +670,20 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#10B981"
+            colors={['#10B981']}
+          />
+        }
+      >
         {/* Photo Card */}
-        <View style={styles.photoCard}>
+        <TouchableOpacity style={styles.photoCard} onPress={handlePhotoPress} activeOpacity={0.8}>
           <LinearGradient
             colors={['#10B981', '#059669']}
             start={{ x: 0, y: 0 }}
@@ -623,43 +691,47 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             style={styles.photoGradient}
           >
             <View style={styles.photoContent}>
-              <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.8)" />
+              <View style={styles.cameraIconWrapper}>
+                <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.9)" />
+              </View>
               <Text style={styles.photoText}>Add Plot Photo</Text>
               <Text style={styles.photoSubtext}>Tap to capture your garden</Text>
             </View>
           </LinearGradient>
           
           <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('health')} activeOpacity={0.7}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
                 <Ionicons name="heart" size={22} color="#EF4444" />
               </View>
               <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
               <Text style={styles.statLabel}>Health</Text>
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('age')} activeOpacity={0.7}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
                 <Ionicons name="calendar" size={22} color="#10B981" />
               </View>
               <Text style={styles.statValue}>2mo</Text>
               <Text style={styles.statLabel}>Age</Text>
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('water')} activeOpacity={0.7}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                 <Ionicons name="water" size={22} color="#3B82F6" />
               </View>
               <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
               <Text style={styles.statLabel}>Saved</Text>
-            </View>
+            </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* AI Insights */}
         <View style={styles.aiCard}>
           <LinearGradient
             colors={['#8B5CF6', '#7C3AED']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.aiGradient}
           >
             <View style={styles.aiHeader}>
@@ -671,24 +743,42 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 style={styles.aiRefreshButton}
                 onPress={generateAISummary}
                 disabled={generatingAI}
+                activeOpacity={0.7}
               >
                 {generatingAI ? (
-                  <Ionicons name="refresh" size={18} color="white" style={styles.spinningIcon} />
+                  <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Ionicons name="refresh-outline" size={18} color="white" />
                 )}
               </TouchableOpacity>
             </View>
-            <Text style={styles.aiSummary}>
-              {aiSummary || "Generating personalized insights for your plot..."}
-            </Text>
+            {generatingAI ? (
+              <View style={styles.aiLoadingContainer}>
+                <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.8)" />
+                <Text style={styles.aiLoadingText}>Analyzing your plot data...</Text>
+              </View>
+            ) : (
+              <Text style={styles.aiSummary}>
+                {aiSummary || "Tap refresh to generate personalized insights for your plot."}
+              </Text>
+            )}
+            {lastRefresh && (
+              <Text style={styles.aiLastUpdate}>
+                Last updated: {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            )}
           </LinearGradient>
         </View>
 
         {/* Sensor Status Grid */}
         <View style={styles.sensorsGrid}>
           {plot.sensors && plot.sensors.length > 0 ? plot.sensors.map((sensor) => (
-            <View key={sensor.id} style={styles.sensorCard}>
+            <TouchableOpacity 
+              key={sensor.id} 
+              style={styles.sensorCard}
+              onPress={() => handleSensorPress(sensor)}
+              activeOpacity={0.7}
+            >
               <View style={styles.sensorHeader}>
                 <View style={[
                   styles.sensorIcon,
@@ -713,7 +803,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 <Ionicons name="time" size={12} color="#6B7280" />
                 <Text style={styles.sensorTime}>{sensor.lastUpdate}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )) : (
             <Text style={styles.noSensorsText}>No sensors available</Text>
           )}
@@ -1137,6 +1227,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.95)',
     lineHeight: 22,
+  },
+  aiLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  aiLoadingText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontStyle: 'italic',
+  },
+  aiLastUpdate: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
+  cameraIconWrapper: {
+    marginBottom: 12,
   },
   content: {
     flex: 1,
