@@ -618,9 +618,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
-          <Ionicons name="refresh" size={48} color="#10B981" style={styles.spinningIcon} />
+          <Ionicons name="refresh" size={48} color="#26A69A" style={styles.spinningIcon} />
           <Text style={styles.loadingText}>Loading plot details...</Text>
         </View>
       </SafeAreaView>
@@ -630,9 +630,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   if (!plot) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="dark-content" />
         <View style={styles.errorContainer}>
-          <Ionicons name="warning" size={48} color="#EF4444" />
+          <Ionicons name="warning" size={48} color="#EF5350" />
           <Text style={styles.errorText}>No plot data found</Text>
         </View>
       </SafeAreaView>
@@ -641,18 +641,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <Ionicons name="arrow-back" size={24} color="#2D3748" />
         </TouchableOpacity>
         
         <View style={styles.headerContent}>
           <View style={styles.plotIcon}>
             <Text style={styles.plotEmoji}>🌿</Text>
-            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#10B981' : '#EF4444' }]}>
+            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#26A69A' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
           </View>
@@ -665,7 +665,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerAction} onPress={handleSettings}>
-            <Ionicons name="settings-outline" size={22} color="white" />
+            <Ionicons name="settings-outline" size={22} color="#2D3748" />
           </TouchableOpacity>
         </View>
       </View>
@@ -677,15 +677,15 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#10B981"
-            colors={['#10B981']}
+            tintColor="#26A69A"
+            colors={['#26A69A']}
           />
         }
       >
         {/* Photo Card */}
         <TouchableOpacity style={styles.photoCard} onPress={handlePhotoPress} activeOpacity={0.8}>
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={['#4DB6AC', '#26A69A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.photoGradient}
@@ -701,24 +701,24 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           
           <View style={styles.statsGrid}>
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('health')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                <Ionicons name="heart" size={22} color="#EF4444" />
+              <View style={[styles.statIcon, { backgroundColor: '#FFEBEE' }]}>
+                <Ionicons name="heart" size={24} color="#EF5350" />
               </View>
               <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
               <Text style={styles.statLabel}>Health</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('age')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                <Ionicons name="calendar" size={22} color="#10B981" />
+              <View style={[styles.statIcon, { backgroundColor: '#E0F2F1' }]}>
+                <Ionicons name="calendar" size={24} color="#26A69A" />
               </View>
               <Text style={styles.statValue}>2mo</Text>
               <Text style={styles.statLabel}>Age</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('water')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                <Ionicons name="water" size={22} color="#3B82F6" />
+              <View style={[styles.statIcon, { backgroundColor: '#E3F2FD' }]}>
+                <Ionicons name="water" size={24} color="#42A5F5" />
               </View>
               <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
               <Text style={styles.statLabel}>Saved</Text>
@@ -729,7 +729,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         {/* AI Insights */}
         <View style={styles.aiCard}>
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={['#4DB6AC', '#26A69A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.aiGradient}
@@ -882,7 +882,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Switch
               value={showOriginalSchedule}
               onValueChange={setShowOriginalSchedule}
-              trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+              trackColor={{ false: '#B2DFDB', true: '#26A69A' }}
               thumbColor={'white'}
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
@@ -896,7 +896,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               onPress={() => navigation.navigate('Calendar', { plotId })}
             >
               <LinearGradient
-                colors={['#10B981', '#059669']}
+                colors={['#4DB6AC', '#26A69A']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.calendarGradient}
@@ -948,7 +948,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
-                      <Ionicons name="water" size={10} color="#3B82F6" />
+                      <Ionicons name="water" size={10} color="#42A5F5" />
                       {day.volume > 0 && (
                         <Text style={styles.wateringVolume}>{day.volume}L</Text>
                       )}
@@ -986,7 +986,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
-                      <Ionicons name="water" size={10} color="#3B82F6" />
+                      <Ionicons name="water" size={10} color="#42A5F5" />
                       {day.volume > 0 && (
                         <Text style={styles.wateringVolume}>{day.volume}L</Text>
                       )}
@@ -1060,7 +1060,7 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#E0F2F1',
   },
   loadingContainer: {
     flex: 1,
@@ -1069,8 +1069,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: 'white',
+    color: '#2D3748',
     marginTop: 16,
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
@@ -1079,28 +1080,28 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: 'white',
+    color: '#2D3748',
     marginTop: 16,
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 20,
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingTop: 24,
+    backgroundColor: 'white',
+    borderBottomWidth: 0,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1118,57 +1119,56 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#111827',
+    borderWidth: 3,
+    borderColor: 'white',
   },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: -0.5,
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#2D3748',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#718096',
+    marginTop: 4,
+    fontWeight: '400',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   headerAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   photoCard: {
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
-    borderRadius: 24,
-    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 32,
+    marginBottom: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 3,
   },
   photoGradient: {
-    height: 220,
+    height: 240,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1176,100 +1176,97 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   photoText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: 'white',
-    marginTop: 12,
-    letterSpacing: -0.3,
+    marginTop: 16,
+    letterSpacing: -0.2,
   },
   photoSubtext: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: 6,
-    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 8,
+    fontWeight: '400',
   },
   statsGrid: {
     flexDirection: 'row',
-    padding: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    backdropFilter: 'blur(20px)',
+    padding: 28,
+    backgroundColor: '#FAFAFA',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    marginBottom: 14,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: 'white',
-    marginBottom: 4,
-    letterSpacing: -0.5,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
   statLabel: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    color: '#A0AEC0',
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   aiCard: {
-    marginBottom: 20,
-    borderRadius: 24,
+    marginBottom: 24,
+    borderRadius: 32,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 3,
   },
   aiGradient: {
-    padding: 24,
+    padding: 28,
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   aiTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   aiTitleText: {
-    fontSize: 19,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: 'white',
     letterSpacing: -0.3,
   },
   aiRefreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   aiSummary: {
-    fontSize: 15,
+    fontSize: 16,
     color: 'rgba(255, 255, 255, 0.95)',
-    lineHeight: 24,
-    fontWeight: '500',
+    lineHeight: 26,
+    fontWeight: '400',
   },
   aiLoadingContainer: {
     flexDirection: 'row',
@@ -1292,7 +1289,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    paddingTop: 8,
   },
   sensorsGrid: {
     flexDirection: 'row',
@@ -1472,38 +1470,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sensorCard: {
-    width: (width - 52) / 2,
-    borderRadius: 20,
+    width: (width - 56) / 2,
+    borderRadius: 28,
     overflow: 'hidden',
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
+    backgroundColor: 'white',
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   sensorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 18,
-    paddingBottom: 12,
+    padding: 20,
+    paddingBottom: 14,
   },
   sensorIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    borderWidth: 0,
   },
   blueIcon: {
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
@@ -1522,44 +1513,37 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   sensorStatus: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 0,
   },
   sensorStatusText: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#10B981',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    color: '#4CAF50',
+    letterSpacing: 0.5,
   },
   sensorValue: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: 'white',
-    paddingHorizontal: 18,
-    marginBottom: 10,
-    letterSpacing: -1,
+    fontSize: 34,
+    fontWeight: '600',
+    color: '#2D3748',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    letterSpacing: -0.5,
   },
   sensorFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   sensorTime: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    color: '#A0AEC0',
     marginLeft: 4,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   waterButton: {
     backgroundColor: '#10B981',
@@ -1579,24 +1563,23 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   infoCard: {
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    backgroundColor: 'white',
+    borderRadius: 32,
+    padding: 28,
+    marginBottom: 24,
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: 'white',
-    marginBottom: 20,
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 24,
+    letterSpacing: -0.3,
   },
   infoList: {
     gap: 14,
@@ -1605,37 +1588,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 20,
+    borderWidth: 0,
   },
   infoLabel: {
     flex: 1,
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.75)',
-    marginLeft: 12,
-    fontWeight: '600',
+    fontSize: 16,
+    color: '#718096',
+    marginLeft: 14,
+    fontWeight: '400',
   },
   infoValue: {
-    fontSize: 15,
-    color: 'white',
-    fontWeight: '700',
+    fontSize: 16,
+    color: '#2D3748',
+    fontWeight: '600',
   },
   scheduleToggleCard: {
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    backgroundColor: 'white',
+    borderRadius: 32,
+    padding: 28,
+    marginBottom: 24,
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 2,
   },
   scheduleToggleHeader: {
     marginBottom: 18,
@@ -1657,68 +1638,61 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#A0AEC0',
   },
   activeToggleLabel: {
-    color: '#10B981',
+    color: '#26A69A',
     fontWeight: '700',
   },
   calendarCard: {
-    backgroundColor: 'rgba(17, 24, 39, 0.6)',
-    borderRadius: 24,
-    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 32,
+    marginBottom: 24,
     overflow: 'hidden',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 3,
+    borderWidth: 0,
   },
   calendarHeader: {
     overflow: 'hidden',
   },
   calendarGradient: {
-    padding: 20,
+    padding: 28,
   },
   calendarHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   calendarIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    marginRight: 16,
+    borderWidth: 0,
   },
   calendarHeaderInfo: {
     flex: 1,
   },
   calendarTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '600',
     color: 'white',
     letterSpacing: -0.3,
   },
   calendarSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 4,
-    fontWeight: '600',
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginTop: 6,
+    fontWeight: '400',
   },
   calendarContent: {
-    padding: 24,
+    padding: 28,
   },
   daysHeader: {
     flexDirection: 'row',
@@ -1728,50 +1702,47 @@ const styles = StyleSheet.create({
   dayHeader: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#A0AEC0',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   calendarDay: {
     width: (width - 88) / 7,
-    height: 64,
+    height: 68,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     position: 'relative',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
+    backgroundColor: '#F7FAFC',
+    borderWidth: 0,
     marginHorizontal: 2,
   },
   todayDay: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: '#B2DFDB',
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
   },
   scheduledDay: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderWidth: 1.5,
-    borderColor: '#3B82F6',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: '#E1F5FE',
+    borderWidth: 0,
+    shadowColor: '#0288D1',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 1,
   },
   dayNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 2,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 3,
   },
   wateringIndicator: {
     alignItems: 'center',
@@ -1779,16 +1750,16 @@ const styles = StyleSheet.create({
   },
   wateringVolume: {
     fontSize: 9,
-    color: '#3B82F6',
+    color: '#42A5F5',
     marginTop: 2,
     fontWeight: '700',
   },
   todayPulse: {
     position: 'absolute',
     inset: 0,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#26A69A',
     opacity: 0.3,
   },
   weekGrid: {
@@ -1797,20 +1768,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   todayText: {
-    color: '#10B981',
-    fontWeight: '800',
-  },
-  scheduledText: {
-    color: '#3B82F6',
+    color: '#26A69A',
     fontWeight: '700',
   },
+  scheduledText: {
+    color: '#0288D1',
+    fontWeight: '600',
+  },
   legendCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 0,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   legendContent: {
     flexDirection: 'row',
@@ -1823,18 +1798,16 @@ const styles = StyleSheet.create({
   legendToday: {
     width: 14,
     height: 14,
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-    borderWidth: 2,
-    borderColor: '#10B981',
+    backgroundColor: '#B2DFDB',
+    borderWidth: 0,
     borderRadius: 4,
     marginRight: 6,
   },
   legendScheduled: {
     width: 14,
     height: 14,
-    backgroundColor: 'rgba(59, 130, 246, 0.25)',
-    borderWidth: 2,
-    borderColor: '#3B82F6',
+    backgroundColor: '#E1F5FE',
+    borderWidth: 0,
     borderRadius: 4,
     marginRight: 6,
     justifyContent: 'center',
@@ -1843,47 +1816,39 @@ const styles = StyleSheet.create({
   legendAvailable: {
     width: 14,
     height: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#F7FAFC',
+    borderWidth: 0,
     borderRadius: 4,
     marginRight: 6,
   },
   legendText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#718096',
   },
   bottomButtons: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 12,
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+    gap: 16,
+    backgroundColor: 'white',
+    borderTopWidth: 0,
   },
   askMiraquaButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(107, 114, 128, 0.25)',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 18,
+    borderRadius: 24,
+    gap: 10,
+    borderWidth: 0,
   },
   askMiraquaText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3748',
     letterSpacing: -0.2,
   },
   waterNowBottomButton: {
@@ -1891,19 +1856,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 8,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
+    backgroundColor: '#26A69A',
+    paddingVertical: 18,
+    borderRadius: 24,
+    gap: 10,
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   waterNowBottomText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '600',
     color: 'white',
     letterSpacing: -0.2,
   },
