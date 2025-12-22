@@ -620,7 +620,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <Ionicons name="refresh" size={48} color="#10B981" style={styles.spinningIcon} />
+          <Ionicons name="refresh" size={48} color="#3B82F6" style={styles.spinningIcon} />
           <Text style={styles.loadingText}>Loading plot details...</Text>
         </View>
       </SafeAreaView>
@@ -677,15 +677,15 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#10B981"
-            colors={['#10B981']}
+            tintColor="#3B82F6"
+            colors={['#3B82F6']}
           />
         }
       >
         {/* Photo Card */}
         <TouchableOpacity style={styles.photoCard} onPress={handlePhotoPress} activeOpacity={0.8}>
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={['#3B82F6', '#2563EB']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.photoGradient}
@@ -709,8 +709,8 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('age')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                <Ionicons name="calendar" size={22} color="#10B981" />
+              <View style={[styles.statIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                <Ionicons name="calendar" size={22} color="#3B82F6" />
               </View>
               <Text style={styles.statValue}>2mo</Text>
               <Text style={styles.statLabel}>Age</Text>
@@ -729,7 +729,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         {/* AI Insights */}
         <View style={styles.aiCard}>
           <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
+            colors={['#3B82F6', '#2563EB']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.aiGradient}
@@ -835,7 +835,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <Text style={styles.sectionTitle}>Plot Information</Text>
           <View style={styles.infoList}>
             <View style={styles.infoItem}>
-              <Ionicons name="leaf" size={16} color="#10B981" />
+              <Ionicons name="leaf" size={16} color="#3B82F6" />
               <Text style={styles.infoLabel}>Crop Type</Text>
               <Text style={styles.infoValue}>{plot.crop || 'Unknown'}</Text>
             </View>
@@ -882,7 +882,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Switch
               value={showOriginalSchedule}
               onValueChange={setShowOriginalSchedule}
-              trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+              trackColor={{ false: '#D1D5DB', true: '#3B82F6' }}
               thumbColor={'white'}
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
@@ -896,7 +896,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               onPress={() => navigation.navigate('Calendar', { plotId })}
             >
               <LinearGradient
-                colors={['#10B981', '#3B82F6']}
+                colors={['#3B82F6', '#2563EB']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.calendarGradient}
@@ -1199,7 +1199,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   aiGradient: {
     padding: 24,
@@ -1683,7 +1683,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   scheduledDay: {
-    backgroundColor: 'rgba(59, 130, 246, 0.25)',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
     borderWidth: 1.5,
     borderColor: '#3B82F6',
   },

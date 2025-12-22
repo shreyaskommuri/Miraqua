@@ -111,124 +111,163 @@ const SpecificDayScreen = ({ route, navigation }: SpecificDayScreenProps) => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Main Schedule Card */}
-        <View style={styles.mainScheduleCard}>
+        {/* Date Header */}
+        <View style={styles.dateHeader}>
           <LinearGradient
             colors={['#10B981', '#3B82F6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.mainGradient}
+            style={styles.dateGradient}
           >
-            <View style={styles.mainScheduleHeader}>
-              <View style={styles.dateIcon}>
-                <Ionicons name="calendar" size={24} color="white" />
-              </View>
-              <View style={styles.dateTextContainer}>
-                <Text style={styles.dayOfWeek}>
-                  {new Date(date).toLocaleDateString('en-US', { weekday: 'long' })}
-                </Text>
-                <Text style={styles.fullDate}>
-                  {new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </Text>
-                <Text style={styles.plotLabel}>Plot {plotId} • Add kick-back watering hour schedule</Text>
-              </View>
+            <View style={styles.dateContent}>
+              <Ionicons name="calendar" size={24} color="white" />
+              <Text style={styles.dateText}>{formatDate(date)}</Text>
+              <Text style={styles.dateSubtext}>Plot {plotId} Schedule</Text>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Scheduled Watering */}
-        <View style={styles.scheduledSection}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIcon}>
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-              </View>
-              <Text style={styles.sectionTitleText}>Scheduled Watering</Text>
+        {/* Scheduled Watering Cards */}
+        <View style={styles.scheduledWateringCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <Ionicons name="time" size={16} color="#3B82F6" />
+              <Text style={styles.cardTitle}>Scheduled Watering</Text>
             </View>
-            <TouchableOpacity>
-              <Ionicons name="add" size={24} color="#10B981" />
+            <TouchableOpacity style={styles.settingsButton}>
+              <Ionicons name="settings" size={16} color="#3B82F6" />
             </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity style={styles.wateringTimeCard}>
-            <View style={styles.timeCardLeft}>
-              <View style={styles.timeIconWrapper}>
-                <Ionicons name="water" size={24} color="#3B82F6" />
-              </View>
-              <View style={styles.timeDetails}>
-                <Text style={styles.largeTime}>7:00 AM</Text>
-                <Text style={styles.timeSubtext}>5 min • 10L</Text>
-              </View>
+          <View style={styles.cardContent}>
+            <View style={styles.timeInfo}>
+              <Text style={styles.timeText}>7:00 AM</Text>
+              <Text style={styles.detailsText}>5 min • 15L</Text>
             </View>
-          </TouchableOpacity>
+            <View style={styles.waterIcon}>
+              <Ionicons name="water" size={32} color="#3B82F6" />
+            </View>
+          </View>
+        </View>
+
+        {/* Summary Stats */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Ionicons name="water" size={20} color="#3B82F6" />
+            <Text style={styles.summaryValue}>{getTotalVolume(currentSchedule)}L</Text>
+            <Text style={styles.summaryLabel}>Total Water</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Ionicons name="time" size={20} color="#10B981" />
+            <Text style={styles.summaryValue}>
+              {Object.values(currentSchedule).filter(Boolean).length}
+            </Text>
+            <Text style={styles.summaryLabel}>Sessions</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Ionicons name="leaf" size={20} color="#F59E0B" />
+            <Text style={styles.summaryValue}>
+              {getTotalVolume(currentSchedule) * 0.1}%
+            </Text>
+            <Text style={styles.summaryLabel}>Efficiency</Text>
+          </View>
         </View>
 
         {/* Watering Sessions */}
-        <View style={styles.sessionsSection}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIcon}>
-                <Ionicons name="time" size={16} color="#F59E0B" />
+        <View style={styles.sessionsCard}>
+          <Text style={styles.sectionTitle}>Watering Sessions</Text>
+          
+          {/* Morning Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="sunny" size={16} color="#F59E0B" />
+                <Text style={styles.sessionTitle}>Morning</Text>
               </View>
-              <Text style={styles.sectionTitleText}>Watering Sessions</Text>
+              {currentSchedule.morning ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.morning.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.morning.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('morning')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('morning')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-          
-          <View style={styles.sessionsList}>
-            {/* Morning */}
-            <TouchableOpacity style={styles.sessionCard}>
-              <View style={styles.sessionLeft}>
-                <View style={[styles.sessionIconWrapper, { backgroundColor: 'rgba(251, 146, 60, 0.15)' }]}>
-                  <Ionicons name="sunny" size={20} color="#FB923C" />
-                </View>
-                <Text style={styles.sessionText}>Morning</Text>
+
+          {/* Afternoon Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="partly-sunny" size={16} color="#F59E0B" />
+                <Text style={styles.sessionTitle}>Afternoon</Text>
               </View>
-              <TouchableOpacity style={styles.addSessionButton}>
-                <Ionicons name="add" size={18} color="#10B981" />
-                <Text style={styles.addSessionText}>Add</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-            
-            {/* Afternoon */}
-            <TouchableOpacity style={styles.sessionCard}>
-              <View style={styles.sessionLeft}>
-                <View style={[styles.sessionIconWrapper, { backgroundColor: 'rgba(251, 146, 60, 0.15)' }]}>
-                  <Ionicons name="partly-sunny" size={20} color="#FB923C" />
+              {currentSchedule.afternoon ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.afternoon.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.afternoon.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('afternoon')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.sessionText}>Afternoon</Text>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('afternoon')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Evening Session */}
+          <View style={styles.sessionItem}>
+            <View style={styles.sessionHeader}>
+              <View style={styles.sessionInfo}>
+                <Ionicons name="moon" size={16} color="#8B5CF6" />
+                <Text style={styles.sessionTitle}>Evening</Text>
               </View>
-              <TouchableOpacity style={styles.addSessionButton}>
-                <Ionicons name="add" size={18} color="#10B981" />
-                <Text style={styles.addSessionText}>Add</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-            
-            {/* Evening */}
-            <TouchableOpacity style={styles.sessionCard}>
-              <View style={styles.sessionLeft}>
-                <View style={[styles.sessionIconWrapper, { backgroundColor: 'rgba(167, 139, 250, 0.15)' }]}>
-                  <Ionicons name="moon" size={20} color="#A78BFA" />
+              {currentSchedule.evening ? (
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTime}>{currentSchedule.evening.time}</Text>
+                  <Text style={styles.sessionVolume}>{currentSchedule.evening.volume}L</Text>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveWatering('evening')}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.sessionText}>Evening</Text>
-              </View>
-              <TouchableOpacity style={styles.addSessionButton}>
-                <Ionicons name="add" size={18} color="#10B981" />
-                <Text style={styles.addSessionText}>Add</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={() => handleAddWatering('evening')}
+                >
+                  <Ionicons name="add" size={16} color="#10B981" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
         {/* Settings */}
         <View style={styles.settingsCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionIcon}>
-                <Ionicons name=\"settings\" size={16} color=\"#8B5CF6\" />
-              </View>
-              <Text style={styles.sectionTitleText}>Settings</Text>
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
               <Ionicons name="settings" size={16} color="#6B7280" />
@@ -345,176 +384,130 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  mainScheduleCard: {
-    marginBottom: 24,
-    marginTop: 8,
-    borderRadius: 20,
+  dateHeader: {
+    marginBottom: 20,
+    borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
   },
-  mainGradient: {
-    padding: 24,
+  dateGradient: {
+    padding: 20,
   },
-  mainScheduleHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  dateIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+  dateContent: {
     alignItems: 'center',
-    marginRight: 16,
   },
-  dateTextContainer: {
-    flex: 1,
-  },
-  dayOfWeek: {
-    fontSize: 24,
-    fontWeight: '700',
+  dateText: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginTop: 8,
+    textAlign: 'center',
   },
-  fullDate: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
-  },
-  plotLabel: {
-    fontSize: 13,
+  dateSubtext: {
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 18,
+    marginTop: 4,
   },
-  scheduledSection: {
+  summaryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    alignItems: 'center',
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 8,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+  },
+  sessionsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 20,
     marginBottom: 20,
   },
-  sectionHeader: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginBottom: 16,
+  },
+  sessionItem: {
+    marginBottom: 16,
+  },
+  sessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  sectionHeaderLeft: {
+  sessionInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  sectionIcon: {
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
+    marginLeft: 8,
+  },
+  sessionDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sessionTime: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
     marginRight: 8,
   },
-  sectionTitleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
-  wateringTimeCard: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  timeCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeIconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  timeDetails: {
-    flex: 1,
-  },
-  largeTime: {
-    fontSize: 32,
-    fontWeight: '700',
+  sessionVolume: {
+    fontSize: 12,
     color: '#3B82F6',
-    marginBottom: 4,
-  },
-  timeSubtext: {
-    fontSize: 14,
-    color: '#60A5FA',
     fontWeight: '500',
+    marginRight: 8,
   },
-  sessionsSection: {
-    marginBottom: 20,
+  removeButton: {
+    padding: 4,
   },
-  sessionsList: {
-    gap: 12,
-  },
-  sessionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 16,
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
   },
-  sessionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sessionIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  sessionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'white',
-  },
-  addSessionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-  },
-  addSessionText: {
-    fontSize: 14,
-    fontWeight: '600',
+  addButtonText: {
+    fontSize: 12,
     color: '#10B981',
+    marginLeft: 4,
   },
   settingsCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
   },
   settingInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   settingText: {
-    fontSize: 15,
+    fontSize: 14,
     color: 'white',
-    fontWeight: '500',
     marginLeft: 8,
   },
   actionsCard: {
@@ -540,6 +533,55 @@ const styles = StyleSheet.create({
     color: 'white',
     marginTop: 8,
     textAlign: 'center',
+  },
+  scheduledWateringCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 8,
+  },
+  settingsButton: {
+    padding: 4,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeInfo: {
+    flex: 1,
+  },
+  timeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  detailsText: {
+    fontSize: 14,
+    color: '#3B82F6',
+  },
+  waterIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
