@@ -757,7 +757,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                 Last updated: {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
             )}
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Sensor Status Grid */}
