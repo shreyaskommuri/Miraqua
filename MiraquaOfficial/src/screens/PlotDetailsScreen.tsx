@@ -620,7 +620,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
-          <Ionicons name="refresh" size={48} color="#26A69A" style={styles.spinningIcon} />
+          <Ionicons name="refresh" size={48} color="#6366F1" style={styles.spinningIcon} />
           <Text style={styles.loadingText}>Loading plot details...</Text>
         </View>
       </SafeAreaView>
@@ -646,13 +646,13 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#2D3748" />
+          <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
         
         <View style={styles.headerContent}>
           <View style={styles.plotIcon}>
             <Text style={styles.plotEmoji}>🌿</Text>
-            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#26A69A' : '#EF4444' }]}>
+            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#22C55E' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
           </View>
@@ -665,7 +665,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerAction} onPress={handleSettings}>
-            <Ionicons name="settings-outline" size={22} color="#2D3748" />
+            <Ionicons name="settings-outline" size={22} color="#111827" />
           </TouchableOpacity>
         </View>
       </View>
@@ -677,19 +677,14 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#26A69A"
-            colors={['#26A69A']}
+            tintColor="#6366F1"
+            colors={['#6366F1']}
           />
         }
       >
         {/* Photo Card */}
         <TouchableOpacity style={styles.photoCard} onPress={handlePhotoPress} activeOpacity={0.8}>
-          <LinearGradient
-            colors={['#4DB6AC', '#26A69A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.photoGradient}
-          >
+          <View style={styles.photoGradient}>
             <View style={styles.photoContent}>
               <View style={styles.cameraIconWrapper}>
                 <Ionicons name="camera-outline" size={48} color="rgba(255, 255, 255, 0.9)" />
@@ -697,28 +692,28 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <Text style={styles.photoText}>Add Plot Photo</Text>
               <Text style={styles.photoSubtext}>Tap to capture your garden</Text>
             </View>
-          </LinearGradient>
+          </View>
           
           <View style={styles.statsGrid}>
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('health')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: '#FFEBEE' }]}>
-                <Ionicons name="heart" size={24} color="#EF5350" />
+              <View style={[styles.statIcon, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="heart" size={22} color="#EF4444" />
               </View>
               <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
               <Text style={styles.statLabel}>Health</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('age')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: '#E0F2F1' }]}>
-                <Ionicons name="calendar" size={24} color="#26A69A" />
+              <View style={[styles.statIcon, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="calendar" size={22} color="#22C55E" />
               </View>
               <Text style={styles.statValue}>2mo</Text>
               <Text style={styles.statLabel}>Age</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.statItem} onPress={() => handleStatPress('water')} activeOpacity={0.7}>
-              <View style={[styles.statIcon, { backgroundColor: '#E3F2FD' }]}>
-                <Ionicons name="water" size={24} color="#42A5F5" />
+              <View style={[styles.statIcon, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="water" size={22} color="#3B82F6" />
               </View>
               <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
               <Text style={styles.statLabel}>Saved</Text>
@@ -728,12 +723,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
         {/* AI Insights */}
         <View style={styles.aiCard}>
-          <LinearGradient
-            colors={['#4DB6AC', '#26A69A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.aiGradient}
-          >
+          <View style={styles.aiGradient}>
             <View style={styles.aiHeader}>
               <View style={styles.aiTitle}>
                 <Ionicons name="sparkles" size={20} color="white" />
@@ -882,7 +872,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Switch
               value={showOriginalSchedule}
               onValueChange={setShowOriginalSchedule}
-              trackColor={{ false: '#B2DFDB', true: '#26A69A' }}
+              trackColor={{ false: '#D1D5DB', true: '#6366F1' }}
               thumbColor={'white'}
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
@@ -895,12 +885,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               style={styles.calendarHeader}
               onPress={() => navigation.navigate('Calendar', { plotId })}
             >
-              <LinearGradient
-                colors={['#4DB6AC', '#26A69A']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.calendarGradient}
-              >
+              <View style={styles.calendarGradient}>
                 <View style={styles.calendarHeaderContent}>
                   <View style={styles.calendarIcon}>
                     <Ionicons name="calendar" size={20} color="white" />
@@ -912,7 +897,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                     </Text>
                   </View>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
             
 
@@ -1060,7 +1045,7 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E0F2F1',
+    backgroundColor: '#F8F9FA',
   },
   loadingContainer: {
     flex: 1,
@@ -1069,7 +1054,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#2D3748',
+    color: '#111827',
     marginTop: 16,
     fontWeight: '500',
   },
@@ -1080,7 +1065,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#2D3748',
+    color: '#111827',
     marginTop: 16,
     fontWeight: '500',
   },
@@ -1088,20 +1073,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 20,
     backgroundColor: 'white',
-    borderBottomWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F5F5F5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1131,141 +1117,129 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#2D3748',
-    letterSpacing: -0.3,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 15,
-    color: '#718096',
-    marginTop: 4,
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
     fontWeight: '400',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   headerAction: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F5F5F5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   photoCard: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    marginBottom: 24,
+    borderRadius: 16,
+    marginBottom: 16,
     overflow: 'hidden',
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   photoGradient: {
-    height: 240,
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#6366F1',
   },
   photoContent: {
     alignItems: 'center',
   },
   photoText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: 'white',
-    marginTop: 16,
+    marginTop: 12,
     letterSpacing: -0.2,
   },
   photoSubtext: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 8,
+    marginTop: 6,
     fontWeight: '400',
   },
   statsGrid: {
     flexDirection: 'row',
-    padding: 28,
-    backgroundColor: '#FAFAFA',
+    padding: 20,
+    backgroundColor: '#F9FAFB',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 10,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#2D3748',
-    marginBottom: 6,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
     letterSpacing: -0.3,
   },
   statLabel: {
     fontSize: 12,
-    color: '#A0AEC0',
+    color: '#6B7280',
     fontWeight: '500',
-    letterSpacing: 0.3,
   },
   aiCard: {
-    marginBottom: 24,
-    borderRadius: 32,
+    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   aiGradient: {
-    padding: 28,
+    padding: 20,
+    backgroundColor: '#6366F1',
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   aiTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   aiTitleText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: 'white',
     letterSpacing: -0.3,
   },
   aiRefreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   aiSummary: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.95)',
-    lineHeight: 26,
+    fontSize: 15,
+    color: 'white',
+    lineHeight: 22,
     fontWeight: '400',
   },
   aiLoadingContainer: {
@@ -1289,8 +1263,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingHorizontal: 20,
+    paddingTop: 4,
   },
   sensorsGrid: {
     flexDirection: 'row',
@@ -1470,31 +1444,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sensorCard: {
-    width: (width - 56) / 2,
-    borderRadius: 28,
+    width: (width - 52) / 2,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'white',
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   sensorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
-    paddingBottom: 14,
+    padding: 16,
+    paddingBottom: 12,
   },
   sensorIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 0,
   },
   blueIcon: {
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
@@ -1513,35 +1482,36 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   sensorStatus: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 0,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
   },
   sensorStatusText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#4CAF50',
-    letterSpacing: 0.5,
+    color: '#22C55E',
+    letterSpacing: 0.3,
   },
   sensorValue: {
-    fontSize: 34,
-    fontWeight: '600',
-    color: '#2D3748',
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    paddingHorizontal: 16,
+    marginBottom: 8,
     letterSpacing: -0.5,
   },
   sensorFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   sensorTime: {
-    fontSize: 12,
-    color: '#A0AEC0',
+    fontSize: 11,
+    color: '#9CA3AF',
     marginLeft: 4,
     fontWeight: '400',
   },
@@ -1564,21 +1534,17 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    padding: 28,
-    marginBottom: 24,
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#2D3748',
-    marginBottom: 24,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
     letterSpacing: -0.3,
   },
   infoList: {
@@ -1588,35 +1554,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#F7FAFC',
-    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
     borderWidth: 0,
   },
   infoLabel: {
     flex: 1,
-    fontSize: 16,
-    color: '#718096',
-    marginLeft: 14,
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 12,
     fontWeight: '400',
   },
   infoValue: {
-    fontSize: 16,
-    color: '#2D3748',
+    fontSize: 14,
+    color: '#111827',
     fontWeight: '600',
   },
   scheduleToggleCard: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    padding: 28,
-    marginBottom: 24,
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   scheduleToggleHeader: {
     marginBottom: 18,
@@ -1638,61 +1600,57 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#A0AEC0',
+    color: '#9CA3AF',
   },
   activeToggleLabel: {
-    color: '#26A69A',
+    color: '#6366F1',
     fontWeight: '700',
   },
   calendarCard: {
     backgroundColor: 'white',
-    borderRadius: 32,
-    marginBottom: 24,
+    borderRadius: 16,
+    marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3,
-    borderWidth: 0,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   calendarHeader: {
     overflow: 'hidden',
   },
   calendarGradient: {
-    padding: 28,
+    padding: 20,
+    backgroundColor: '#6366F1',
   },
   calendarHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   calendarIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 0,
+    marginRight: 12,
   },
   calendarHeaderInfo: {
     flex: 1,
   },
   calendarTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: 'white',
     letterSpacing: -0.3,
   },
   calendarSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.95)',
-    marginTop: 6,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 2,
     fontWeight: '400',
   },
   calendarContent: {
-    padding: 28,
+    padding: 20,
   },
   daysHeader: {
     flexDirection: 'row',
@@ -1702,47 +1660,38 @@ const styles = StyleSheet.create({
   dayHeader: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#A0AEC0',
+    color: '#9CA3AF',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   calendarDay: {
     width: (width - 88) / 7,
-    height: 68,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     position: 'relative',
-    borderRadius: 20,
-    backgroundColor: '#F7FAFC',
-    borderWidth: 0,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     marginHorizontal: 2,
   },
   todayDay: {
-    backgroundColor: '#B2DFDB',
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
   },
   scheduledDay: {
-    backgroundColor: '#E1F5FE',
-    borderWidth: 0,
-    shadowColor: '#0288D1',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 1,
+    backgroundColor: '#DBEAFE',
+    borderColor: '#3B82F6',
   },
   dayNumber: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#2D3748',
-    marginBottom: 3,
+    color: '#111827',
+    marginBottom: 2,
   },
   wateringIndicator: {
     alignItems: 'center',
@@ -1750,16 +1699,16 @@ const styles = StyleSheet.create({
   },
   wateringVolume: {
     fontSize: 9,
-    color: '#42A5F5',
+    color: '#3B82F6',
     marginTop: 2,
     fontWeight: '700',
   },
   todayPulse: {
     position: 'absolute',
     inset: 0,
-    borderRadius: 20,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#26A69A',
+    borderColor: '#6366F1',
     opacity: 0.3,
   },
   weekGrid: {
@@ -1768,24 +1717,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   todayText: {
-    color: '#26A69A',
+    color: 'white',
     fontWeight: '700',
   },
   scheduledText: {
-    color: '#0288D1',
+    color: '#3B82F6',
     fontWeight: '600',
   },
   legendCard: {
     backgroundColor: 'white',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 0,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   legendContent: {
     flexDirection: 'row',
@@ -1796,81 +1741,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legendToday: {
-    width: 14,
-    height: 14,
-    backgroundColor: '#B2DFDB',
-    borderWidth: 0,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    backgroundColor: '#6366F1',
+    borderRadius: 3,
     marginRight: 6,
   },
   legendScheduled: {
-    width: 14,
-    height: 14,
-    backgroundColor: '#E1F5FE',
-    borderWidth: 0,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    backgroundColor: '#DBEAFE',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderRadius: 3,
     marginRight: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   legendAvailable: {
-    width: 14,
-    height: 14,
-    backgroundColor: '#F7FAFC',
-    borderWidth: 0,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 3,
     marginRight: 6,
   },
   legendText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#718096',
+    fontWeight: '500',
+    color: '#6B7280',
   },
   bottomButtons: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    gap: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
     backgroundColor: 'white',
-    borderTopWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   askMiraquaButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingVertical: 18,
-    borderRadius: 24,
-    gap: 10,
-    borderWidth: 0,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
   askMiraquaText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#2D3748',
-    letterSpacing: -0.2,
+    color: '#111827',
   },
   waterNowBottomButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#26A69A',
-    paddingVertical: 18,
-    borderRadius: 24,
-    gap: 10,
-    shadowColor: '#26A69A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#6366F1',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
   waterNowBottomText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: 'white',
-    letterSpacing: -0.2,
   },
   spinningIcon: {
     transform: [{ rotate: '360deg' }],
