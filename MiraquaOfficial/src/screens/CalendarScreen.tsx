@@ -10,28 +10,20 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
-interface ScheduleSlot {
-  time: string;
-  volume: number;
-}
 
 interface ScheduleEntry {
-  morning: ScheduleSlot | null;
-  afternoon: ScheduleSlot | null;
-  evening: ScheduleSlot | null;
+  liters: number;
+  optimal_time: string;
+  explanation?: string;
 }
 
 interface CalendarDay {
   date: string;
   day: number;
-  dayOfWeek: string;
   isToday: boolean;
   hasWatering: boolean;
-  schedule: ScheduleEntry | null;
+  entry: ScheduleEntry | null;
   isCurrentMonth: boolean;
-  isAdjacentMonth: boolean;
 }
 
 interface CalendarScreenProps {
@@ -42,291 +34,238 @@ interface CalendarScreenProps {
 const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
   const { plotId } = route.params;
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry>>({});
 
-  // Mock schedule data
   const generateScheduleData = (): Record<string, ScheduleEntry> => {
     const data: Record<string, ScheduleEntry> = {};
     const today = new Date();
-    
-    for (let i = -10; i < 30; i++) {
+    const times = ['5:30 AM', '6:00 AM', '6:15 AM', '5:45 AM'];
+    const explanations = [
+      'ET₀ deficit accumulated. Optimal watering window before peak heat.',
+      'Soil moisture below threshold. Morning irrigation scheduled.',
+      'Low rainfall forecast. Scheduled based on crop water demand.',
+      'Weekly water budget requires irrigation today.',
+    ];
+
+    for (let i = -5; i < 25; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       const dateStr = date.toISOString().split('T')[0];
-      
-      if (Math.random() > 0.6) {
+
+      if (Math.random() > 0.55) {
+        const liters = Math.floor(Math.random() * 14) + 8;
         data[dateStr] = {
-          morning: Math.random() > 0.5 ? { time: '06:00', volume: Math.floor(Math.random() * 15) + 5 } : null,
-          afternoon: Math.random() > 0.7 ? { time: '14:00', volume: Math.floor(Math.random() * 10) + 3 } : null,
-          evening: Math.random() > 0.8 ? { time: '18:00', volume: Math.floor(Math.random() * 8) + 2 } : null,
+          liters,
+          optimal_time: times[Math.floor(Math.random() * times.length)],
+          explanation: explanations[Math.floor(Math.random() * explanations.length)],
         };
       }
     }
-    
     return data;
   };
 
   const generateMonthDays = (): CalendarDay[] => {
     const today = new Date();
-    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-    
+    const todayStr = today.toISOString().split('T')[0];
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
     const days: CalendarDay[] = [];
-    
-    // Get the day of week for the first day of the month (0 = Sunday, 1 = Monday, etc.)
-    const firstDayOfWeek = firstDayOfMonth.getDay();
-    
-    // Add previous month's days before the current month starts
-    if (firstDayOfWeek > 0) {
-      const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 0);
-      const daysInPrevMonth = prevMonth.getDate();
-      
-      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-        const day = daysInPrevMonth - i;
-        const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, day);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        
-        days.push({
-          date: dateStr,
-          day: day,
-          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isToday: false,
-          hasWatering: false,
-          schedule: null,
-          isCurrentMonth: false,
-          isAdjacentMonth: true
-        });
-      }
-    }
-    
-    // Generate the actual days of the current month
-    for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-      const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const todayStr = today.toISOString().split('T')[0];
-      const isToday = dateStr === todayStr;
-      
-      const schedule = scheduleData[dateStr];
-      const hasWatering = !!schedule;
-      
+
+    // Pad start with previous month days
+    const startDow = firstDay.getDay();
+    for (let i = startDow - 1; i >= 0; i--) {
+      const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), -i);
       days.push({
-        date: dateStr,
-        day: currentDate.getDate(),
-        dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-        isToday,
-        hasWatering,
-        schedule,
-        isCurrentMonth: true,
-        isAdjacentMonth: false
+        date: d.toISOString().split('T')[0],
+        day: d.getDate(),
+        isToday: false,
+        hasWatering: false,
+        entry: null,
+        isCurrentMonth: false,
       });
     }
-    
-    // Calculate how many cells we need to complete the grid
-    // We want exactly 6 rows × 7 days = 42 cells total
-    const totalCells = days.length;
-    const targetCells = 42;
-    const remainingCells = Math.max(0, targetCells - totalCells);
-    
-    // Add next month's days to complete the grid
-    if (remainingCells > 0) {
-      for (let i = 1; i <= remainingCells; i++) {
-        const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        
-        days.push({
-          date: dateStr,
-          day: i,
-          dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isToday: false,
-          hasWatering: false,
-          schedule: null,
-          isCurrentMonth: false,
-          isAdjacentMonth: true
-        });
-      }
+
+    // Current month days
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const dateStr = d.toISOString().split('T')[0];
+      const entry = scheduleData[dateStr] || null;
+      days.push({
+        date: dateStr,
+        day,
+        isToday: dateStr === todayStr,
+        hasWatering: !!entry,
+        entry,
+        isCurrentMonth: true,
+      });
     }
-    
+
+    // Pad end to 42 cells
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i);
+      days.push({
+        date: d.toISOString().split('T')[0],
+        day: i,
+        isToday: false,
+        hasWatering: false,
+        entry: null,
+        isCurrentMonth: false,
+      });
+    }
+
     return days;
   };
-
-  const getTotalVolume = (schedule: ScheduleEntry | null) => {
-    if (!schedule) return 0;
-    return (schedule.morning?.volume || 0) + (schedule.afternoon?.volume || 0) + (schedule.evening?.volume || 0);
-  };
-
-  const handleDateSelect = (dateStr: string) => {
-    setSelectedDate(dateStr);
-    // Navigate to specific day view
-    navigation.navigate('SpecificDay', { 
-      plotId, 
-      date: dateStr,
-      schedule: scheduleData[dateStr] || null
-    });
-  };
-
-  const goToPreviousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
-
-  const goToNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
-
-  const calendarDays = generateMonthDays();
 
   useEffect(() => {
     setScheduleData(generateScheduleData());
   }, []);
 
+  const calendarDays = generateMonthDays();
+
+  const monthWateringDays = calendarDays.filter(d => d.isCurrentMonth && d.hasWatering).length;
+  const monthSkipDays = calendarDays.filter(d => d.isCurrentMonth && !d.hasWatering).length;
+  const totalLiters = calendarDays
+    .filter(d => d.isCurrentMonth && d.entry)
+    .reduce((sum, d) => sum + (d.entry?.liters || 0), 0);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <Ionicons name="arrow-back" size={22} color="white" />
         </TouchableOpacity>
-        
-        <View style={styles.headerContent}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="calendar" size={20} color="white" />
-          </View>
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>Calendar</Text>
-            <Text style={styles.headerSubtitle}>Plot {plotId} Schedule</Text>
-          </View>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Schedule</Text>
+          <Text style={styles.headerSubtitle}>AI-generated irrigation plan</Text>
         </View>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Calendar Header */}
-        <View style={styles.calendarHeader}>
-          <LinearGradient
-            colors={['#10B981', '#3B82F6']}
-            style={styles.calendarGradient}
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* Month navigation */}
+        <View style={styles.monthNav}>
+          <TouchableOpacity
+            style={styles.navBtn}
+            onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
           >
-            <View style={styles.calendarHeaderContent}>
-              <View style={styles.calendarTitle}>
-                <View style={styles.calendarIcon}>
-                  <Ionicons name="calendar" size={16} color="white" />
-                </View>
-                <View>
-                  <Text style={styles.monthTitle}>
-                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                  </Text>
-                  <Text style={styles.calendarSubtitle}>Tap dates for details</Text>
-                </View>
-              </View>
-              
-              <View style={styles.monthNavigation}>
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={goToPreviousMonth}
-                >
-                  <Ionicons name="chevron-back" size={16} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={goToNextMonth}
-                >
-                  <Ionicons name="chevron-forward" size={16} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </LinearGradient>
+            <Ionicons name="chevron-back" size={18} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.monthLabel}>
+            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </Text>
+          <TouchableOpacity
+            style={styles.navBtn}
+            onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+          >
+            <Ionicons name="chevron-forward" size={18} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Month stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{monthWateringDays}</Text>
+            <Text style={styles.statLabel}>Irrigating</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{monthSkipDays}</Text>
+            <Text style={styles.statLabel}>Skipping</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{totalLiters}L</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
         </View>
 
         {/* Calendar Grid */}
         <View style={styles.calendarCard}>
-          {/* Days of Week Header */}
+          {/* Day-of-week headers */}
           <View style={styles.daysHeader}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <Text key={day} style={styles.dayHeader}>{day}</Text>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+              <Text key={d} style={styles.dayHeader}>{d}</Text>
             ))}
           </View>
 
-          {/* Calendar Days Grid */}
-          <View style={styles.calendarGrid}>
-            {Array.from({ length: 6 }, (_, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRow}>
-                {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
-                  <View
-                    key={`${weekIndex}-${dayIndex}-${day.date || 'empty'}`}
-                    style={[
-                      styles.calendarDay,
-                      day.isAdjacentMonth && styles.adjacentMonthDay,
-                      day.isToday && styles.todayDay,
-                      day.hasWatering && styles.scheduledDay,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.dayNumber,
-                      day.isAdjacentMonth && styles.adjacentMonthText,
-                      day.isToday && styles.todayText,
-                      day.hasWatering && styles.scheduledText,
-                    ]}>
-                      {day.day}
-                    </Text>
-                    {day.hasWatering && day.isCurrentMonth && (
-                      <View style={styles.wateringIndicator}>
-                        <Ionicons name="water" size={10} color="#3B82F6" />
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
+          {/* Weeks */}
+          {Array.from({ length: 6 }, (_, wi) => (
+            <View key={wi} style={styles.weekRow}>
+              {calendarDays.slice(wi * 7, wi * 7 + 7).map((day, di) => (
+                <TouchableOpacity
+                  key={`${wi}-${di}`}
+                  style={[
+                    styles.dayCell,
+                    !day.isCurrentMonth && styles.dayFaded,
+                    day.isToday && styles.dayToday,
+                    day.hasWatering && day.isCurrentMonth && styles.dayWater,
+                  ]}
+                  onPress={() => {
+                    if (day.isCurrentMonth) {
+                      navigation.navigate('SpecificDay', {
+                        plotId,
+                        date: day.date,
+                        schedule: day.entry,
+                      });
+                    }
+                  }}
+                  activeOpacity={day.isCurrentMonth ? 0.7 : 1}
+                >
+                  <Text style={[
+                    styles.dayNumber,
+                    !day.isCurrentMonth && styles.dayNumberFaded,
+                    day.isToday && styles.dayNumberToday,
+                  ]}>
+                    {day.day}
+                  </Text>
+                  {day.hasWatering && day.isCurrentMonth && (
+                    <View style={styles.waterDot} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
         </View>
 
         {/* Legend */}
-        <View style={styles.legendCard}>
-          <View style={styles.legendContent}>
-            <View style={styles.legendItem}>
-              <View style={styles.legendToday} />
-              <Text style={styles.legendText}>Today</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={styles.legendScheduled}>
-                <Ionicons name="water" size={6} color="#3B82F6" />
-              </View>
-              <Text style={styles.legendText}>Scheduled</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={styles.legendAvailable} />
-              <Text style={styles.legendText}>Available</Text>
-            </View>
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, styles.legendToday]} />
+            <Text style={styles.legendText}>Today</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, styles.legendWater]} />
+            <Text style={styles.legendText}>Irrigating</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, styles.legendSkip]} />
+            <Text style={styles.legendText}>Skip day</Text>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.actionsCard}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('AddSchedule', { plotId })}
-            >
-              <Ionicons name="add" size={20} color="#10B981" />
-              <Text style={styles.actionText}>Add Schedule</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('ScheduleSettings', { plotId })}
-            >
-              <Ionicons name="settings" size={20} color="#3B82F6" />
-              <Text style={styles.actionText}>Settings</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Ask Miraqua */}
+        <TouchableOpacity
+          style={styles.askButton}
+          onPress={() => navigation.navigate('Chat', { plotId })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chatbubble-outline" size={18} color="#1aa179" />
+          <Text style={styles.askButtonText}>Ask Miraqua about this month</Text>
+          <Ionicons name="arrow-forward" size={16} color="#1aa179" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const { width } = Dimensions.get('window');
+const CELL = Math.floor((width - 40 - 32) / 7);
 
 const styles = StyleSheet.create({
   container: {
@@ -337,256 +276,200 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   backButton: {
-    padding: 8,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerIcon: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  headerInfo: {
+  headerCenter: {
     flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#6B7280',
     marginTop: 2,
   },
-  content: {
+  scroll: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 20,
   },
-  calendarHeader: {
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  calendarGradient: {
-    padding: 20,
-  },
-  calendarHeaderContent: {
+  monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  calendarTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  calendarIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  monthTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  monthLabel: {
+    fontSize: 17,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: -0.3,
   },
-  calendarSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-  },
-  monthNavigation: {
+  statsRow: {
     flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
   },
-  navButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   calendarCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 16,
+    marginBottom: 14,
   },
   daysHeader: {
     flexDirection: 'row',
-    marginBottom: 16,
-    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   dayHeader: {
-    width: (width - 80) / 7,
+    width: CELL,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  calendarGrid: {
-    flexDirection: 'column',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   weekRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  calendarDay: {
-    width: (width - 80) / 7,
-    height: 50,
+  dayCell: {
+    width: CELL,
+    height: CELL,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    position: 'relative',
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 1,
-    padding: 8,
+    borderRadius: 10,
   },
-  todayDay: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+  dayFaded: {
+    opacity: 0.25,
   },
-  scheduledDay: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
+  dayToday: {
+    backgroundColor: 'rgba(26, 161, 121, 0.18)',
+    borderWidth: 1.5,
+    borderColor: '#1aa179',
+  },
+  dayWater: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: 'white',
-    marginBottom: 2,
   },
-  todayText: {
-    color: '#10B981',
-    fontWeight: 'bold',
+  dayNumberFaded: {
+    color: '#4B5563',
   },
-  scheduledText: {
-    color: 'white',
-    fontWeight: '500',
+  dayNumberToday: {
+    color: '#1aa179',
+    fontWeight: '700',
   },
-  wateringIndicator: {
-    alignItems: 'center',
+  waterDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#60A5FA',
     marginTop: 2,
   },
-  adjacentMonthDay: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  adjacentMonthText: {
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
-  legendCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  legendContent: {
+  legend: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 14,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+  },
+  legendSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
   },
   legendToday: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 2,
-    borderColor: '#10B981',
-    borderRadius: 3,
-    marginRight: 4,
+    backgroundColor: 'rgba(26, 161, 121, 0.18)',
+    borderWidth: 1.5,
+    borderColor: '#1aa179',
   },
-  legendScheduled: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    borderRadius: 3,
-    marginRight: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+  legendWater: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.4)',
   },
-  legendAvailable: {
-    width: 12,
-    height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    marginRight: 4,
+  legendSkip: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   legendText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    color: '#9CA3AF',
   },
-  actionsCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 16,
-  },
-  actionsGrid: {
-    flexDirection: 'column',
-    gap: 16,
-  },
-  actionButton: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 20,
+  askButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(26, 161, 121, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(26, 161, 121, 0.25)',
+    borderRadius: 14,
+    paddingVertical: 14,
   },
-  actionText: {
+  askButtonText: {
     fontSize: 14,
-    color: 'white',
-    marginTop: 12,
+    fontWeight: '600',
+    color: '#1aa179',
+    flex: 1,
     textAlign: 'center',
-    fontWeight: '500',
   },
 });
 

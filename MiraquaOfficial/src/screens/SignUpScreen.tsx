@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -67,7 +67,7 @@ const SignUpScreen = ({ navigation }: any) => {
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
             <View style={styles.logoContainer}>
-              <Ionicons name="leaf" size={48} color="#10B981" />
+              <Ionicons name="leaf" size={48} color="#1aa179" />
             </View>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join Miraqua today</Text>
@@ -146,7 +146,7 @@ const SignUpScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
+            <TouchableOpacity style={[styles.signUpButton, loading && { opacity: 0.7 }]} onPress={handleSignUp} disabled={loading}>
               <Text style={styles.signUpText}>Create Account</Text>
             </TouchableOpacity>
 
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -220,13 +220,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   inputIcon: {
     marginRight: 12,
@@ -234,13 +234,13 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: 'white',
   },
   eyeButton: {
     padding: 4,
   },
   signUpButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -270,17 +270,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderRadius: 12,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   googleText: {
     marginLeft: 8,
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
+    color: 'white',
   },
   footer: {
     flexDirection: 'row',
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 14,
-    color: '#10B981',
+    color: '#1aa179',
     fontWeight: '600',
   },
 });

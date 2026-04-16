@@ -58,7 +58,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     {
       id: 1,
       sender: 'bot',
-      text: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
+      text: "Hi! I'm Miraqua. I manage your irrigation automatically — but you're always in control. Ask me to adjust schedules, explain any decision, or give you a forecast.",
       time: 'now',
       plotId: null // General message
     }
@@ -67,7 +67,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     {
       id: 1,
       sender: 'bot',
-      text: "Hi! I'm your AI irrigation assistant. I can help you optimize watering schedules, diagnose plant issues, and provide expert gardening advice.",
+      text: "Hi! I'm Miraqua. I manage your irrigation automatically — but you're always in control. Ask me to adjust schedules, explain any decision, or give you a forecast.",
       time: 'now',
       plotId: null // General message
     }
@@ -193,7 +193,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         const generalMessage: Message = {
           id: Date.now(),
           sender: 'bot',
-          text: "I'm now in general mode. I can help you with questions about all your plots, general gardening advice, or answer any irrigation-related questions. What would you like to know?",
+          text: "I'm now in general mode. Ask me about any of your plots, upcoming schedules, or irrigation decisions. What would you like to know?",
           time: 'now',
           plotId: null
         };
@@ -307,7 +307,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         setMessages(prev => prev.filter(msg => msg.text !== '🤖 AI is thinking...'));
         
         // Fallback to smart mock response
-        let botResponse = "I understand your concern. Let me analyze your garden data and provide personalized recommendations.";
+        let botResponse = "I understand. Let me analyze your plot data and provide personalized recommendations.";
         
         if (selectedPlot) {
           if (messageToSend.toLowerCase().includes('water')) {
@@ -407,7 +407,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
                   style={{ marginRight: 16, padding: 8 }}
                   onPress={fetchRealPlots}
                 >
-                  <Ionicons name="refresh" size={20} color="#10b981" />
+                  <Ionicons name="refresh" size={20} color="#1aa179" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowPlotSelector(false)}>
                   <Ionicons name="close" size={24} color="white" />
@@ -423,7 +423,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
                 onPress={() => handlePlotSelection("general")}
               >
                 <View style={styles.plotOptionContent}>
-                  <Ionicons name="leaf" size={20} color="#10b981" />
+                  <Ionicons name="leaf" size={20} color="#1aa179" />
                   <View style={styles.plotOptionText}>
                     <Text style={styles.plotOptionTitle}>General Info</Text>
                     <Text style={styles.plotOptionSubtitle}>Ask about all plots</Text>
@@ -452,7 +452,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
                     onPress={() => handlePlotSelection(plot.id)}
                   >
                     <View style={styles.plotOptionContent}>
-                      <Ionicons name="leaf" size={20} color="#10b981" />
+                      <Ionicons name="leaf" size={20} color="#1aa179" />
                       <View style={styles.plotOptionText}>
                         <Text style={styles.plotOptionTitle}>{plot.name || `Plot ${plot.id.slice(0, 8)}`}</Text>
                         <Text style={styles.plotOptionSubtitle}>
@@ -536,7 +536,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             ? "AI is thinking..." 
             : selectedPlot 
               ? `Ask about your ${selectedPlot.name}...` 
-              : "Ask me anything about your garden..."
+              : "Ask Miraqua anything..."
           }
           placeholderTextColor="#9CA3AF"
           value={message}
@@ -587,11 +587,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    shadowColor: '#10B981',
+    shadowColor: '#1aa179',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   onlineText: {
     fontSize: 13,
-    color: '#10B981',
+    color: '#1aa179',
     marginLeft: 6,
     fontWeight: '600',
   },
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   selectedPlotOption: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#1aa179',
   },
   plotOptionContent: {
     flexDirection: 'row',
@@ -818,10 +818,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   userAvatar: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#1aa179',
   },
   botAvatar: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
   },
   messageBubble: {
     padding: 12,
@@ -829,7 +829,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   userBubble: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#1aa179',
     borderBottomRightRadius: 8,
   },
   botBubble: {
@@ -906,10 +906,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#10B981',
+    shadowColor: '#1aa179',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

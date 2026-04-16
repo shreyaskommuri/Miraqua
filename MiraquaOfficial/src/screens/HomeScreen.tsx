@@ -174,7 +174,7 @@ export default function HomeScreen({ navigation }: any) {
         
         <View style={styles.headerRight}>
           <View style={styles.onlineStatus}>
-            <Ionicons name="wifi" size={16} color="#10B981" />
+            <Ionicons name="wifi" size={16} color="#1aa179" />
             <Text style={styles.onlineText}>Online</Text>
           </View>
           <TouchableOpacity 
@@ -198,7 +198,7 @@ export default function HomeScreen({ navigation }: any) {
                 {getGreeting()} 👋
               </Text>
               <Text style={styles.greetingSubtext}>
-                Your gardens are looking great today
+                AI running on all plots — monitoring 24/7
               </Text>
             </View>
             
@@ -254,28 +254,34 @@ export default function HomeScreen({ navigation }: any) {
           ) : (
             <View style={styles.plotsGrid}>
               {filteredPlots.map((plot) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={plot.id}
                   style={styles.plotGridCard}
                   onPress={() => {
-                    console.log(`${plot.name} pressed`);
                     navigation.navigate('PlotDetails' as never, { plotId: plot.id } as never);
                   }}
                   activeOpacity={0.7}
                 >
-                                <View style={styles.plotGridHeader}>
-                                  <View style={styles.plotGridTitleContainer}>
-                                    <Text style={styles.plotGridTitle}>{plot.name}</Text>
-                                    <Ionicons name="leaf" size={14} color="#10B981" />
-                                  </View>
-                                </View>
+                  <View style={styles.plotGridHeader}>
+                    <View style={styles.plotGridTitleContainer}>
+                      <Text style={styles.plotGridTitle} numberOfLines={1}>{plot.name}</Text>
+                    </View>
+                    <View style={styles.aiBadge}>
+                      <View style={styles.aiDot} />
+                      <Text style={styles.aiBadgeText}>AI</Text>
+                    </View>
+                  </View>
 
-                                <Text style={styles.plotGridType}>{plot.crop}</Text>
-                                
-                                <View style={styles.plotGridLocation}>
-                                  <Ionicons name="location" size={12} color="#9CA3AF" />
-                                  <Text style={styles.plotGridLocationText}>{plot.zip_code}</Text>
-                                </View>
+                  <Text style={styles.plotGridType}>{plot.crop}</Text>
+
+                  <View style={styles.plotGridLocation}>
+                    <Ionicons name="location-outline" size={12} color="#6B7280" />
+                    <Text style={styles.plotGridLocationText}>{plot.zip_code}</Text>
+                  </View>
+
+                  <View style={styles.plotGridFooterRow}>
+                    <Ionicons name="arrow-forward-circle-outline" size={16} color="rgba(26,161,121,0.6)" />
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -330,7 +336,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -351,7 +357,7 @@ const styles = StyleSheet.create({
   },
   onlineText: {
     fontSize: 12,
-    color: '#10B981',
+    color: '#1aa179',
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -475,7 +481,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     borderRadius: 2,
   },
   bottomMetricsRow: {
@@ -550,7 +556,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   healthBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -640,7 +646,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     marginRight: 6,
   },
   statusText: {
@@ -649,7 +655,7 @@ const styles = StyleSheet.create({
   },
   healthStatus: {
     fontSize: 12,
-    color: '#10B981',
+    color: '#1aa179',
     fontWeight: '600',
   },
   wateringScheduleWithAction: {
@@ -691,7 +697,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -707,32 +713,58 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   plotGridCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     width: '48%',
     minWidth: 150,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   plotGridHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   plotGridTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
+    marginRight: 6,
   },
   plotGridTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: 'white',
-    marginRight: 4,
+  },
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(26, 161, 121, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 161, 121, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  aiDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#1aa179',
+  },
+  aiBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1aa179',
+  },
+  plotGridFooterRow: {
+    marginTop: 10,
+    alignItems: 'flex-end',
   },
   healthBadgeSmall: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 3,
@@ -787,7 +819,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     marginRight: 4,
   },
   plotGridStatusText: {
