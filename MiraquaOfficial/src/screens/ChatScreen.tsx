@@ -111,6 +111,49 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     getCurrentUser();
   }, []);
 
+  // Load previous chat history for current plot
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (!userId) return;
+
+      try {
+        console.log(`📚 Loading chat history for user=${userId}, plot=${selectedPlotId}`);
+        const response = await fetch('http://localhost:5050/get_chat_log', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            plot_id: selectedPlotId === 'general' ? 'general' : selectedPlotId
+          })
+        });
+
+        if (response.ok) {
+          const history = await response.json();
+          if (history && history.length > 0) {
+            // Convert backend format to frontend format
+            const loadedMessages = history.map((msg: any, index: number) => ({
+              id: index + 2, // Start after welcome message
+              sender: msg.sender,
+              text: msg.text,
+              time: new Date(msg.timestamp).toLocaleTimeString(),
+              plotId: selectedPlotId === 'general' ? null : selectedPlotId
+            }));
+
+            // Append loaded messages after welcome message
+            setMessages(prev => [...prev, ...loadedMessages]);
+            console.log(`✅ Loaded ${loadedMessages.length} previous messages`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    };
+
+    loadChatHistory();
+  }, [userId, selectedPlotId]);
+
   // Filter messages based on selected plot
   useEffect(() => {
     if (selectedPlotId === 'general') {
@@ -121,6 +164,13 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
       setFilteredMessages(messages.filter(msg => msg.plotId === selectedPlotId));
     }
   }, [selectedPlotId, messages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [filteredMessages]);
 
   const quickActions = selectedPlot ? [
     "Water",

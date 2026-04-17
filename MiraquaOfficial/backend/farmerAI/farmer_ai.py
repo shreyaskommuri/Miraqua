@@ -228,7 +228,9 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 === USER'S PLOTS ===
 {plots_summary}
 
-=== THEIR QUESTION ===
+{history_summary}
+
+=== THEIR CURRENT QUESTION ===
 "{prompt.strip()}"
 
 === YOUR RESPONSE RULES ===
@@ -236,8 +238,9 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 2. Example BAD response: "check your local forecast" ❌
 3. Example GOOD response: "Tomorrow shows 57°F with 0% rain chance, so water as planned" ✅
 4. If they ask about watering, tell them YES/NO based on the ACTUAL rain % above
-5. Keep it SHORT (2-3 sentences max)
-6. Never say "I don't have access" - the data is literally shown above
+5. If they ask a follow-up question (like "what about tomorrow?"), use the conversation history above to understand context
+6. Keep it SHORT (2-3 sentences max)
+7. Never say "I don't have access" - the data is literally shown above
 
 YOUR ANSWER:"""
             model = genai.GenerativeModel("models/gemini-2.5-flash")
@@ -334,6 +337,61 @@ YOUR ANSWER:"""
                 reply_lines.append(f"⏸️ Paused watering on {updated_schedule[i]['day']} ({updated_schedule[i]['date']}).")
             schedule_changed = True
 
+        # === 5b. Increase/Decrease All Days ===
+        # Matches: "water more", "increase by 20%", "decrease all", "reduce watering"
+        increase_match = re.search(r"(?:increase|more|add).*?(\d+)\s*%?", prompt_lower)
+        decrease_match = re.search(r"(?:decrease|less|reduce).*?(\d+)\s*%?", prompt_lower)
+
+        # Check for whole-week modifiers
+        whole_week = any(word in prompt_lower for word in ["all", "every", "week", "entire"])
+
+        if (increase_match or decrease_match) and (whole_week or not target_indices):
+            # Apply to all days if no specific days mentioned
+            if not target_indices:
+                target_indices = set(range(len(updated_schedule)))
+
+            if increase_match:
+                percent = int(increase_match.group(1))
+                for idx in target_indices:
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * (1 + percent / 100), 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = f"Increased by {percent}%"
+                    reply_lines.append(f"✅ Increased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (+{percent}%)")
+                schedule_changed = True
+
+            elif decrease_match:
+                percent = int(decrease_match.group(1))
+                for idx in target_indices:
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * (1 - percent / 100), 2)
+                    updated_schedule[idx]["liters"] = max(0, new_val)
+                    updated_schedule[idx]["note"] = f"Decreased by {percent}%"
+                    reply_lines.append(f"✅ Decreased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (-{percent}%)")
+                schedule_changed = True
+
+        # === 5c. Simple "more" or "less" without percentage ===
+        if not schedule_changed and whole_week:
+            if "more" in prompt_lower or "increase" in prompt_lower:
+                # Default to 20% increase
+                for idx in range(len(updated_schedule)):
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * 1.2, 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = "Increased by 20%"
+                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (+20%)")
+                schedule_changed = True
+
+            elif "less" in prompt_lower or "reduce" in prompt_lower:
+                # Default to 20% decrease
+                for idx in range(len(updated_schedule)):
+                    old_val = updated_schedule[idx]["liters"]
+                    new_val = round(old_val * 0.8, 2)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = "Decreased by 20%"
+                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (-20%)")
+                schedule_changed = True
+
         # === 6. Revert to Original ===
         if "revert" in prompt_lower or "reset schedule" in prompt_lower:
             if og_schedule:
@@ -417,6 +475,16 @@ Provide helpful gardening advice based on the crop and location. Be specific and
             last_watered = logs[0].get("watered_at", "Unknown")
             watering_summary = f"Last watered: {last_watered}"
 
+        # Create chat history summary for plot-specific queries
+        history_summary = ""
+        recent_chats = plot.get("recent_chats", [])
+        if recent_chats:
+            history_lines = []
+            for chat in recent_chats[-3:]:  # Last 3 exchanges
+                history_lines.append(f"User: {chat['prompt'][:100]}")
+                history_lines.append(f"Bot: {chat['reply'][:100]}")
+            history_summary = f"\n\n=== RECENT CONVERSATION ===\n" + "\n".join(history_lines)
+
         # Summarize weather from hourly data (OpenWeather format)
         weather_summary = "Weather data unavailable"
         if hourly and len(hourly) > 0:
@@ -449,8 +517,9 @@ You are FarmerBot. Use the data below to answer the question.
 === PLOT INFO ===
 {crop} plot "{plot_name}" - {age} months old, {plot.get("area", 1.0)}m²
 {watering_summary}
+{history_summary}
 
-=== QUESTION ===
+=== CURRENT QUESTION ===
 "{prompt.strip()}"
 
 === RESPONSE RULES ===
@@ -460,8 +529,9 @@ You are FarmerBot. Use the data below to answer the question.
 4. If rain % > 40%, tell them to skip watering
 5. If rain % < 10%, confirm they should water
 6. Reference their actual schedule times/amounts
-7. Keep answer SHORT (2-3 sentences)
-8. NEVER say you don't have weather data - it's shown above
+7. If they ask a follow-up question, use the recent conversation above for context
+8. Keep answer SHORT (2-3 sentences)
+9. NEVER say you don't have weather data - it's shown above
 
 YOUR ANSWER:"""
 
