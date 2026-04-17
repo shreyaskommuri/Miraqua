@@ -26,6 +26,9 @@ interface CalendarDay {
   isCurrentMonth: boolean;
 }
 
+const localDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 interface CalendarScreenProps {
   route: any;
   navigation: any;
@@ -50,7 +53,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     for (let i = -5; i < 25; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = localDateStr(date);
 
       if (Math.random() > 0.55) {
         const liters = Math.floor(Math.random() * 14) + 8;
@@ -66,7 +69,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
 
   const generateMonthDays = (): CalendarDay[] => {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = localDateStr(today);
     const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
     const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
     const days: CalendarDay[] = [];
@@ -76,7 +79,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     for (let i = startDow - 1; i >= 0; i--) {
       const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), -i);
       days.push({
-        date: d.toISOString().split('T')[0],
+        date: localDateStr(d),
         day: d.getDate(),
         isToday: false,
         hasWatering: false,
@@ -88,7 +91,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     // Current month days
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateStr(d);
       const entry = scheduleData[dateStr] || null;
       days.push({
         date: dateStr,
@@ -105,7 +108,7 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     for (let i = 1; i <= remaining; i++) {
       const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i);
       days.push({
-        date: d.toISOString().split('T')[0],
+        date: localDateStr(d),
         day: i,
         isToday: false,
         hasWatering: false,

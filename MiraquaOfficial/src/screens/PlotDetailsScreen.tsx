@@ -43,6 +43,9 @@ interface Plot {
   }>;
 }
 
+const localDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 interface PlotDetailsScreenProps {
   route: any;
   navigation: any;
@@ -118,9 +121,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             continue;
           }
           
-          const dateStr = currentDate.toISOString().split('T')[0];
-          const isToday = dateStr === today.toISOString().split('T')[0];
-        
+          const dateStr = localDateStr(currentDate);
+          const isToday = dateStr === localDateStr(today);
+
           // Find if this date has watering in the real schedule
           const scheduleEntry = schedule.find((entry: any) => {
             try {
@@ -186,7 +189,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             continue;
           }
           
-          const dateStr = currentDate.toISOString().split('T')[0];
+          const dateStr = localDateStr(currentDate);
           const isToday = i === 0;
         
         if (showOriginalSchedule) {

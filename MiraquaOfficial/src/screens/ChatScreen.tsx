@@ -73,8 +73,13 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     }
   ]);
 
-  // Generate a session ID once per chat screen instance
   const chatSessionId = useRef(uuid.v4() as string).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(timer);
+  }, [filteredMessages]);
 
   // Get current user ID
   useEffect(() => {
@@ -280,6 +285,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             prompt: messageToSend,
             plotId: selectedPlotId === 'general' ? null : selectedPlotId,
             chat_session_id: chatSessionId,
+            current_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
           })
         });
         
@@ -334,61 +340,65 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.menuButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={22} color="white" />
         </TouchableOpacity>
-        
-        <View style={styles.logoContainer}>
-          <View style={styles.logoIcon}>
-            <Ionicons name="leaf" size={20} color="white" />
+
+        <View style={styles.headerCenter}>
+          <View style={styles.botAvatarSmall}>
+            <Ionicons name="leaf" size={14} color="white" />
           </View>
-          <Text style={styles.logoText}>Miraqua</Text>
-        </View>
-        
-        <View style={styles.headerRight}>
-          <View style={styles.onlineStatus}>
-            <Ionicons name="wifi" size={16} color="white" />
-            <Text style={styles.onlineText}>Online</Text>
+          <View>
+            <Text style={styles.headerTitle}>Miraqua AI</Text>
+            {selectedPlot && (
+              <Text style={styles.headerSubtitle}>{selectedPlot.name} · {selectedPlot.crop}</Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={20} color="white" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationCount}>3</Text>
-            </View>
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={styles.plotSelectorBtn} onPress={() => setShowPlotSelector(true)}>
+          <Text style={styles.plotSelectorBtnText} numberOfLines={1}>
+            {selectedPlot ? selectedPlot.name : 'All Plots'}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
       </View>
 
-      {/* Quick Actions Section */}
-      <View style={styles.quickActionsSection}>
-        <View style={styles.quickActionsHeader}>
-          <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-          <TouchableOpacity 
-            style={styles.plotSelector}
-            onPress={() => setShowPlotSelector(true)}
-          >
-            <Text style={styles.plotSelectorText}>
-              {selectedPlot ? selectedPlot.name : "General Info"}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" />
-          </TouchableOpacity>
+      {/* Context banner when navigated from a plot */}
+      {selectedPlot && plotIdFromRoute && (
+        <View style={styles.contextBanner}>
+          <View style={styles.contextBannerDot} />
+          <Text style={styles.contextBannerText}>
+            Talking about <Text style={styles.contextBannerPlot}>{selectedPlot.name}</Text> — {selectedPlot.crop}
+          </Text>
         </View>
-        <View style={styles.quickActionsGrid}>
-          {quickActions.map((action, index) => (
+      )}
+
+      {/* Quick Action Chips */}
+      <View style={styles.quickActionsSection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
+          {[
+            { label: 'Water today?', icon: 'water-outline' },
+            { label: 'Skip day', icon: 'calendar-outline' },
+            { label: 'Health check', icon: 'leaf-outline' },
+            { label: 'This week', icon: 'stats-chart-outline' },
+            { label: 'Adjust schedule', icon: 'settings-outline' },
+          ].map((action, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.quickActionButton}
-              onPress={() => handleQuickAction(action)}
+              style={styles.quickActionChip}
+              onPress={() => handleQuickAction(action.label)}
             >
-              <Text style={styles.quickActionText}>{action}</Text>
+              <Ionicons name={action.icon as any} size={13} color="#1aa179" />
+              <Text style={styles.quickActionChipText}>{action.label}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       {/* Plot Selector Modal */}
@@ -478,233 +488,315 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         </View>
       </Modal>
 
-      {/* Messages - Scrollable Area */}
-      <ScrollView 
-        style={styles.chatArea} 
+      {/* Messages */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.chatArea}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.messagesContainer}>
-          {filteredMessages.map((msg) => (
-            <View
-              key={msg.id}
-              style={[
-                styles.messageRow,
-                msg.sender === 'user' ? styles.userMessageRow : styles.botMessageRow
-              ]}
-            >
-              <View style={styles.messageContent}>
-                {msg.sender === 'user' && (
-                  <View style={[styles.avatar, styles.userAvatar]}>
-                    <Ionicons name="person" size={16} color="white" />
+          {filteredMessages.map((msg) => {
+            const isTyping = msg.text === '🤖 AI is thinking...';
+            return (
+              <View
+                key={msg.id}
+                style={[
+                  styles.messageRow,
+                  msg.sender === 'user' ? styles.userMessageRow : styles.botMessageRow,
+                ]}
+              >
+                {msg.sender === 'bot' && (
+                  <View style={styles.botAvatarMsg}>
+                    <Ionicons name="leaf" size={12} color="white" />
                   </View>
                 )}
                 <View style={[
                   styles.messageBubble,
-                  msg.sender === 'user' ? styles.userBubble : styles.botBubble
+                  msg.sender === 'user' ? styles.userBubble : styles.botBubble,
+                  isTyping && styles.typingBubble,
                 ]}>
-                  <Text style={[
-                    styles.messageText,
-                    msg.sender === 'user' ? styles.userText : styles.botText
-                  ]}>
-                    {msg.text}
+                  <Text style={[styles.messageText, msg.sender === 'user' ? styles.userText : styles.botText]}>
+                    {isTyping ? '● ● ●' : msg.text}
                   </Text>
-                  <Text style={[
-                    styles.messageTime,
-                    msg.sender === 'user' ? styles.userTime : styles.botTime
-                  ]}>
-                    {msg.time}
-                  </Text>
+                  {!isTyping && (
+                    <Text style={[styles.messageTime, msg.sender === 'user' ? styles.userTime : styles.botTime]}>
+                      {msg.time}
+                    </Text>
+                  )}
                 </View>
+                {msg.sender === 'user' && (
+                  <View style={styles.userAvatarMsg}>
+                    <Ionicons name="person" size={12} color="white" />
+                  </View>
+                )}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
 
-      {/* Input Area */}
-      <View style={styles.standaloneInputArea}>
-        <TouchableOpacity style={styles.inputButton}>
-          <Ionicons name="camera" size={20} color="#6b7280" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.inputButton}>
-          <Ionicons name="mic" size={20} color="#6b7280" />
-        </TouchableOpacity>
+      {/* Input */}
+      <View style={styles.inputArea}>
         <TextInput
           style={styles.textInput}
-          placeholder={isAIProcessing 
-            ? "AI is thinking..." 
-            : selectedPlot 
-              ? `Ask about your ${selectedPlot.name}...` 
-              : "Ask Miraqua anything..."
+          placeholder={
+            isAIProcessing
+              ? 'Miraqua is thinking...'
+              : selectedPlot
+              ? `Ask about ${selectedPlot.name}...`
+              : 'Ask Miraqua anything...'
           }
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={message}
           onChangeText={setMessage}
           onSubmitEditing={() => handleSendMessage()}
           editable={!isAIProcessing}
+          multiline
         />
-        <TouchableOpacity 
-          style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+        <TouchableOpacity
+          style={[styles.sendButton, (!message.trim() || isAIProcessing) && styles.sendButtonDisabled]}
           onPress={() => handleSendMessage()}
           disabled={!message.trim() || isAIProcessing}
         >
-          {isAIProcessing ? (
-            <Ionicons name="hourglass" size={20} color="white" />
-          ) : (
-            <Ionicons name="paper-plane" size={20} color="white" />
-          )}
+          <Ionicons name="paper-plane" size={18} color="white" />
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A', // Cleaner dark background
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    paddingTop: 60,
-    backgroundColor: '#1E293B', // Subtle header background
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  menuButton: {
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#1aa179',
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    shadowColor: '#1aa179',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  logoText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
-  headerRight: {
+  headerCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 10,
   },
-  onlineStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  onlineText: {
-    fontSize: 13,
-    color: '#1aa179',
-    marginLeft: 6,
-    fontWeight: '600',
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+  botAvatarSmall: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#1aa179',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  notificationCount: {
-    color: 'white',
-    fontSize: 11,
+  headerTitle: {
+    fontSize: 16,
     fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  plotSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.11)',
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    maxWidth: 130,
+  },
+  plotSelectorBtnText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  contextBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(26,161,121,0.07)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(26,161,121,0.14)',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  contextBannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1aa179',
+  },
+  contextBannerText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
+  contextBannerPlot: {
+    color: '#1aa179',
+    fontWeight: '600',
   },
   quickActionsSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: '#0F172A',
-  },
-  quickActionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  quickActionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    letterSpacing: 0.3,
-  },
-  plotSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
     paddingVertical: 10,
-    minHeight: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  plotSelectorText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+  quickActionsScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  quickActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  quickActionChipText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  quickActionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+  chatArea: {
     flex: 1,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  quickActionText: {
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 12,
+  },
+  messagesContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  userMessageRow: {
+    justifyContent: 'flex-end',
+  },
+  botMessageRow: {
+    justifyContent: 'flex-start',
+  },
+  botAvatarMsg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#1aa179',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    flexShrink: 0,
+  },
+  userAvatarMsg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+  messageBubble: {
+    maxWidth: '74%',
+    padding: 12,
+    borderRadius: 18,
+  },
+  userBubble: {
+    backgroundColor: '#1aa179',
+    borderBottomRightRadius: 4,
+  },
+  botBubble: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderBottomLeftRadius: 4,
+  },
+  typingBubble: {
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  userText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+  },
+  botText: {
+    color: 'rgba(255,255,255,0.9)',
+  },
+  messageTime: {
+    fontSize: 11,
+    marginTop: 6,
+  },
+  userTime: {
+    color: 'rgba(255,255,255,0.6)',
+  },
+  botTime: {
+    color: 'rgba(255,255,255,0.35)',
+  },
+  inputArea: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    gap: 10,
+  },
+  textInput: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    color: 'white',
+    fontSize: 15,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1aa179',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  sendButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   modalOverlay: {
     flex: 1,
@@ -753,7 +845,7 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   selectedPlotOption: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(26, 161, 121, 0.12)',
     borderWidth: 2,
     borderColor: '#1aa179',
   },
@@ -776,148 +868,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
-  },
-  chatArea: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  messagesContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 120, // Extra padding to prevent content being cut off by input bar
-  },
-  messageRow: {
-    marginBottom: 16,
-  },
-  userMessageRow: {
-    alignItems: 'flex-end',
-  },
-  botMessageRow: {
-    alignItems: 'flex-start',
-  },
-  messageContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    maxWidth: '80%',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  userAvatar: {
-    backgroundColor: '#1aa179',
-  },
-  botAvatar: {
-    backgroundColor: '#1aa179',
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 20,
-    flexShrink: 1,
-  },
-  userBubble: {
-    backgroundColor: '#1aa179',
-    borderBottomRightRadius: 8,
-  },
-  botBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderBottomLeftRadius: 8,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  userText: {
-    color: 'white',
-  },
-  botText: {
-    color: 'white',
-  },
-  messageTime: {
-    fontSize: 12,
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  userTime: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  botTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  inputArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
-  standaloneInputArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 30, // Increased for safe area and to prevent overlap
-    backgroundColor: '#1E293B',
-    gap: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  inputButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-    minHeight: 48,
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#1aa179',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1aa179',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sendButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    shadowOpacity: 0,
-    elevation: 0,
   },
 }); 
