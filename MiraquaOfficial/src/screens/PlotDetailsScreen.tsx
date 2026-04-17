@@ -12,7 +12,6 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { environment } from '../config/environment';
 
 interface Plot {
@@ -516,7 +515,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <Ionicons name="refresh" size={48} color="#10B981" style={styles.spinningIcon} />
+          <Ionicons name="refresh" size={48} color="#1aa179" style={styles.spinningIcon} />
           <Text style={styles.loadingText}>Loading plot details...</Text>
         </View>
       </SafeAreaView>
@@ -548,7 +547,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
         <View style={styles.headerContent}>
           <View style={styles.plotIcon}>
             <Text style={styles.plotEmoji}>🌿</Text>
-            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#10B981' : '#EF4444' }]}>
+            <View style={[styles.onlineIndicator, { backgroundColor: (plot.isOnline !== undefined ? plot.isOnline : true) ? '#1aa179' : '#EF4444' }]}>
               <Ionicons name="wifi" size={8} color="white" />
             </View>
           </View>
@@ -575,21 +574,21 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Photo/Map Header */}
+        {/* Plot Hero Header */}
         <View style={styles.photoCard}>
-          <LinearGradient
-            colors={['#10B981', '#059669']}
-            style={styles.photoGradient}
-          >
+          <View style={styles.photoGradient}>
             <View style={styles.photoContent}>
-              <Ionicons name="camera" size={64} color="rgba(255, 255, 255, 0.6)" />
-              <Text style={styles.photoText}>Tap to add plot photo</Text>
-              <Text style={styles.photoSubtext}>Show off your beautiful garden</Text>
+              <View style={styles.plotHeroIcon}>
+                <Ionicons name="leaf" size={36} color="rgba(255,255,255,0.9)" />
+              </View>
+              <Text style={styles.photoText}>{plot.name}</Text>
+              <Text style={styles.photoSubtext}>{plot.crop}{plot.variety ? ` · ${plot.variety}` : ''}</Text>
             </View>
-            <TouchableOpacity style={styles.maximizeButton}>
-              <Ionicons name="expand" size={16} color="white" />
-            </TouchableOpacity>
-          </LinearGradient>
+            <View style={styles.onlinePill}>
+              <View style={styles.onlinePillDot} />
+              <Text style={styles.onlinePillText}>AI Active</Text>
+            </View>
+          </View>
           
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
@@ -602,7 +601,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             
             <View style={styles.statItem}>
               <View style={styles.statIcon}>
-                <Ionicons name="calendar" size={24} color="#10B981" />
+                <Ionicons name="calendar" size={24} color="#1aa179" />
               </View>
               <Text style={styles.statValue}>2 months</Text>
               <Text style={styles.statLabel}>Crop Age</Text>
@@ -620,10 +619,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
         {/* AI Summary */}
         <View style={styles.aiCard}>
-          <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
-            style={styles.aiGradient}
-          >
+          <View style={styles.aiGradient}>
             <View style={styles.aiHeader}>
               <View style={styles.aiTitle}>
                 <Ionicons name="sparkles" size={20} color="white" />
@@ -644,7 +640,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Text style={styles.aiSummary}>
               {aiSummary || "Generating personalized insights for your plot..."}
             </Text>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Sensor Status Grid */}
@@ -662,7 +658,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   {sensor.name === 'Soil Moisture' && <Ionicons name="water" size={20} color="#3B82F6" />}
                   {sensor.name === 'Temperature' && <Ionicons name="thermometer" size={20} color="#F59E0B" />}
                   {sensor.name === 'Light' && <Ionicons name="sunny" size={20} color="#F59E0B" />}
-                  {sensor.name === 'pH Level' && <Ionicons name="analytics" size={20} color="#10B981" />}
+                  {sensor.name === 'pH Level' && <Ionicons name="analytics" size={20} color="#1aa179" />}
                 </View>
                 <View style={styles.sensorStatus}>
                   <Text style={styles.sensorStatusText}>{sensor.status}</Text>
@@ -707,7 +703,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <Text style={styles.sectionTitle}>Plot Information</Text>
           <View style={styles.infoList}>
             <View style={styles.infoItem}>
-              <Ionicons name="leaf" size={16} color="#10B981" />
+              <Ionicons name="leaf" size={16} color="#1aa179" />
               <Text style={styles.infoLabel}>Crop Type</Text>
               <Text style={styles.infoValue}>{plot.crop || 'Unknown'}</Text>
             </View>
@@ -754,7 +750,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             <Switch
               value={showOriginalSchedule}
               onValueChange={setShowOriginalSchedule}
-              trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+              trackColor={{ false: '#D1D5DB', true: '#1aa179' }}
               thumbColor={'white'}
             />
             <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
@@ -763,14 +759,11 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
                   {/* Integrated Calendar Schedule */}
           <View style={styles.calendarCard}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.calendarHeader}
               onPress={() => navigation.navigate('Calendar', { plotId })}
             >
-              <LinearGradient
-                colors={['#10B981', '#3B82F6']}
-                style={styles.calendarGradient}
-              >
+              <View style={styles.calendarGradient}>
                 <View style={styles.calendarHeaderContent}>
                   <View style={styles.calendarIcon}>
                     <Ionicons name="calendar" size={16} color="white" />
@@ -781,8 +774,9 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                       {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
                     </Text>
                   </View>
+                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
             
                         {/* Debug Info - Only show in development */}
@@ -1038,30 +1032,63 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   photoGradient: {
-    height: 200,
+    height: 160,
+    backgroundColor: 'rgba(26, 161, 121, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(26, 161, 121, 0.2)',
+  },
+  plotHeroIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(26, 161, 121, 0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(26, 161, 121, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   photoContent: {
     alignItems: 'center',
   },
   photoText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '800',
     color: 'white',
-    marginTop: 16,
+    letterSpacing: -0.3,
   },
   photoSubtext: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+    color: '#9CA3AF',
     marginTop: 4,
   },
-  maximizeButton: {
+  onlinePill: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 8,
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 161, 121, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 161, 121, 0.35)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 5,
+  },
+  onlinePillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1aa179',
+  },
+  onlinePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1aa179',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -1098,6 +1125,10 @@ const styles = StyleSheet.create({
   },
   aiGradient: {
     padding: 20,
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.2)',
+    borderRadius: 12,
   },
   aiHeader: {
     flexDirection: 'row',
@@ -1369,7 +1400,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   waterButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1aa179',
     borderRadius: 12,
     paddingVertical: 16,
     marginBottom: 20,
@@ -1445,7 +1476,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   activeToggleLabel: {
-    color: '#10B981',
+    color: '#1aa179',
     fontWeight: '600',
   },
   calendarCard: {
@@ -1464,6 +1495,9 @@ const styles = StyleSheet.create({
   },
   calendarGradient: {
     padding: 16,
+    backgroundColor: 'rgba(26, 161, 121, 0.12)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(26, 161, 121, 0.2)',
   },
   calendarHeaderContent: {
     flexDirection: 'row',
@@ -1526,8 +1560,8 @@ const styles = StyleSheet.create({
   todayDay: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
+    borderColor: '#1aa179',
+    shadowColor: '#1aa179',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1554,7 +1588,7 @@ const styles = StyleSheet.create({
     inset: 0,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#1aa179',
     opacity: 0.3,
   },
   weekGrid: {
@@ -1562,7 +1596,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   todayText: {
-    color: '#10B981',
+    color: '#1aa179',
     fontWeight: 'bold',
   },
   scheduledText: {
@@ -1593,7 +1627,7 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#1aa179',
     borderRadius: 3,
     marginRight: 4,
   },
@@ -1643,7 +1677,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#374151',
+    backgroundColor: 'rgba(26, 161, 121, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 161, 121, 0.25)',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -1651,14 +1687,14 @@ const styles = StyleSheet.create({
   askMiraquaText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#9CA3AF',
+    color: '#1aa179',
   },
   waterNowBottomButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#1aa179',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,

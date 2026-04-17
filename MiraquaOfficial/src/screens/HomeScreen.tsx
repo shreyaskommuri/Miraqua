@@ -190,24 +190,40 @@ export default function HomeScreen({ navigation }: any) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Greeting and Weather Section */}
+        {/* Greeting and Stats Section */}
         {!searchText.trim() && (
-          <View style={styles.greetingSection}>
-            <View style={styles.greetingContainer}>
-              <Text style={styles.greetingText}>
-                {getGreeting()} 👋
-              </Text>
-              <Text style={styles.greetingSubtext}>
-                AI running on all plots — monitoring 24/7
-              </Text>
+          <>
+            <View style={styles.greetingSection}>
+              <View style={styles.greetingLeft}>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                <Text style={styles.greetingSubtext}>AI monitoring all plots 24/7</Text>
+              </View>
+              <View style={styles.weatherPill}>
+                <Ionicons name="partly-sunny" size={16} color="#F59E0B" />
+                <Text style={styles.weatherPillTemp}>{weatherTemp}°F</Text>
+              </View>
             </View>
-            
-            <View style={styles.weatherCard}>
-              <Ionicons name="partly-sunny" size={24} color="#F59E0B" />
-              <Text style={styles.temperature}>{weatherTemp}°F</Text>
-              <Text style={styles.weatherConditions}>{weatherCondition}</Text>
+
+            <View style={styles.quickStats}>
+              <View style={styles.quickStat}>
+                <Text style={styles.quickStatValue}>{plots.length}</Text>
+                <Text style={styles.quickStatLabel}>Plots</Text>
+              </View>
+              <View style={styles.quickStatLine} />
+              <View style={styles.quickStat}>
+                <View style={styles.liveRow}>
+                  <View style={styles.liveDot} />
+                  <Text style={[styles.quickStatValue, { color: '#1aa179' }]}>Live</Text>
+                </View>
+                <Text style={styles.quickStatLabel}>AI Status</Text>
+              </View>
+              <View style={styles.quickStatLine} />
+              <View style={styles.quickStat}>
+                <Text style={styles.quickStatValue}>24/7</Text>
+                <Text style={styles.quickStatLabel}>Coverage</Text>
+              </View>
             </View>
-          </View>
+          </>
         )}
 
         {/* Search Bar */}
@@ -252,35 +268,33 @@ export default function HomeScreen({ navigation }: any) {
               </Text>
             </View>
           ) : (
-            <View style={styles.plotsGrid}>
+            <View style={styles.plotsList}>
               {filteredPlots.map((plot) => (
                 <TouchableOpacity
                   key={plot.id}
-                  style={styles.plotGridCard}
+                  style={styles.plotCard}
                   onPress={() => {
                     navigation.navigate('PlotDetails' as never, { plotId: plot.id } as never);
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.plotGridHeader}>
-                    <View style={styles.plotGridTitleContainer}>
-                      <Text style={styles.plotGridTitle} numberOfLines={1}>{plot.name}</Text>
+                  <View style={styles.plotCardAccent} />
+                  <View style={styles.plotCardBody}>
+                    <View style={styles.plotCardTopRow}>
+                      <Text style={styles.plotCardName} numberOfLines={1}>{plot.name}</Text>
+                      <View style={styles.aiBadge}>
+                        <View style={styles.aiDot} />
+                        <Text style={styles.aiBadgeText}>AI</Text>
+                      </View>
                     </View>
-                    <View style={styles.aiBadge}>
-                      <View style={styles.aiDot} />
-                      <Text style={styles.aiBadgeText}>AI</Text>
+                    <Text style={styles.plotCardCrop}>{plot.crop}</Text>
+                    <View style={styles.plotCardBottomRow}>
+                      <View style={styles.plotCardLocRow}>
+                        <Ionicons name="location-outline" size={12} color="#6B7280" />
+                        <Text style={styles.plotCardLocText}>{plot.zip_code}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#1aa179" />
                     </View>
-                  </View>
-
-                  <Text style={styles.plotGridType}>{plot.crop}</Text>
-
-                  <View style={styles.plotGridLocation}>
-                    <Ionicons name="location-outline" size={12} color="#6B7280" />
-                    <Text style={styles.plotGridLocationText}>{plot.zip_code}</Text>
-                  </View>
-
-                  <View style={styles.plotGridFooterRow}>
-                    <Ionicons name="arrow-forward-circle-outline" size={16} color="rgba(26,161,121,0.6)" />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -387,42 +401,82 @@ const styles = StyleSheet.create({
   },
   greetingSection: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  greetingContainer: {
+  greetingLeft: {
     flex: 1,
   },
   greetingText: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '800',
     color: 'white',
+    letterSpacing: -0.5,
     marginBottom: 4,
   },
   greetingSubtext: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#9CA3AF',
-    lineHeight: 22,
   },
-  weatherCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 16,
+  weatherPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 100,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
   },
-  temperature: {
-    fontSize: 20,
+  weatherPillTemp: {
+    fontSize: 15,
     fontWeight: '700',
     color: 'white',
-    marginTop: 4,
   },
-  weatherConditions: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
+  quickStats: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginBottom: 24,
+  },
+  quickStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  quickStatValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: 'white',
+    letterSpacing: -0.5,
+  },
+  quickStatLabel: {
+    fontSize: 11,
+    color: '#6B7280',
     marginTop: 2,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  quickStatLine: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 4,
+  },
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#1aa179',
   },
   searchContainer: {
     marginBottom: 24,
@@ -845,5 +899,56 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 8,
+  },
+  plotsList: {
+    gap: 10,
+  },
+  plotCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  plotCardAccent: {
+    width: 4,
+    backgroundColor: '#1aa179',
+  },
+  plotCardBody: {
+    flex: 1,
+    padding: 16,
+  },
+  plotCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  plotCardName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    flex: 1,
+    marginRight: 8,
+  },
+  plotCardCrop: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 10,
+  },
+  plotCardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  plotCardLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  plotCardLocText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
 }); 
