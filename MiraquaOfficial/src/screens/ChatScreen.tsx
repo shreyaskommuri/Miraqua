@@ -36,6 +36,7 @@ interface Message {
   text: string;
   time: string;
   plotId?: string | null;
+  isWelcome?: boolean;
 }
 
 interface ChatScreenProps {
@@ -45,7 +46,9 @@ interface ChatScreenProps {
 
 export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   const plotIdFromRoute = route?.params?.plotId;
-  
+  const contextDateFromRoute = route?.params?.contextDate as string | undefined;
+  const contextScheduleFromRoute = route?.params?.contextSchedule as { liters: number; optimal_time: string } | null | undefined;
+
   const [message, setMessage] = useState('');
   const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
   const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute || 'general');
@@ -54,6 +57,11 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   const [realPlots, setRealPlots] = useState<any[]>([]);
   const [isLoadingPlots, setIsLoadingPlots] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  // Active day context (set when navigating from SpecificDayScreen)
+  const [contextDate, setContextDate] = useState<string | null>(contextDateFromRoute ?? null);
+  const [contextSchedule, setContextSchedule] = useState<{ liters: number; optimal_time: string } | null>(
+    contextScheduleFromRoute ?? null
+  );
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -73,15 +81,17 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     }
   ]);
 
-  const chatSessionId = useRef(uuid.v4() as string).current;
+  // Stable session ID per plot so history is always recoverable
+  const getSessionId = (plotId: string) => plotId === 'general' ? 'general' : `plot_${plotId}`;
   const scrollViewRef = useRef<ScrollView>(null);
+  const historyLoadedFor = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const timer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
     return () => clearTimeout(timer);
   }, [filteredMessages]);
 
-  // Get current user ID
+  // Get current user ID, then load history for any already-selected plot
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
@@ -89,6 +99,10 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id) {
           setUserId(user.id);
+          // If a plot was already selected before auth resolved, load its history now
+          if (selectedPlotId && selectedPlotId !== 'general') {
+            loadChatHistory(selectedPlotId, user.id);
+          }
         }
       } catch (error) {
         console.error('Failed to get user:', error);
@@ -145,6 +159,43 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     fetchRealPlots();
   }, []);
 
+  const loadChatHistory = async (plotId: string, currentUserId: string) => {
+    if (plotId === 'general' || historyLoadedFor.current.has(plotId)) return;
+    historyLoadedFor.current.add(plotId);
+    try {
+      const { environment } = await import('../config/environment');
+      const res = await fetch(`${environment.apiUrl}/get_chat_log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUserId,
+          plot_id: plotId,
+          chat_session_id: getSessionId(plotId),
+        }),
+      });
+      if (!res.ok) return;
+      const history: { sender: string; text: string; timestamp: string }[] = await res.json();
+      if (!history || history.length === 0) return;
+
+      const loaded: Message[] = history.map((h, i) => ({
+        id: Date.now() + i,
+        sender: h.sender as 'user' | 'bot',
+        text: h.text,
+        time: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        plotId,
+      }));
+      // Prepend history, replacing any welcome message for this plot
+      setMessages(prev => {
+        const withoutWelcome = prev.filter(
+          m => !(m.plotId === plotId && m.isWelcome)
+        );
+        return [...loaded, ...withoutWelcome];
+      });
+    } catch (e) {
+      console.error('❌ Failed to load chat history:', e);
+    }
+  };
+
   // Auto-select plot when opened from a specific plot
   useEffect(() => {
     if (plotIdFromRoute && plotIdFromRoute !== 'general' && realPlots.length > 0) {
@@ -168,21 +219,37 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
           lastWatered: realPlot.last_watered || "Unknown"
         });
         
-        // Add initial message about the selected plot (only once)
+        // Add welcome message (only once, history load may replace it)
         const hasPlotMessage = messages.some(msg => msg.plotId === plotIdFromRoute && msg.sender === 'bot');
         if (!hasPlotMessage) {
-          const plotMessage: Message = {
+          const cropName = realPlot.crop ? realPlot.crop.toLowerCase() : 'your crop';
+          let welcomeText: string;
+          if (contextDateFromRoute) {
+            const [yr, mo, dy] = contextDateFromRoute.split('-').map(Number);
+            const dayLabel = new Date(yr, mo - 1, dy).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            if (contextScheduleFromRoute && contextScheduleFromRoute.liters > 0) {
+              welcomeText = `What would you like to change about ${dayLabel}? It's currently scheduled for ${contextScheduleFromRoute.liters}L at ${contextScheduleFromRoute.optimal_time}.`;
+            } else {
+              welcomeText = `${dayLabel} is currently a skip day. Want to add irrigation, or ask about the schedule around it?`;
+            }
+          } else {
+            welcomeText = `What's up! Ask me anything about ${realPlot.name || 'your plot'} — schedule, skips, ${cropName} health, or what's coming up this week.`;
+          }
+          setMessages(prev => [...prev, {
             id: Date.now(),
             sender: 'bot',
-            text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
+            text: welcomeText,
             time: 'now',
-            plotId: realPlot.id
-          };
-          setMessages(prev => [...prev, plotMessage]);
+            plotId: realPlot.id,
+            isWelcome: true,
+          }]);
         }
+
+        // Load chat history for this plot
+        if (userId) loadChatHistory(plotIdFromRoute, userId);
       }
     }
-  }, [plotIdFromRoute, realPlots.length, selectedPlotId]);
+  }, [plotIdFromRoute, realPlots.length, userId]);
 
   const handlePlotSelection = (plotId: string) => {
     // Update the selected plot ID
@@ -225,19 +292,24 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
           lastWatered: realPlot.last_watered || "Unknown"
         });
         
-        // Check if we already have a message for this plot
+        // Add welcome message if no history for this plot yet
         const hasPlotMessage = messages.some(msg => msg.plotId === plotId);
         if (!hasPlotMessage) {
-          // Add initial message about the selected plot
-          const plotMessage: Message = {
+          setMessages(prev => [...prev, {
             id: Date.now(),
             sender: 'bot',
-            text: `I see you've selected ${realPlot.name || 'a plot'}. I'll now provide personalized advice based on your actual plot data, weather conditions, and watering history. How can I help optimize this plot?`,
+            text: `What's up! Ask me anything about ${realPlot.name || 'your plot'} — schedule, skips, ${(realPlot.crop || 'crop').toLowerCase()} health, or what's coming up this week.`,
             time: 'now',
-            plotId: realPlot.id
-          };
-          setMessages(prev => [...prev, plotMessage]);
+            plotId: realPlot.id,
+            isWelcome: true,
+          }]);
         }
+        // Clear any day context when switching plots manually
+        setContextDate(null);
+        setContextSchedule(null);
+
+        // Load history for this plot
+        if (userId) loadChatHistory(plotId, userId);
       }
     }
   };
@@ -267,7 +339,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
       const typingMessage: Message = {
         id: Date.now() + 1,
         sender: 'bot',
-        text: '🤖 AI is thinking...',
+        text: '● ● ●',
         time: 'now',
         plotId: selectedPlotId === 'general' ? null : selectedPlotId
       };
@@ -282,9 +354,12 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            prompt: messageToSend,
+            // If a specific day is in context, prefix it so the AI knows which date to act on
+            prompt: contextDate
+              ? `[Context: the user is looking at ${contextDate}${contextSchedule ? `, currently ${contextSchedule.liters}L at ${contextSchedule.optimal_time}` : ', a skip day'}] ${messageToSend}`
+              : messageToSend,
             plotId: selectedPlotId === 'general' ? null : selectedPlotId,
-            chat_session_id: chatSessionId,
+            chat_session_id: getSessionId(selectedPlotId),
             current_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
           })
         });
@@ -293,7 +368,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
           const data = await response.json();
           
           // Remove typing indicator and add real AI response
-          setMessages(prev => prev.filter(msg => msg.text !== '🤖 AI is thinking...'));
+          setMessages(prev => prev.filter(msg => msg.text !== '● ● ●'));
           
           const aiMessage: Message = {
             id: Date.now() + 1,
@@ -303,6 +378,9 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             plotId: selectedPlotId === 'general' ? null : selectedPlotId
           };
           setMessages(prev => [...prev, aiMessage]);
+          // Clear day context after first use so subsequent messages aren't prefixed
+          setContextDate(null);
+          setContextSchedule(null);
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -310,7 +388,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
         console.error('❌ AI chat error:', error);
         
         // Remove typing indicator
-        setMessages(prev => prev.filter(msg => msg.text !== '🤖 AI is thinking...'));
+        setMessages(prev => prev.filter(msg => msg.text !== '● ● ●'));
         
         // Fallback to smart mock response
         let botResponse = "I understand. Let me analyze your plot data and provide personalized recommendations.";

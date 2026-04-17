@@ -155,8 +155,22 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
 
         target_indices = set()
 
+        # === Extract frontend context date if present ===
+        context_match = re.search(r"\[context:.*?(\d{4}-\d{2}-\d{2})", prompt_lower)
+        if context_match:
+            ctx_date_str = context_match.group(1)
+            try:
+                ctx_date = date_parser.parse(ctx_date_str).date()
+                ctx_key = ctx_date.strftime("%m/%d/%y")
+                if ctx_key in date_map:
+                    target_indices.add(date_map[ctx_key])
+            except:
+                pass
+            # Strip the context prefix from the prompt before further processing
+            prompt_lower = re.sub(r"\[context:[^\]]*\]\s*", "", prompt_lower)
+
         if "tomorrow" in prompt_lower:
-            tmr = (datetime.utcnow().date() + timedelta(days=1)).strftime("%m/%d/%y")
+            tmr = (datetime.now().date() + timedelta(days=1)).strftime("%m/%d/%y")
             if tmr in date_map:
                 target_indices.add(date_map[tmr])
 
@@ -190,20 +204,37 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
             schedule_changed = True
 
         # === 4. Skip or Set ===
-        skip_cmd = any(word in prompt_lower for word in ["skip", "cancel", "don’t water", "don't water", "no watering"])
+        skip_cmd = any(word in prompt_lower for word in ["skip", "cancel", "don’t water", "don’t water", "no watering"])
         set_match = re.search(r"set\s*(?:to)?\s*(\d+(\.\d+)?)\s*(liters|l)?", prompt_lower)
+        add_match = re.search(r"add\s+(\d+(\.\d+)?)\s*(liters?|l)\b", prompt_lower)
+        subtract_match = re.search(r"(?:subtract|remove|reduce\s+by)\s+(\d+(\.\d+)?)\s*(liters?|l)\b", prompt_lower)
 
-        if target_indices and (skip_cmd or set_match):
+        if target_indices and (skip_cmd or set_match or add_match or subtract_match):
             for idx in target_indices:
+                day_label = f"{updated_schedule[idx][‘day’]} ({updated_schedule[idx][‘date’]})"
                 if skip_cmd:
                     updated_schedule[idx]["liters"] = 0
                     updated_schedule[idx]["note"] = "User-skip"
-                    reply_lines.append(f"✅ Skipped {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}) — 0L.")
+                    reply_lines.append(f"Done — skipped {day_label}.")
                 elif set_match:
-                    new_val = float(set_match.group(1))
+                    new_val = round(float(set_match.group(1)), 1)
                     updated_schedule[idx]["liters"] = new_val
                     updated_schedule[idx]["note"] = f"User-set to {new_val}L"
-                    reply_lines.append(f"✅ Set {new_val}L on {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}).")
+                    reply_lines.append(f"Set to {new_val}L on {day_label}.")
+                elif add_match:
+                    added = round(float(add_match.group(1)), 1)
+                    current = updated_schedule[idx].get("liters", 0)
+                    new_val = round(current + added, 1)
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = f"User added {added}L"
+                    reply_lines.append(f"Added {added}L on {day_label} — now {new_val}L total.")
+                elif subtract_match:
+                    removed = round(float(subtract_match.group(1)), 1)
+                    current = updated_schedule[idx].get("liters", 0)
+                    new_val = max(0, round(current - removed, 1))
+                    updated_schedule[idx]["liters"] = new_val
+                    updated_schedule[idx]["note"] = f"User removed {removed}L"
+                    reply_lines.append(f"Reduced by {removed}L on {day_label} — now {new_val}L.")
             schedule_changed = True
 
         # === 5. Pause N Days ===
@@ -275,37 +306,36 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
         )
 
         prompt_template = f"""
-You are FarmerBot, helping a user grow {crop} at ({lat:.4f}, {lon:.4f}).
+You are Miraqua, an AI irrigation assistant. You're knowledgeable, direct, and conversational — like a smart friend who happens to know everything about farming and irrigation. You never sound like a robot or a database report.
 
-Plot:
+Tone rules:
+- Casual and warm. Short sentences. No unnecessary filler.
+- If the user just says hi or something conversational, reply naturally — don't dump irrigation data on them.
+- When giving numbers, round them (say "around 58°F", not "57.97°F"; say "3L", not "3.0L").
+- Never say "Please proceed with..." or "I'll now provide personalized advice...". Just talk like a human.
+- Keep responses concise. 2-4 sentences for simple questions, more only when detail is genuinely needed.
+- No bullet points unless specifically listing a schedule or multiple items. Prefer flowing sentences.
+- Don't mention the user's coordinates unless they ask about location.
+
+Context about this plot:
+- Plot name: {plot_name}
+- Crop: {crop}
 - Area: {plot.get("area")} m²
-- Crop Age: {age} months
-- Flex Type: {plot.get("flex_type")}
-- Constraints: {plot.get("custom_constraints") or 'None'}
+- Crop age: {age} months
+- Constraints: {plot.get("custom_constraints") or "none"}
 
-this is how the schedule is:
-[
-  {{
-    "day": "Day 1",
-    "date": "06/16/25",
-    "liters": 6.5,
-    "optimal_time": "05:00 AM"
-  }},
-  ...
-]
-Schedule:
+Upcoming irrigation schedule:
 {schedule_lines}
 
-Weather Forecast:
-Daily: {json.dumps(daily, indent=2)}
-Hourly: {json.dumps(hourly, indent=2)}
+Recent weather forecast:
+{json.dumps(daily[:3] if daily else [], indent=2)}
 
-Watering Logs:
-{json.dumps(logs, indent=2)}
+Recent watering logs:
+{json.dumps(logs[-5:] if logs else [], indent=2)}
 
-User asked: "{prompt.strip()}"
+User message: "{prompt.strip()}"
 
-Reply with accurate insights, friendly tone, and clear explanations. Avoid vague assistant talk.
+Reply naturally. If it's a greeting, greet back and maybe mention one useful thing about the plot. If it's an irrigation question, give a clear helpful answer with real data.
 """
 
         model = genai.GenerativeModel("gemini-1.5-flash")
@@ -341,7 +371,7 @@ def generate_ai_schedule(plot, daily, hourly, logs):
 You are Miraqua, a smart irrigation assistant designed to save farmers water and money — while keeping their crops healthy.
 
 Today is {today}.
-Your job is to generate a precise, weather-aware, and cost-saving 7-day irrigation schedule tailored to this specific plot.
+Your job is to generate a precise, weather-aware, and cost-saving 14-day irrigation schedule tailored to this specific plot.
 
 ---
 
@@ -403,7 +433,7 @@ Hourly Forecast:
 
 ✅ **Return Format**
 
-Respond with only a valid JSON array containing **exactly 7 objects** (one per day), like this:
+Respond with only a valid JSON array containing **exactly 14 objects** (one per day), like this:
 
 [
   {{
@@ -417,7 +447,7 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
 ]
 
 ### Rules for format:
-- `"day"` must be: `"Day 1"`, `"Day 2"`, ..., `"Day 7"`
+- `"day"` must be: `"Day 1"`, `"Day 2"`, ..., `"Day 14"`
 - `"date"` format must be: **MM/DD/YY** (e.g., `"06/16/25"`)
 - `"liters"` must be a numeric value (float or int)
 - `"optimal_time"` must be in **HH:MM AM/PM** format (e.g., `"04:00 AM"`)
@@ -435,11 +465,10 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
         # ✅ Parse JSON
         schedule = json.loads(clean_text)
 
-        # ✅ Enforce correct dates & day names
-        for i in range(7):
-            date_obj = datetime.utcnow().date() + timedelta(days=i)
+        # ✅ Enforce correct dates & day names (14 days)
+        for i in range(min(14, len(schedule))):
+            date_obj = datetime.now().date() + timedelta(days=i)
             schedule[i]["date"] = date_obj.strftime("%m/%d/%y")
-
             schedule[i]["day"] = f"Day {i + 1}"
 
 

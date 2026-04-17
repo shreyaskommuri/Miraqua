@@ -111,52 +111,24 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
   const loadPlotData = async () => {
     setIsLoading(true);
     try {
-      console.log('🔄 Loading plot data for plot ID:', plotId);
-      
-      // Import the getPlotById function
       const { getPlotById } = await import('../api/plots');
-      
-      // Fetch the plot data from the database
       const result = await getPlotById(plotId);
-      
+
       if (result.success && result.plot) {
-        console.log('✅ Plot data loaded:', result.plot);
-        
-        // Transform the database data to match our PlotData interface
         const plot = result.plot;
-        setPlotData({
+        setPlotData(prev => ({
+          ...prev,
           id: plot.id,
-          name: plot.name || "Unnamed Plot",
-          cropType: plot.crop || "unknown",
-          variety: "Standard", // Default value since not in database
-          zoneNumber: "A-1", // Default value since not in database
-          location: "Backyard Plot A", // Default value since not in database
-          coordinates: { 
-            lat: plot.lat || 37.7749, 
-            lng: plot.lon || -122.4194 
-          },
+          name: plot.name || 'Unnamed Plot',
+          cropType: plot.crop || 'unknown',
+          coordinates: { lat: plot.lat || 37.7749, lng: plot.lon || -122.4194 },
           area: plot.area || 25,
-          soilType: "loamy", // Default value since not in database
-          irrigationMethod: "drip", // Default value since not in database
-          plantingDate: new Date(plot.planting_date || "2024-05-15"),
-          expectedHarvest: new Date("2024-08-15"), // Default value since not in database
-          autoWatering: true, // Default value since not in database
-          smartScheduling: true, // Default value since not in database
-          notifications: true, // Default value since not in database
-          weatherIntegration: true, // Default value since not in database
-          moistureThreshold: 65, // Default value since not in database
-          wateringDuration: 10, // Default value since not in database
-          sensors: {
-            moisture: { status: 'online', battery: 89, signal: 'Strong' },
-            temperature: { status: 'online', battery: 76, signal: 'Good' }
-          }
-        });
+          plantingDate: new Date(plot.planting_date || '2024-05-15'),
+        }));
       } else {
-        console.error('❌ Failed to load plot data:', result.error);
         Alert.alert('Error', `Failed to load plot data: ${result.error}`);
       }
     } catch (error) {
-      console.error('❌ Error loading plot data:', error);
       Alert.alert('Error', 'Failed to load plot data');
     } finally {
       setIsLoading(false);
@@ -174,34 +146,21 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      console.log('💾 Saving plot settings for plot ID:', plotId);
-      console.log('💾 Updated plot data:', plotData);
-      
-      // Import the updatePlot function
       const { updatePlot } = await import('../api/plots');
-      
-      // Call the API to actually save the plot
       const result = await updatePlot(plotId, {
         name: plotData.name,
         area: plotData.area,
-        crop: plotData.cropType, // Map cropType to crop
-        // Note: Only update fields that exist in your Plot interface
-        // The Plot interface has: id, name, crop, zip_code, area, ph_level, lat, lon, flex_type, planting_date, age_at_entry, custom_constraints, user_id, updated_at
+        crop: plotData.cropType,
       });
-      
+
       if (result.success) {
-        console.log('✅ Plot updated successfully:', result.plot);
-        Alert.alert('✅ Settings saved', 'Your plot settings have been updated successfully');
+        Alert.alert('Settings saved', 'Your plot settings have been updated');
         setHasChanges(false);
-        
-        // Refresh the plot data to show the updated values
         await loadPlotData();
       } else {
-        console.error('❌ Failed to update plot:', result.error);
         Alert.alert('Error', `Failed to save settings: ${result.error}`);
       }
     } catch (error) {
-      console.error('❌ Error saving plot settings:', error);
       Alert.alert('Error', 'Failed to save settings. Please try again.');
     } finally {
       setIsLoading(false);
@@ -220,9 +179,14 @@ export default function PlotSettingsScreen({ navigation, route }: any) {
           onPress: async () => {
             setIsLoading(true);
             try {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              Alert.alert('🗑️ Plot deleted', 'Your plot has been removed successfully');
-              navigation.goBack();
+              const { deletePlot } = await import('../api/plots');
+              const result = await deletePlot(plotId);
+              if (result.success) {
+                Alert.alert('Plot deleted', 'Your plot has been removed successfully');
+                navigation.goBack();
+              } else {
+                Alert.alert('Error', result.error || 'Failed to delete plot');
+              }
             } catch (error) {
               Alert.alert('Error', 'Failed to delete plot. Please try again.');
             } finally {

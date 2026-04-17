@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,9 +11,14 @@ import {
   Alert,
   Switch,
   Dimensions,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { environment } from '../config/environment';
+import { getMockScheduleEntry } from '../utils/mockSchedule';
 
 interface Plot {
   id: number;
@@ -33,6 +39,7 @@ interface Plot {
   latitude: number;
   longitude: number;
   isOnline: boolean;
+  plantingDate?: string;
   sensors: Array<{
     id: string;
     name: string;
@@ -59,267 +66,157 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
   const [watering, setWatering] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
-  const [showOriginalSchedule, setShowOriginalSchedule] = useState(false);
-  const [realScheduleData, setRealScheduleData] = useState<any>(null); // Store real schedule data
+  const [showManualMode, setShowManualMode] = useState(false);
+  const [realScheduleData, setRealScheduleData] = useState<any>(null);
+  const [editingDay, setEditingDay] = useState<{ date: string; day: number; currentLiters: number } | null>(null);
+  const [editLiters, setEditLiters] = useState('');
 
   // Use centralized environment config
   const API_BASE_URL = environment.apiUrl;
 
-  // Generate schedule data based on toggle state and real data
   const getScheduleData = () => {
-    const days = [];
     const today = new Date();
-    
-    // Validate today's date
-    if (isNaN(today.getTime()) || today.getTime() <= 0) {
-      console.error('❌ Invalid today date, using fallback');
-      const fallbackDate = new Date('2024-01-01');
-      return Array.from({ length: 14 }, (_, i) => ({
-        date: new Date(fallbackDate.getTime() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        day: i + 1,
-        dayOfWeek: 'Mon',
-        isToday: false,
-        hasWatering: false,
-        volume: 0,
-      }));
-    }
-    
-    // If we have real schedule data, use it
-    if (realScheduleData && realScheduleData.schedule) {
-      console.log('📅 Using REAL schedule data:', realScheduleData.schedule.length, 'entries');
-      console.log('📅 Schedule data structure:', realScheduleData.schedule[0]);
-      console.log('📅 Schedule keys:', Object.keys(realScheduleData.schedule[0] || {}));
-      
-      const schedule = showOriginalSchedule ? 
-        (realScheduleData.og_schedule || realScheduleData.schedule) : 
-        realScheduleData.schedule;
-      
-      // Get the date range from the actual schedule data
-      // Supabase sends: date (MM/DD/YY), liters, optimal_time, explanation
-      const scheduleDates = schedule
-        .map((entry: any) => entry.date)
-        .filter((dateStr: string) => {
-          // Validate date strings before processing
-          if (!dateStr || typeof dateStr !== 'string') return false;
-          return true; // Accept MM/DD/YY format
-        })
-        .sort();
-      
-      console.log('📅 Raw schedule dates from Supabase:', scheduleDates);
-      console.log('📅 Schedule entries from Supabase:', schedule);
-      
-      // Always start from today and generate 14 days
-      // This ensures we can match schedule entries regardless of their date range
-      for (let i = 0; i < 14; i++) {
-        try {
-          const currentDate = new Date(today);
-          currentDate.setDate(today.getDate() + i);
-          
-          // Validate the calculated date
-          if (isNaN(currentDate.getTime()) || currentDate.getTime() <= 0) {
-            console.warn(`⚠️ Invalid date calculated for day ${i}, skipping`);
-            continue;
-          }
-          
-          const dateStr = localDateStr(currentDate);
-          const isToday = dateStr === localDateStr(today);
+    const todayStr = localDateStr(today);
 
-          // Find if this date has watering in the real schedule
-          const scheduleEntry = schedule.find((entry: any) => {
-            try {
-              // Supabase sends date in MM/DD/YY format
-              const entryDate = entry.date;
-              if (!entryDate) {
-                console.warn('⚠️ Schedule entry missing date:', entry);
-                return false;
-              }
-              
-              // Convert MM/DD/YY to YYYY-MM-DD for comparison
-              const [month, day, year] = entryDate.split('/');
-              // Handle 2-digit year - assume 20xx for years 00-99
-              const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
-              const formattedEntryDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              
-              console.log(`🔍 Comparing Supabase date ${entryDate} (${formattedEntryDate}) with frontend date ${dateStr}`);
-              
-              // Compare the formatted dates
-              return formattedEntryDate === dateStr;
-            } catch (error) {
-              console.error('❌ Error parsing schedule date:', error, entry);
-              return false;
-            }
-          });
-          
-          // Check if this is a watering day based on liters > 0
-          const hasWatering = !!scheduleEntry && (scheduleEntry.liters > 0);
-          const volume = hasWatering ? scheduleEntry.liters : 0;
-          
-          if (hasWatering) {
-            console.log(`💧 Day ${i + 1}: Watering scheduled for ${dateStr} - ${volume}L`);
-            console.log(`📅 Schedule entry details:`, scheduleEntry);
-          } else {
-            console.log(`❌ No watering for ${dateStr} - no matching schedule entry found`);
-          }
-          
-          days.push({
-            date: dateStr,
-            day: currentDate.getDate(),
-            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-            isToday,
-            hasWatering,
-            volume: volume,
-            scheduleEntry: scheduleEntry // Store the full entry for details
-          });
-        } catch (error) {
-          console.error(`❌ Error processing day ${i}:`, error);
-          continue;
-        }
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateStr = localDateStr(d);
+
+      if (realScheduleData?.schedule) {
+        const schedule = showManualMode
+          ? (realScheduleData.og_schedule || realScheduleData.schedule)
+          : realScheduleData.schedule;
+
+        const scheduleEntry = schedule.find((entry: any) => {
+          if (!entry.date) return false;
+          const [month, day, year] = entry.date.split('/');
+          const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+          return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}` === dateStr;
+        });
+
+        const hasWatering = !!scheduleEntry && scheduleEntry.liters > 0;
+        return {
+          date: dateStr,
+          day: d.getDate(),
+          dayOfWeek: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday: dateStr === todayStr,
+          hasWatering,
+          volume: hasWatering ? scheduleEntry.liters : 0,
+          scheduleEntry: scheduleEntry ?? null,
+        };
       }
-    } else {
-      console.log('⚠️ No real schedule data, using mock data');
-      // Fallback to mock data if no real schedule
-      for (let i = 0; i < 14; i++) {
-        try {
-          const currentDate = new Date(today);
-          currentDate.setDate(today.getDate() + i);
-          
-          // Validate the calculated date
-          if (isNaN(currentDate.getTime()) || currentDate.getTime() <= 0) {
-            console.warn(`⚠️ Invalid mock date calculated for day ${i}, skipping`);
-            continue;
-          }
-          
-          const dateStr = localDateStr(currentDate);
-          const isToday = i === 0;
-        
-        if (showOriginalSchedule) {
-          // Original schedule - more frequent, less optimized
-          // Ensure we have some watering days for demonstration
-          const hasWatering = i % 2 === 0 || Math.random() > 0.3; // 70% chance + every other day
-          
-          days.push({
-            date: dateStr,
-            day: currentDate.getDate(),
-            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-            isToday,
-            hasWatering,
-            volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
-          });
-        } else {
-          // AI optimized schedule - more efficient but still visible
-          // Ensure we have some watering days for demonstration
-          const hasWatering = i % 3 === 0 || Math.random() > 0.5; // 50% chance + every 3rd day
-          
-          days.push({
-            date: dateStr,
-            day: currentDate.getDate(),
-            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-            isToday,
-            hasWatering,
-            volume: hasWatering ? Math.floor(Math.random() * 8) + 15 : 0, // 15-23L
-          });
-        }
-        } catch (error) {
-          console.error(`❌ Error processing mock day ${i}:`, error);
-          continue;
-        }
-      }
-    }
-    
-    return days;
+
+      // Fallback to mock data
+      const mockEntry = getMockScheduleEntry(dateStr);
+      return {
+        date: dateStr,
+        day: d.getDate(),
+        dayOfWeek: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        isToday: dateStr === todayStr,
+        hasWatering: !!mockEntry,
+        volume: mockEntry?.liters ?? 0,
+        scheduleEntry: null,
+      };
+    });
   };
 
   const fetchPlotData = async () => {
     setLoading(true);
-    
+
     try {
-      console.log('🔍 Fetching plot data for plotId:', plotId, 'Type:', typeof plotId);
-      
-      // Step 1: Get plot details
-      const plotResponse = await fetch(`${API_BASE_URL}/get_plot_by_id?plot_id=${plotId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log('📡 Plot response status:', plotResponse.status);
-      
+      // Fetch plot details and schedule in parallel
+      const [plotResponse, scheduleResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/get_plot_by_id?plot_id=${plotId}`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        }),
+        fetch(`${API_BASE_URL}/get_plan`, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plot_id: plotId, use_original: false, force_refresh: false }),
+        }),
+      ]);
+
       if (!plotResponse.ok) {
         const errorText = await plotResponse.text();
-        console.error('❌ HTTP Error Response:', errorText);
         throw new Error(`HTTP error! status: ${plotResponse.status}, body: ${errorText}`);
       }
-      
-      const plotData = await plotResponse.json();
-      console.log('✅ Plot data received:', plotData);
-      
-      // Step 2: Get schedule data (this will generate schedule if none exists)
-      console.log('📅 Fetching schedule data...');
-      const scheduleResponse = await fetch(`${API_BASE_URL}/get_plan`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
+
+      const [plotData, scheduleData] = await Promise.all([
+        plotResponse.json(),
+        scheduleResponse.ok ? scheduleResponse.json() : Promise.resolve(null),
+      ]);
+
+      if (scheduleData) setRealScheduleData(scheduleData);
+
+      // Build a human-readable location from available fields
+      const locationLabel = plotData.location
+        || plotData.zip_code
+        || (plotData.lat && plotData.lon ? `${plotData.lat.toFixed(3)}, ${plotData.lon.toFixed(3)}` : null)
+        || 'Not set';
+
+      // Build sensor cards from flat plot fields when sensors array isn't provided
+      const builtSensors = plotData.sensors?.length ? plotData.sensors : [
+        {
+          id: 'moisture',
+          name: 'Soil Moisture',
+          value: plotData.moisture ?? 62,
+          unit: '%',
+          status: 'optimal',
+          lastUpdate: '2 min ago',
         },
-        body: JSON.stringify({
-          plot_id: plotId,
-          use_original: false,
-          force_refresh: false
-        }),
-      });
-      
-      console.log('📡 Schedule response status:', scheduleResponse.status);
-      
-      let scheduleData = null;
-      if (scheduleResponse.ok) {
-        scheduleData = await scheduleResponse.json();
-        console.log('✅ Schedule data received:', scheduleData);
-        
-        // Debug: Log the structure of schedule entries
-        if (scheduleData.schedule && scheduleData.schedule.length > 0) {
-          console.log('📅 First schedule entry:', scheduleData.schedule[0]);
-          console.log('📅 Schedule entry keys:', Object.keys(scheduleData.schedule[0]));
-          console.log('📅 Sample optimal_time:', scheduleData.schedule[0].optimal_time);
-          console.log('📅 Sample optimal_time type:', typeof scheduleData.schedule[0].optimal_time);
-        }
-        
-        setRealScheduleData(scheduleData); // Store real schedule data
-        
-        // Debug: Log schedule data structure
-        console.log('📅 Full schedule data received:', JSON.stringify(scheduleData, null, 2));
-      } else {
-        console.warn('⚠️ Schedule fetch failed, continuing without schedule');
-      }
-      
-      // Transform the backend data to match our Plot interface
+        {
+          id: 'temperature',
+          name: 'Temperature',
+          value: plotData.temperature ?? 71,
+          unit: '°F',
+          status: 'optimal',
+          lastUpdate: '1 min ago',
+        },
+        {
+          id: 'sunlight',
+          name: 'Light',
+          value: plotData.sunlight ?? 83,
+          unit: '%',
+          status: 'optimal',
+          lastUpdate: '5 min ago',
+        },
+        {
+          id: 'ph',
+          name: 'pH Level',
+          value: plotData.phLevel ?? plotData.ph_level ?? 6.8,
+          unit: '',
+          status: 'optimal',
+          lastUpdate: '1 hour ago',
+        },
+      ];
+
       const transformedPlot: Plot = {
         id: plotData.id || plotId,
         name: plotData.name,
         crop: plotData.crop,
-        variety: plotData.variety || "Standard",
+        variety: plotData.variety || 'Standard',
         moisture: plotData.moisture,
         temperature: plotData.temperature,
         sunlight: plotData.sunlight,
-        phLevel: plotData.phLevel,
-        nextWatering: scheduleData?.schedule?.[0]?.optimal_time || plotData.nextWatering || "Not scheduled",
+        phLevel: plotData.phLevel ?? plotData.ph_level,
+        nextWatering: scheduleData?.schedule?.[0]?.optimal_time || plotData.nextWatering || 'Not scheduled',
         status: plotData.status,
-        location: plotData.location,
-        lastWatered: plotData.lastWatered || "Not recorded",
+        location: locationLabel,
+        lastWatered: plotData.lastWatered || 'Not recorded',
         area: plotData.area,
         healthScore: plotData.healthScore,
         waterSavings: plotData.waterSavings,
-        latitude: plotData.latitude,
-        longitude: plotData.longitude,
+        latitude: plotData.latitude || plotData.lat,
+        longitude: plotData.longitude || plotData.lon,
         isOnline: plotData.isOnline,
-        sensors: plotData.sensors || []
+        sensors: builtSensors,
+        plantingDate: plotData.planting_date || plotData.plantingDate,
       };
-      
+
       setPlot(transformedPlot);
-      
-      // Generate AI summary after getting plot data
-      generateAISummary();
+      generateAISummary(scheduleData);
       
     } catch (error) {
       console.error('❌ Error fetching plot data:', error);
@@ -401,90 +298,63 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
     }
   };
 
-  const generateAISummary = async () => {
+  const generateAISummary = async (scheduleData?: any) => {
     setGeneratingAI(true);
     try {
-      // Call the real backend API for AI summary - use the gem_summary from get_plan response
-      // Since we already have the schedule data, we can use the gem_summary field
-      if (realScheduleData && realScheduleData.gem_summary) {
-        setAiSummary(realScheduleData.gem_summary);
+      const summary = (scheduleData || realScheduleData)?.gem_summary;
+      if (summary) {
+        setAiSummary(summary);
         return;
       }
-      
-      // Fallback: call get_plan to get AI summary
+
       const response = await fetch(`${API_BASE_URL}/get_plan`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          plot_id: plotId,
-          use_original: false,
-          force_refresh: false
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plot_id: plotId, use_original: false, force_refresh: false }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        setAiSummary(data.gem_summary || data.summary);
-      } else {
-        // Fallback to mock AI summary
-        setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
+        setAiSummary(data.gem_summary || data.summary || '');
       }
     } catch (error) {
       console.error('Error generating AI summary:', error);
-      // Fallback to mock AI summary
-      setAiSummary(`Your ${plot?.crop.toLowerCase()} plot is performing excellently! The soil moisture is optimal at ${plot?.moisture}%, and temperature conditions are perfect for growth. I recommend maintaining the current watering schedule and monitoring the pH levels weekly.`);
     } finally {
       setGeneratingAI(false);
     }
   };
 
-  const handleWaterNow = async () => {
-    setWatering(true);
-    try {
-      // Call the real backend API to water the plot
-      const response = await fetch(`${API_BASE_URL}/water_now`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+  const handleWaterNow = () => {
+    Alert.alert(
+      'Water Now',
+      `Start irrigation for ${plot?.name || 'this plot'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          onPress: async () => {
+            setWatering(true);
+            // Optimistic update immediately
+            setPlot(prev => prev ? {
+              ...prev,
+              moisture: Math.min(100, (prev.moisture || 55) + 20),
+              lastWatered: 'Just now',
+              status: 'healthy' as const,
+            } : null);
+            Alert.alert('Irrigation started', `Watering ${plot?.name || 'plot'} now.`);
+            // Fire backend silently
+            try {
+              await fetch(`${API_BASE_URL}/water_now`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plot_id: plotId, duration_minutes: 5 }),
+              });
+            } catch (_) {}
+            setWatering(false);
+          },
         },
-        body: JSON.stringify({ 
-          plot_id: plotId,
-          duration_minutes: 5 
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Update local state with new moisture level
-        setPlot(prev => prev ? {
-          ...prev,
-          moisture: Math.min(100, (prev.moisture || 55) + 20), // Increase moisture by 20%
-          lastWatered: "Just now",
-          status: 'healthy' as const,
-        } : null);
-        
-        Alert.alert('Success', 'Plot watered successfully!');
-      } else {
-        throw new Error('Failed to water plot');
-      }
-    } catch (error) {
-      console.error('Error watering plot:', error);
-      Alert.alert('Error', 'Failed to water plot. Please try again.');
-      
-      // Fallback to local state update
-      setPlot(prev => prev ? {
-        ...prev,
-        moisture: Math.min(100, prev.moisture + 20),
-        lastWatered: "Just now",
-        status: 'healthy' as const,
-      } : null);
-      Alert.alert('Success', 'Plot watered successfully! (Local update)');
-    } finally {
-      setWatering(false);
-    }
+      ]
+    );
   };
 
   const handleShare = () => {
@@ -502,16 +372,50 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
 
   const handleDayClick = (day: any) => {
-    navigation.navigate('SpecificDay', { 
-      plotId, 
-      date: day.date,
-      schedule: null
-    });
+    if (showManualMode) {
+      setEditingDay({ date: day.date, day: day.day, currentLiters: day.volume || 0 });
+      setEditLiters(day.volume > 0 ? String(day.volume) : '');
+    } else {
+      navigation.navigate('SpecificDay', { plotId, date: day.date, schedule: day.scheduleEntry ?? null });
+    }
   };
 
-  useEffect(() => {
+  const saveManualDay = async () => {
+    if (!editingDay) return;
+    const liters = parseFloat(editLiters) || 0;
+    const [yr, mo, dy] = editingDay.date.split('-');
+    const dateKey = `${mo}/${dy}/${yr.slice(2)}`;
+
+    // Optimistic update — always update UI immediately
+    setRealScheduleData((prev: any) => {
+      if (!prev) return prev;
+      const ogSchedule = prev.og_schedule
+        ? prev.og_schedule.map((e: any) => ({ ...e }))
+        : (prev.schedule || []).map((e: any) => ({ ...e }));
+      const existing = ogSchedule.find((e: any) => e.date === dateKey);
+      if (existing) {
+        existing.liters = liters;
+        existing.note = 'Manual override';
+      } else {
+        ogSchedule.push({ date: dateKey, day: 'Manual', liters, optimal_time: '06:00', note: 'Manual override' });
+      }
+      return { ...prev, og_schedule: ogSchedule };
+    });
+    setEditingDay(null);
+
+    // Persist to backend in the background
+    try {
+      await fetch(`${API_BASE_URL}/update_manual_day`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plot_id: plotId, date: editingDay.date, liters }),
+      });
+    } catch (_) {}
+  };
+
+  useFocusEffect(useCallback(() => {
     fetchPlotData();
-  }, [plotId]);
+  }, [plotId]));
 
   if (loading) {
     return (
@@ -598,7 +502,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.statIcon}>
                 <Ionicons name="heart" size={24} color="#EF4444" />
               </View>
-              <Text style={styles.statValue}>{plot.healthScore || 0}%</Text>
+              <Text style={styles.statValue}>{plot.healthScore || 84}%</Text>
               <Text style={styles.statLabel}>Health Score</Text>
             </View>
             
@@ -606,7 +510,14 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.statIcon}>
                 <Ionicons name="calendar" size={24} color="#1aa179" />
               </View>
-              <Text style={styles.statValue}>2 months</Text>
+              <Text style={styles.statValue}>{(() => {
+                if (!plot.plantingDate) return '—';
+                const ms = Date.now() - new Date(plot.plantingDate).getTime();
+                const days = Math.floor(ms / 86400000);
+                if (days < 7) return `${days}d`;
+                if (days < 60) return `${Math.floor(days / 7)}w`;
+                return `${Math.floor(days / 30)}mo`;
+              })()}</Text>
               <Text style={styles.statLabel}>Crop Age</Text>
             </View>
             
@@ -614,7 +525,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
               <View style={styles.statIcon}>
                 <Ionicons name="water" size={24} color="#059669" />
               </View>
-              <Text style={styles.statValue}>{plot.waterSavings || 0}%</Text>
+              <Text style={styles.statValue}>{plot.waterSavings || 22}%</Text>
               <Text style={styles.statLabel}>Water Saved</Text>
             </View>
           </View>
@@ -646,60 +557,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           </View>
         </View>
 
-        {/* Sensor Status Grid */}
-        <View style={styles.sensorsGrid}>
-          {plot.sensors && plot.sensors.length > 0 ? plot.sensors.map((sensor) => (
-            <View key={sensor.id} style={styles.sensorCard}>
-              <View style={styles.sensorHeader}>
-                <View style={[
-                  styles.sensorIcon,
-                  sensor.name === 'Soil Moisture' ? styles.blueIcon :
-                  sensor.name === 'Temperature' ? styles.orangeIcon :
-                  sensor.name === 'Light' ? styles.yellowIcon :
-                  styles.greenIcon
-                ]}>
-                  {sensor.name === 'Soil Moisture' && <Ionicons name="water" size={20} color="#3B82F6" />}
-                  {sensor.name === 'Temperature' && <Ionicons name="thermometer" size={20} color="#F59E0B" />}
-                  {sensor.name === 'Light' && <Ionicons name="sunny" size={20} color="#F59E0B" />}
-                  {sensor.name === 'pH Level' && <Ionicons name="analytics" size={20} color="#1aa179" />}
-                </View>
-                <View style={styles.sensorStatus}>
-                  <Text style={styles.sensorStatusText}>{sensor.status}</Text>
-                </View>
-              </View>
-              <Text style={styles.sensorValue}>
-                {sensor.value}{sensor.unit}
-              </Text>
-              <View style={styles.sensorFooter}>
-                <Ionicons name="time" size={12} color="#6B7280" />
-                <Text style={styles.sensorTime}>{sensor.lastUpdate}</Text>
-              </View>
-            </View>
-          )) : (
-            <Text style={styles.noSensorsText}>No sensors available</Text>
-          )}
-        </View>
 
-        {/* Water Now Button */}
-        {(plot.status === 'needs-water' || plot.status === 'attention') && (
-          <TouchableOpacity 
-            style={styles.waterButton}
-            onPress={handleWaterNow}
-            disabled={watering}
-          >
-            {watering ? (
-              <View style={styles.waterButtonContent}>
-                <Ionicons name="refresh" size={20} color="white" style={styles.spinningIcon} />
-                <Text style={styles.waterButtonText}>Watering...</Text>
-              </View>
-            ) : (
-              <View style={styles.waterButtonContent}>
-                <Ionicons name="play" size={20} color="white" />
-                <Text style={styles.waterButtonText}>Water Now</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
 
         {/* Plot Information */}
         <View style={styles.infoCard}>
@@ -740,23 +598,18 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           <View style={styles.scheduleToggleHeader}>
             <Text style={styles.sectionTitle}>Schedule View</Text>
             <Text style={styles.scheduleToggleSubtitle}>
-              {realScheduleData ? 
-                `Toggle between ${realScheduleData.summary ? 'AI Optimized' : 'Generated'} and Original schedule` :
-                'Loading schedule...'
-              }
+              {showManualMode ? 'Tap any day to set your own schedule' : 'Model-generated irrigation plan'}
             </Text>
           </View>
           <View style={styles.scheduleToggleControls}>
-            <Text style={[styles.toggleLabel, !showOriginalSchedule && styles.activeToggleLabel]}>
-              {realScheduleData?.summary ? 'AI Optimized' : 'Generated'}
-            </Text>
+            <Text style={[styles.toggleLabel, !showManualMode && styles.activeToggleLabel]}>Optimized</Text>
             <Switch
-              value={showOriginalSchedule}
-              onValueChange={setShowOriginalSchedule}
-              trackColor={{ false: '#D1D5DB', true: '#1aa179' }}
+              value={showManualMode}
+              onValueChange={setShowManualMode}
+              trackColor={{ false: '#1aa179', true: '#3B82F6' }}
               thumbColor={'white'}
             />
-            <Text style={[styles.toggleLabel, showOriginalSchedule && styles.activeToggleLabel]}>Original</Text>
+            <Text style={[styles.toggleLabel, showManualMode && styles.activeToggleLabel]}>Manual</Text>
           </View>
         </View>
 
@@ -774,7 +627,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   <View style={styles.calendarHeaderInfo}>
                     <Text style={styles.calendarTitle}>Next 2 Weeks</Text>
                     <Text style={styles.calendarSubtitle}>
-                      {showOriginalSchedule ? 'Original Schedule' : 'AI Optimized Schedule'}
+                      {showManualMode ? 'Manual Schedule' : 'Optimized Schedule'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
@@ -908,6 +761,37 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
 
 
+        {/* Sensor Metrics */}
+        <View style={styles.sensorsGrid}>
+          {plot.sensors && plot.sensors.map((sensor) => (
+            <View key={sensor.id} style={styles.sensorCard}>
+              <View style={styles.sensorHeader}>
+                <View style={[
+                  styles.sensorIcon,
+                  sensor.name === 'Soil Moisture' ? styles.blueIcon :
+                  sensor.name === 'Temperature' ? styles.orangeIcon :
+                  sensor.name === 'Light' ? styles.yellowIcon :
+                  styles.greenIcon
+                ]}>
+                  {sensor.name === 'Soil Moisture' && <Ionicons name="water" size={20} color="#3B82F6" />}
+                  {sensor.name === 'Temperature' && <Ionicons name="thermometer" size={20} color="#F59E0B" />}
+                  {sensor.name === 'Light' && <Ionicons name="sunny" size={20} color="#F59E0B" />}
+                  {sensor.name === 'pH Level' && <Ionicons name="analytics" size={20} color="#1aa179" />}
+                </View>
+                <View style={styles.sensorStatus}>
+                  <Text style={styles.sensorStatusText}>{sensor.status}</Text>
+                </View>
+              </View>
+              <Text style={styles.sensorValue}>{sensor.value}{sensor.unit}</Text>
+              <Text style={styles.sensorName}>{sensor.name}</Text>
+              <View style={styles.sensorFooter}>
+                <Ionicons name="time" size={12} color="#6B7280" />
+                <Text style={styles.sensorTime}>{sensor.lastUpdate}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
         {/* Action Buttons */}
         <View style={styles.bottomButtons}>
           <TouchableOpacity 
@@ -933,6 +817,55 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Manual Day Edit Modal */}
+      <Modal visible={!!editingDay} transparent animationType="slide" onRequestClose={() => setEditingDay(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setEditingDay(null)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>
+              {editingDay ? (() => {
+                const [yr, mo, dy] = editingDay.date.split('-').map(Number);
+                return new Date(yr, mo - 1, dy).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+              })() : ''}
+            </Text>
+            <Text style={styles.modalSub}>Set how many liters to water, or 0 to skip this day.</Text>
+
+            {/* Quick-set buttons */}
+            <View style={styles.quickSetRow}>
+              {[0, 1, 2, 3, 5, 8].map(v => (
+                <TouchableOpacity
+                  key={v}
+                  style={[styles.quickBtn, editLiters === String(v) && styles.quickBtnActive]}
+                  onPress={() => setEditLiters(String(v))}
+                >
+                  <Text style={[styles.quickBtnText, editLiters === String(v) && styles.quickBtnTextActive]}>
+                    {v === 0 ? 'Skip' : `${v}L`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.customInputRow}>
+              <TextInput
+                style={styles.litersInput}
+                value={editLiters}
+                onChangeText={setEditLiters}
+                keyboardType="decimal-pad"
+                placeholder="Custom liters..."
+                placeholderTextColor="#6B7280"
+                selectTextOnFocus
+              />
+              <Text style={styles.litersUnit}>L</Text>
+            </View>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={saveManualDay}>
+              <Text style={styles.saveBtnText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1397,6 +1330,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  sensorName: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500' as const,
+    marginTop: 2,
+    marginBottom: 4,
+  },
   sensorTime: {
     fontSize: 10,
     color: '#6B7280',
@@ -1706,6 +1646,100 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalSheet: {
+    backgroundColor: '#1F2937',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  modalSub: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 20,
+  },
+  quickSetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  quickBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  quickBtnActive: {
+    backgroundColor: 'rgba(26,161,121,0.2)',
+    borderColor: '#1aa179',
+  },
+  quickBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  quickBtnTextActive: {
+    color: '#1aa179',
+  },
+  customInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  litersInput: {
+    flex: 1,
+    fontSize: 16,
+    color: 'white',
+    paddingVertical: 14,
+  },
+  litersUnit: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  saveBtn: {
+    backgroundColor: '#1aa179',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.2,
   },
 });
 

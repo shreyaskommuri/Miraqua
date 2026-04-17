@@ -11,6 +11,54 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import SidebarNavigation from './SidebarNavigation';
 
+const StatCard = ({ title, value, subtitle, icon, color }: {
+  title: string; value: string; subtitle?: string; icon: string; color: string;
+}) => (
+  <View style={[styles.statCard, { borderLeftColor: color }]}>
+    <View style={styles.statHeader}>
+      <Ionicons name={icon as any} size={24} color={color} />
+      <Text style={styles.statTitle}>{title}</Text>
+    </View>
+    <Text style={styles.statValue}>{value}</Text>
+    {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+  </View>
+);
+
+const WeeklyChart = ({ weeklyData, onDayClick }: { weeklyData: any[]; onDayClick: (day: any) => void }) => (
+  <View style={styles.chartCard}>
+    <Text style={styles.chartTitle}>Weekly Water Usage</Text>
+    <View style={styles.chartContainer}>
+      {weeklyData.map((day) => (
+        <TouchableOpacity key={day.day} style={styles.chartBar} onPress={() => onDayClick(day)}>
+          <View style={[styles.bar, { height: (day.water / 20) * 100 }]} />
+          <Text style={styles.barLabel}>{day.day}</Text>
+          <Text style={styles.barValue}>{day.water}L</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+const MoistureChart = ({ weeklyData }: { weeklyData: any[] }) => (
+  <View style={styles.chartCard}>
+    <Text style={styles.chartTitle}>Soil Moisture Levels</Text>
+    <View style={styles.moistureContainer}>
+      {weeklyData.map((day) => (
+        <View key={day.day} style={styles.moistureItem}>
+          <View style={styles.moistureBar}>
+            <View style={[styles.moistureFill, {
+              height: `${day.moisture}%`,
+              backgroundColor: day.moisture > 70 ? '#10B981' : day.moisture > 50 ? '#F59E0B' : '#EF4444',
+            }]} />
+          </View>
+          <Text style={styles.moistureLabel}>{day.day}</Text>
+          <Text style={styles.moistureValue}>{day.moisture}%</Text>
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
 interface AnalyticsData {
   totalWaterUsed: number;
   waterSavings: number;
@@ -80,68 +128,6 @@ export default function AnalyticsScreen({ navigation }: any) {
   const handleDayClick = (day: any) => {
     navigation.navigate('SpecificDay', { plotId: 1, day: day.day.toLowerCase() });
   };
-
-  const StatCard = ({ title, value, subtitle, icon, color }: {
-    title: string;
-    value: string;
-    subtitle?: string;
-    icon: string;
-    color: string;
-  }) => (
-    <View style={[styles.statCard, { borderLeftColor: color }]}>
-      <View style={styles.statHeader}>
-        <Ionicons name={icon as any} size={24} color={color} />
-        <Text style={styles.statTitle}>{title}</Text>
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-    </View>
-  );
-
-  const WeeklyChart = () => (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>Weekly Water Usage</Text>
-      <View style={styles.chartContainer}>
-        {analyticsData.weeklyData.map((day, index) => (
-          <TouchableOpacity
-            key={day.day}
-            style={styles.chartBar}
-            onPress={() => handleDayClick(day)}
-          >
-            <View style={[styles.bar, { height: (day.water / 20) * 100 }]} />
-            <Text style={styles.barLabel}>{day.day}</Text>
-            <Text style={styles.barValue}>{day.water}L</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const MoistureChart = () => (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>Soil Moisture Levels</Text>
-      <View style={styles.moistureContainer}>
-        {analyticsData.weeklyData.map((day, index) => (
-          <View key={day.day} style={styles.moistureItem}>
-            <View style={styles.moistureBar}>
-              <View 
-                style={[
-                  styles.moistureFill, 
-                  { 
-                    height: `${day.moisture}%`,
-                    backgroundColor: day.moisture > 70 ? '#10B981' : 
-                                   day.moisture > 50 ? '#F59E0B' : '#EF4444'
-                  }
-                ]} 
-              />
-            </View>
-            <Text style={styles.moistureLabel}>{day.day}</Text>
-            <Text style={styles.moistureValue}>{day.moisture}%</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
 
   if (isLoading) {
     return (
@@ -262,8 +248,8 @@ export default function AnalyticsScreen({ navigation }: any) {
         {/* Content based on active tab */}
         {activeTab === 'overview' && (
           <View style={styles.tabContent}>
-            <WeeklyChart />
-            <MoistureChart />
+            <WeeklyChart weeklyData={analyticsData.weeklyData} onDayClick={handleDayClick} />
+            <MoistureChart weeklyData={analyticsData.weeklyData} />
           </View>
         )}
 

@@ -39,30 +39,79 @@ export default function WeatherScreen({ navigation }: any) {
   const fetchWeatherData = async () => {
     setIsLoading(true);
     setError('');
-    
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      // Get coordinates from user's plots
+      let lat = 37.7749;
+      let lon = -122.4194;
+      let locationLabel = 'Your Location';
+
+      try {
+        const { getPlots } = await import('../api/plots');
+        const result = await getPlots();
+        const plots = result.plots || [];
+        const plotWithCoords = plots.find(p => p.lat && p.lon);
+        if (plotWithCoords) {
+          lat = plotWithCoords.lat!;
+          lon = plotWithCoords.lon!;
+        } else if (plots.length > 0 && plots[0].zip_code) {
+          const zipRes = await fetch(`https://api.zippopotam.us/us/${plots[0].zip_code}`);
+          if (zipRes.ok) {
+            const zipData = await zipRes.json();
+            lat = parseFloat(zipData.places[0].latitude);
+            lon = parseFloat(zipData.places[0].longitude);
+            locationLabel = `${zipData.places[0]['place name']}, ${zipData.places[0]['state abbreviation']}`;
+          }
+        }
+      } catch (_) {}
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+        `&current_weather=true&hourly=relativehumidity_2m,windspeed_10m` +
+        `&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum` +
+        `&temperature_unit=fahrenheit&timezone=auto&forecast_days=6`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Weather API error');
+      const data = await res.json();
+
+      const codeToCondition = (code: number): { condition: string; icon: string } => {
+        if (code === 0) return { condition: 'Clear', icon: 'sunny' };
+        if (code <= 3) return { condition: 'Partly Cloudy', icon: 'partly-cloudy' };
+        if (code <= 48) return { condition: 'Foggy', icon: 'cloudy' };
+        if (code <= 67) return { condition: 'Rainy', icon: 'rain' };
+        if (code <= 77) return { condition: 'Snowy', icon: 'cloudy' };
+        if (code <= 82) return { condition: 'Rain Showers', icon: 'rain' };
+        return { condition: 'Thunderstorms', icon: 'rain' };
+      };
+
+      const currentCode = data.current_weather.weathercode;
+      const currentCondition = codeToCondition(currentCode);
+      // humidity from first hourly slot
+      const humidity = data.hourly?.relativehumidity_2m?.[0] ?? 70;
+      const windSpeed = Math.round(data.current_weather.windspeed * 0.621371); // km/h → mph
+
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const forecast = (data.daily.time as string[]).slice(0, 5).map((dateStr: string, i: number) => {
+        const d = new Date(dateStr + 'T12:00:00');
+        const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : dayNames[d.getDay()];
+        const { condition, icon } = codeToCondition(data.daily.weathercode[i]);
+        const high = Math.round(data.daily.temperature_2m_max[i]);
+        return { day: label, temperature: high, condition, icon };
+      });
+
       setWeatherData({
-        location: "San Francisco, CA",
+        location: locationLabel,
         current: {
-          temperature: 68,
-          condition: "Partly Cloudy",
-          humidity: 75,
-          windSpeed: 12,
-          icon: "partly-cloudy"
+          temperature: Math.round(data.current_weather.temperature),
+          condition: currentCondition.condition,
+          humidity,
+          windSpeed,
+          icon: currentCondition.icon,
         },
-        forecast: [
-          { day: "Today", temperature: 70, condition: "Sunny", icon: "sunny" },
-          { day: "Tomorrow", temperature: 65, condition: "Cloudy", icon: "cloudy" },
-          { day: "Wed", temperature: 62, condition: "Rain", icon: "rain" },
-          { day: "Thu", temperature: 68, condition: "Partly Cloudy", icon: "partly-cloudy" },
-          { day: "Fri", temperature: 72, condition: "Sunny", icon: "sunny" }
-        ]
+        forecast,
       });
     } catch (err) {
-      setError("Failed to load weather data");
+      setError('Failed to load weather data');
     } finally {
       setIsLoading(false);
     }

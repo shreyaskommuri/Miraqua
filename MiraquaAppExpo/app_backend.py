@@ -440,6 +440,51 @@ def chat():
 
 
 
+@app.route("/update_manual_day", methods=["POST"])
+def update_manual_day():
+    data = request.get_json()
+    plot_id  = data.get("plot_id")
+    date_str = data.get("date")   # YYYY-MM-DD
+    liters   = data.get("liters", 0)
+
+    if not plot_id or not date_str:
+        return jsonify({"error": "Missing fields"}), 400
+
+    try:
+        sched_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
+        sched_data = sched_res.data
+
+        # og_schedule is the manual schedule; seed from optimized schedule if not yet set
+        manual = list(sched_data.get("og_schedule") or sched_data.get("schedule") or [])
+
+        # Convert YYYY-MM-DD to MM/DD/YY
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        date_key = d.strftime("%m/%d/%y")
+
+        updated = False
+        for entry in manual:
+            if entry.get("date") == date_key:
+                entry["liters"] = liters
+                entry["note"] = "Manual override"
+                updated = True
+                break
+
+        if not updated:
+            manual.append({
+                "date": date_key,
+                "day": "Manual",
+                "liters": liters,
+                "optimal_time": "06:00",
+                "note": "Manual override"
+            })
+
+        supabase.table("plot_schedules").update({"og_schedule": manual}).eq("plot_id", plot_id).execute()
+        return jsonify({"success": True, "date": date_key, "liters": liters})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/get_chat_log", methods=["POST"])
 def get_chat_log():
     data = request.get_json()
@@ -447,18 +492,17 @@ def get_chat_log():
     plot_id = data.get("plot_id")
     chat_session_id = data.get("chat_session_id")
 
-    if not user_id or not plot_id or not chat_session_id:
+    if not user_id or not plot_id:
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
-        res = supabase.table("farmerAI_chatlog") \
+        query = supabase.table("farmerAI_chatlog") \
             .select("prompt, reply, created_at, is_user_message") \
             .eq("user_id", user_id) \
-            .eq("plot_id", plot_id) \
-            .eq("chat_session_id", chat_session_id) \
-            .order("created_at", desc=True) \
-            .limit(5) \
-            .execute()
+            .eq("plot_id", plot_id)
+        if chat_session_id:
+            query = query.eq("chat_session_id", chat_session_id)
+        res = query.order("created_at", desc=True).limit(30).execute()
 
         print(f"🔍 Retrieved {len(res.data)} chat rows for user={user_id}, plot={plot_id}, session={chat_session_id}")
 

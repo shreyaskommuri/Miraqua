@@ -6,11 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  SafeAreaView,
   StatusBar,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { addPlot } from '../api/plots';
 
 interface SetupPlotScreenProps {
@@ -20,10 +22,6 @@ interface SetupPlotScreenProps {
 const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
   const [plotName, setPlotName] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Additional fields for Supabase
   const [zipCode, setZipCode] = useState('');
   const [area, setArea] = useState('');
   const [phLevel, setPhLevel] = useState('');
@@ -34,154 +32,49 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
   const [customConstraints, setCustomConstraints] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const crops = [
-    { 
-      id: "tomatoes", 
-      name: "Tomatoes", 
-      emoji: "🍅", 
-      season: "Spring/Summer", 
-      difficulty: "Beginner",
-      wateringFreq: "Daily",
-      benefits: "High yield, easy to grow",
-      popular: true
-    },
-    { 
-      id: "herbs", 
-      name: "Herbs", 
-      emoji: "🌿", 
-      season: "Year-round", 
-      difficulty: "Beginner",
-      wateringFreq: "Every 2-3 days",
-      benefits: "Continuous harvest, aromatic",
-      popular: true
-    },
-    { 
-      id: "strawberries", 
-      name: "Strawberries", 
-      emoji: "🍓", 
-      season: "Spring/Summer", 
-      difficulty: "Intermediate",
-      wateringFreq: "Daily",
-      benefits: "Perennial, sweet fruit",
-      popular: true
-    },
-    { 
-      id: "lettuce", 
-      name: "Lettuce", 
-      emoji: "🥬", 
-      season: "Spring/Fall", 
-      difficulty: "Beginner",
-      wateringFreq: "Every 2 days",
-      benefits: "Fast growing, low maintenance"
-    },
-    { 
-      id: "carrots", 
-      name: "Carrots", 
-      emoji: "🥕", 
-      season: "Spring/Fall", 
-      difficulty: "Beginner",
-      wateringFreq: "Every 2 days",
-      benefits: "Root vegetable, stores well"
-    },
-    { 
-      id: "peppers", 
-      name: "Peppers", 
-      emoji: "🌶️", 
-      season: "Summer", 
-      difficulty: "Intermediate",
-      wateringFreq: "Daily",
-      benefits: "Heat-loving, colorful varieties"
-    },
-    { 
-      id: "broccoli", 
-      name: "Broccoli", 
-      emoji: "🥦", 
-      season: "Spring/Fall", 
-      difficulty: "Intermediate",
-      wateringFreq: "Daily",
-      benefits: "Nutritious, cool-weather crop"
-    },
-    { 
-      id: "beans", 
-      name: "Beans", 
-      emoji: "🫘", 
-      season: "Spring/Summer", 
-      difficulty: "Beginner",
-      wateringFreq: "Every 2 days",
-      benefits: "Nitrogen-fixing, protein-rich"
-    },
-    { 
-      id: "custom", 
-      name: "Other/Custom", 
-      emoji: "✨", 
-      season: "Variable", 
-      difficulty: "Variable",
-      wateringFreq: "Custom",
-      benefits: "Tailored to your needs"
-    }
+    { id: 'tomatoes',     name: 'Tomatoes',     emoji: '🍅', wateringFreq: 'Daily',         difficulty: 'Beginner',     popular: true  },
+    { id: 'herbs',        name: 'Herbs',         emoji: '🌿', wateringFreq: 'Every 2-3 days', difficulty: 'Beginner',     popular: true  },
+    { id: 'strawberries', name: 'Strawberries',  emoji: '🍓', wateringFreq: 'Daily',         difficulty: 'Intermediate', popular: true  },
+    { id: 'lettuce',      name: 'Lettuce',       emoji: '🥬', wateringFreq: 'Every 2 days',  difficulty: 'Beginner',     popular: false },
+    { id: 'carrots',      name: 'Carrots',       emoji: '🥕', wateringFreq: 'Every 2 days',  difficulty: 'Beginner',     popular: false },
+    { id: 'peppers',      name: 'Peppers',       emoji: '🌶️', wateringFreq: 'Daily',         difficulty: 'Intermediate', popular: false },
+    { id: 'broccoli',     name: 'Broccoli',      emoji: '🥦', wateringFreq: 'Daily',         difficulty: 'Intermediate', popular: false },
+    { id: 'beans',        name: 'Beans',         emoji: '🫘', wateringFreq: 'Every 2 days',  difficulty: 'Beginner',     popular: false },
+    { id: 'custom',       name: 'Other/Custom',  emoji: '✨', wateringFreq: 'Custom',        difficulty: 'Variable',     popular: false },
   ];
 
-  // Filter crops based on search
-  const filteredCrops = crops.filter(crop => 
-    crop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    crop.difficulty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    crop.season.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Popular crops for recommendations
-  const popularCrops = crops.filter(crop => crop.popular);
-
-  const validateForm = () => {
+  const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
-    
-    if (plotName.trim().length < 2) {
-      newErrors.plotName = "Plot name must be at least 2 characters";
+    if (step === 1) {
+      if (plotName.trim().length < 2) newErrors.plotName = 'At least 2 characters';
+      if (!selectedCrop) newErrors.selectedCrop = 'Please select a crop';
     }
-    
-    if (!selectedCrop) {
-      newErrors.selectedCrop = "Please select a crop type";
+    if (step === 2) {
+      if (!zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
+      if (!area.trim()) newErrors.area = 'Area is required';
     }
-
-    if (currentStep === 2) {
-      if (!zipCode.trim()) {
-        newErrors.zipCode = "ZIP code is required";
-      }
-      if (!area.trim()) {
-        newErrors.area = "Area is required";
-      }
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
-    if (!validateForm()) return;
-
-    if (currentStep === 1) {
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      handleSubmit();
-    }
+    if (!validateStep(currentStep)) return;
+    if (currentStep === 1) { setCurrentStep(2); return; }
+    handleSubmit();
   };
 
   const handleBack = () => {
-    if (currentStep === 1) {
-      navigation.goBack();
-    } else {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep === 1) navigation.goBack();
+    else setCurrentStep(1);
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
-
+    if (!validateStep(2)) return;
     setIsSubmitting(true);
-    
     try {
-      const cropDetails = crops.find(crop => crop.id === selectedCrop);
-      
       const plotData = {
         name: plotName.trim(),
         crop: selectedCrop,
@@ -190,792 +83,510 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
         ph_level: parseFloat(phLevel) || 6.5,
         lat: parseFloat(latitude) || null,
         lon: parseFloat(longitude) || null,
-        flex_type: cropDetails?.name || 'Custom',
+        flex_type: crops.find(c => c.id === selectedCrop)?.name || 'Custom',
         planting_date: plantingDate || new Date().toISOString().split('T')[0],
         age_at_entry: parseFloat(ageAtEntry) || 0,
         custom_constraints: customConstraints.trim(),
       };
-
       const response = await addPlot(plotData);
-      
       if (response.success) {
-        Alert.alert('✅ Success!', 'Your plot has been created successfully!', [
-          {
-            text: 'Go to Home',
-            onPress: () => navigation.navigate('Home')
-          }
+        Alert.alert('Plot Created', 'Your AI irrigation system is now active.', [
+          { text: 'View Home', onPress: () => navigation.navigate('Home') },
         ]);
       } else {
-        Alert.alert('❌ Error', response.error || 'Failed to create plot. Please try again.');
+        Alert.alert('Error', response.error || 'Failed to create plot.');
       }
     } catch (error: any) {
-      Alert.alert('❌ Error', error.message || 'Something went wrong. Please try again.');
+      Alert.alert('Error', error.message || 'Something went wrong.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isFormValid = plotName.trim().length >= 2 && selectedCrop && 
-    (currentStep === 1 || (currentStep === 2 && zipCode.trim() && area.trim()));
-
-  const renderStep1 = () => (
-    <>
-      {/* Intro */}
-      <View style={styles.introSection}>
-        <View style={styles.introIcon}>
-          <LinearGradient
-            colors={['#10B981', '#059669']}
-            style={styles.iconGradient}
-          >
-            <Ionicons name="leaf" size={32} color="white" />
-          </LinearGradient>
-        </View>
-        <Text style={styles.introTitle}>Let's set up your garden plot</Text>
-        <Text style={styles.introDescription}>
-          Give your plot a name and choose what you're growing for personalized care
-        </Text>
-      </View>
-
-      {/* Popular for beginners */}
-      {!selectedCrop && (
-        <View style={styles.popularSection}>
-          <View style={styles.popularHeader}>
-            <Ionicons name="sparkles" size={20} color="#10B981" />
-            <Text style={styles.popularTitle}>Popular for beginners</Text>
-          </View>
-          <View style={styles.popularCrops}>
-            {popularCrops.map((crop) => (
-              <TouchableOpacity
-                key={crop.id}
-                style={styles.popularCropButton}
-                onPress={() => setSelectedCrop(crop.id)}
-              >
-                <Text style={styles.popularCropEmoji}>{crop.emoji}</Text>
-                <Text style={styles.popularCropName}>{crop.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Plot Name */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Plot Name</Text>
-        <Text style={styles.inputDescription}>Give your plot a memorable name</Text>
-        <TextInput
-          style={[styles.textInput, errors.plotName ? styles.inputError : null]}
-          placeholder="e.g., Backyard Garden, Herb Corner"
-          placeholderTextColor="#9CA3AF"
-          value={plotName}
-          onChangeText={(text) => {
-            setPlotName(text);
-            if (errors.plotName) {
-              setErrors(prev => ({ ...prev, plotName: '' }));
-            }
-          }}
-          maxLength={50}
-        />
-        {errors.plotName && (
-          <Text style={styles.errorText}>{errors.plotName}</Text>
-        )}
-        <Text style={styles.characterCount}>{plotName.length}/50 characters</Text>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search crops (e.g., tomatoes, beginner, summer)..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      {/* Crop Selection */}
-      <View style={styles.cropsSection}>
-        <Text style={styles.sectionTitle}>Choose your crop</Text>
-        <Text style={styles.sectionSubtitle}>
-          {filteredCrops.length} crop{filteredCrops.length !== 1 ? 's' : ''} available
-        </Text>
-        
-        <View style={styles.cropsGrid}>
-          {filteredCrops.map((crop) => (
-            <TouchableOpacity
-              key={crop.id}
-              style={[
-                styles.cropGridCard,
-                selectedCrop === crop.id && styles.cropGridCardSelected
-              ]}
-              onPress={() => setSelectedCrop(crop.id)}
-            >
-              <View style={styles.cropGridHeader}>
-                <Text style={styles.cropGridEmoji}>{crop.emoji}</Text>
-                <View style={styles.cropGridTitleContainer}>
-                  <Text style={styles.cropGridTitle}>{crop.name}</Text>
-                  {crop.popular && (
-                    <View style={styles.popularBadgeSmall}>
-                      <Text style={styles.popularBadgeText}>Popular</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              
-              <View style={styles.cropGridBadges}>
-                <View style={[
-                  styles.cropGridBadge,
-                  crop.difficulty === 'Beginner' ? styles.beginnerBadge : styles.intermediateBadge
-                ]}>
-                  <Text style={styles.cropBadgeText}>{crop.difficulty}</Text>
-                </View>
-                <View style={styles.cropGridBadge}>
-                  <Ionicons name="time" size={12} color="#3B82F6" />
-                  <Text style={[styles.cropBadgeText, { color: '#3B82F6' }]}>{crop.season}</Text>
-                </View>
-                <View style={styles.cropGridBadge}>
-                  <Ionicons name="water" size={12} color="#06B6D4" />
-                  <Text style={[styles.cropBadgeText, { color: '#06B6D4' }]}>{crop.wateringFreq}</Text>
-                </View>
-              </View>
-              
-              <Text style={styles.cropBenefits}>{crop.benefits}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </>
-  );
-
-  const renderStep2 = () => (
-    <>
-      {/* Location and Details Intro */}
-      <View style={styles.introSection}>
-        <View style={styles.introIcon}>
-          <LinearGradient
-            colors={['#3B82F6', '#1D4ED8']}
-            style={styles.iconGradient}
-          >
-            <Ionicons name="location" size={32} color="white" />
-          </LinearGradient>
-        </View>
-        <Text style={styles.introTitle}>Plot Location & Details</Text>
-        <Text style={styles.introDescription}>
-          Add location information and plot specifications for better care recommendations
-        </Text>
-      </View>
-
-      {/* ZIP Code */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>ZIP Code</Text>
-        <Text style={styles.inputDescription}>Your plot's location for weather data</Text>
-        <TextInput
-          style={[styles.textInput, errors.zipCode ? styles.inputError : null]}
-          placeholder="e.g., 12345"
-          placeholderTextColor="#9CA3AF"
-          value={zipCode}
-          onChangeText={(text) => {
-            setZipCode(text);
-            if (errors.zipCode) {
-              setErrors(prev => ({ ...prev, zipCode: '' }));
-            }
-          }}
-          keyboardType="numeric"
-          maxLength={5}
-        />
-        {errors.zipCode && (
-          <Text style={styles.errorText}>{errors.zipCode}</Text>
-        )}
-      </View>
-
-      {/* Area */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Plot Area (sq ft)</Text>
-        <Text style={styles.inputDescription}>Size of your growing space</Text>
-        <TextInput
-          style={[styles.textInput, errors.area ? styles.inputError : null]}
-          placeholder="e.g., 100"
-          placeholderTextColor="#9CA3AF"
-          value={area}
-          onChangeText={(text) => {
-            setArea(text);
-            if (errors.area) {
-              setErrors(prev => ({ ...prev, area: '' }));
-            }
-          }}
-          keyboardType="numeric"
-        />
-        {errors.area && (
-          <Text style={styles.errorText}>{errors.area}</Text>
-        )}
-      </View>
-
-      {/* pH Level */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Soil pH Level (Optional)</Text>
-        <Text style={styles.inputDescription}>Ideal range: 6.0-7.0 for most crops</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="e.g., 6.5"
-          placeholderTextColor="#9CA3AF"
-          value={phLevel}
-          onChangeText={setPhLevel}
-          keyboardType="numeric"
-        />
-      </View>
-
-      {/* Coordinates (Optional) */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Coordinates (Optional)</Text>
-        <Text style={styles.inputDescription}>For precise weather and soil data</Text>
-        <View style={styles.coordinatesContainer}>
-          <TextInput
-            style={[styles.textInput, styles.coordinateInput]}
-            placeholder="Latitude"
-            placeholderTextColor="#9CA3AF"
-            value={latitude}
-            onChangeText={setLatitude}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={[styles.textInput, styles.coordinateInput]}
-            placeholder="Longitude"
-            placeholderTextColor="#9CA3AF"
-            value={longitude}
-            onChangeText={setLongitude}
-            keyboardType="numeric"
-          />
-        </View>
-      </View>
-
-      {/* Planting Date */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Planting Date (Optional)</Text>
-        <Text style={styles.inputDescription}>When you plan to plant</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#9CA3AF"
-          value={plantingDate}
-          onChangeText={setPlantingDate}
-        />
-      </View>
-
-      {/* Custom Constraints */}
-      <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Special Requirements (Optional)</Text>
-        <Text style={styles.inputDescription}>Any specific growing conditions or notes</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder="e.g., Shade-loving, drought-resistant, container growing..."
-          placeholderTextColor="#9CA3AF"
-          value={customConstraints}
-          onChangeText={setCustomConstraints}
-          multiline
-          numberOfLines={3}
-        />
-      </View>
-    </>
-  );
+  const isStep1Valid = plotName.trim().length >= 2 && !!selectedCrop;
+  const isStep2Valid = zipCode.trim().length > 0 && area.trim().length > 0;
+  const canProceed = currentStep === 1 ? isStep1Valid : isStep2Valid;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#374151" />
+          <Ionicons name="arrow-back" size={22} color="white" />
         </TouchableOpacity>
-        
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Setup Your Plot</Text>
+          <Text style={styles.headerTitle}>
+            {currentStep === 1 ? 'New Plot' : 'Location & Details'}
+          </Text>
           <Text style={styles.headerSubtitle}>Step {currentStep} of 2</Text>
         </View>
-        
-        <View style={styles.headerRight} />
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${currentStep * 50}%` }]} />
-        </View>
+      {/* Progress dots */}
+      <View style={styles.progressRow}>
+        {[1, 2].map(s => (
+          <View
+            key={s}
+            style={[styles.progressDot, s === currentStep && styles.progressDotActive, s < currentStep && styles.progressDotDone]}
+          />
+        ))}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {currentStep === 1 ? renderStep1() : renderStep2()}
-      </ScrollView>
-
-      {/* Next/Submit Button */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity
-          style={[
-            styles.nextButton,
-            isFormValid ? styles.nextButtonActive : styles.nextButtonDisabled
-          ]}
-          onPress={handleNext}
-          disabled={!isFormValid || isSubmitting}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          style={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={[
-            styles.nextButtonText,
-            isFormValid ? styles.nextButtonTextActive : styles.nextButtonTextDisabled
-          ]}>
-            {isSubmitting ? 'Creating Plot...' : 
-             currentStep === 1 ? 'Next: Location & Details' : 'Create Plot'}
+          {currentStep === 1 ? (
+            <>
+              {/* Hero */}
+              <View style={styles.hero}>
+                <View style={styles.heroIcon}>
+                  <Ionicons name="leaf" size={32} color="white" />
+                </View>
+                <Text style={styles.heroTitle}>What are you growing?</Text>
+                <Text style={styles.heroSubtitle}>Name your plot and pick a crop — Miraqua handles the rest</Text>
+              </View>
+
+              {/* Plot name */}
+              <View style={styles.section}>
+                <Text style={styles.label}>Plot Name</Text>
+                <TextInput
+                  style={[styles.input, errors.plotName ? styles.inputError : null]}
+                  placeholder="e.g., Backyard Tomatoes"
+                  placeholderTextColor="#4B5563"
+                  value={plotName}
+                  onChangeText={t => { setPlotName(t); setErrors(p => ({ ...p, plotName: '' })); }}
+                  maxLength={50}
+                />
+                {errors.plotName ? (
+                  <Text style={styles.errorText}>{errors.plotName}</Text>
+                ) : (
+                  <Text style={styles.hint}>{plotName.length}/50</Text>
+                )}
+              </View>
+
+              {/* Crop grid */}
+              <View style={styles.section}>
+                <Text style={styles.label}>Crop Type</Text>
+                {errors.selectedCrop ? <Text style={styles.errorText}>{errors.selectedCrop}</Text> : null}
+                <View style={styles.cropGrid}>
+                  {crops.map(crop => {
+                    const selected = selectedCrop === crop.id;
+                    return (
+                      <TouchableOpacity
+                        key={crop.id}
+                        style={[styles.cropCard, selected && styles.cropCardSelected]}
+                        onPress={() => { setSelectedCrop(crop.id); setErrors(p => ({ ...p, selectedCrop: '' })); }}
+                        activeOpacity={0.75}
+                      >
+                        {selected && (
+                          <View style={styles.cropCheck}>
+                            <Ionicons name="checkmark" size={10} color="white" />
+                          </View>
+                        )}
+                        <Text style={styles.cropEmoji}>{crop.emoji}</Text>
+                        <Text style={[styles.cropName, selected && styles.cropNameSelected]}>{crop.name}</Text>
+                        <Text style={styles.cropFreq}>{crop.wateringFreq}</Text>
+                        {crop.popular && (
+                          <View style={styles.popularBadge}>
+                            <Text style={styles.popularBadgeText}>Popular</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Hero */}
+              <View style={styles.hero}>
+                <View style={[styles.heroIcon, { backgroundColor: 'rgba(59,130,246,0.2)' }]}>
+                  <Ionicons name="location" size={32} color="#60A5FA" />
+                </View>
+                <Text style={styles.heroTitle}>Location & Details</Text>
+                <Text style={styles.heroSubtitle}>Used to pull weather data and calibrate your irrigation schedule</Text>
+              </View>
+
+              {/* Required */}
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Required</Text>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>ZIP Code</Text>
+                  <TextInput
+                    style={[styles.input, errors.zipCode ? styles.inputError : null]}
+                    placeholder="e.g., 94103"
+                    placeholderTextColor="#4B5563"
+                    value={zipCode}
+                    onChangeText={t => { setZipCode(t); setErrors(p => ({ ...p, zipCode: '' })); }}
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+                  {errors.zipCode ? <Text style={styles.errorText}>{errors.zipCode}</Text> : null}
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Plot Area (sq ft)</Text>
+                  <TextInput
+                    style={[styles.input, errors.area ? styles.inputError : null]}
+                    placeholder="e.g., 100"
+                    placeholderTextColor="#4B5563"
+                    value={area}
+                    onChangeText={t => { setArea(t); setErrors(p => ({ ...p, area: '' })); }}
+                    keyboardType="numeric"
+                  />
+                  {errors.area ? <Text style={styles.errorText}>{errors.area}</Text> : null}
+                </View>
+              </View>
+
+              {/* Optional */}
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Optional</Text>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Soil pH</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., 6.5  (ideal: 6.0–7.0)"
+                    placeholderTextColor="#4B5563"
+                    value={phLevel}
+                    onChangeText={setPhLevel}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Coordinates</Text>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="Latitude"
+                      placeholderTextColor="#4B5563"
+                      value={latitude}
+                      onChangeText={setLatitude}
+                      keyboardType="numeric"
+                    />
+                    <View style={{ width: 10 }} />
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="Longitude"
+                      placeholderTextColor="#4B5563"
+                      value={longitude}
+                      onChangeText={setLongitude}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Planting Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#4B5563"
+                    value={plantingDate}
+                    onChangeText={setPlantingDate}
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Special Requirements</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="e.g., shade-loving, container growing…"
+                    placeholderTextColor="#4B5563"
+                    value={customConstraints}
+                    onChangeText={setCustomConstraints}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Bottom CTA */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[styles.ctaButton, !canProceed && styles.ctaButtonDisabled]}
+          onPress={handleNext}
+          disabled={!canProceed || isSubmitting}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.ctaText, !canProceed && styles.ctaTextDisabled]}>
+            {isSubmitting ? 'Creating…' : currentStep === 1 ? 'Continue' : 'Create Plot'}
           </Text>
           {!isSubmitting && (
-            <Ionicons 
-              name={currentStep === 1 ? "arrow-forward" : "checkmark"} 
-              size={16} 
-              color={isFormValid ? "white" : "#9CA3AF"} 
-              style={styles.nextButtonIcon}
+            <Ionicons
+              name={currentStep === 1 ? 'arrow-forward' : 'checkmark'}
+              size={16}
+              color={canProceed ? 'white' : '#4B5563'}
             />
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
+
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 60,
-    backgroundColor: 'white',
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerCenter: {
+    flex: 1,
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
-  headerRight: {
-    width: 40,
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
   },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-  },
-  progressBar: {
+  progressDot: {
+    width: 8,
     height: 8,
-    backgroundColor: '#E5E7EB',
     borderRadius: 4,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#10B981',
-    borderRadius: 4,
+  progressDotActive: {
+    width: 24,
+    backgroundColor: '#1aa179',
   },
-  content: {
+  progressDotDone: {
+    backgroundColor: '#1aa179',
+    opacity: 0.5,
+  },
+  scroll: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  introSection: {
+  hero: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingTop: 24,
+    paddingBottom: 28,
   },
-  introIcon: {
-    marginBottom: 16,
-  },
-  iconGradient: {
+  heroIcon: {
     width: 64,
     height: 64,
-    borderRadius: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(26,161,121,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 16,
   },
-  introTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: 'white',
+    letterSpacing: -0.5,
     textAlign: 'center',
     marginBottom: 8,
   },
-  introDescription: {
-    fontSize: 16,
-    color: '#6B7280',
+  heroSubtitle: {
+    fontSize: 15,
+    color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+    paddingHorizontal: 12,
   },
-  popularSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
+  section: {
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
-  popularHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 20,
     marginBottom: 16,
   },
-  popularTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginLeft: 8,
-  },
-  popularCrops: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  popularCropButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  popularCropEmoji: {
-    fontSize: 16,
-    marginRight: 4,
-  },
-  popularCropName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  inputSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  inputLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  inputDescription: {
-    fontSize: 14,
+  cardLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#6B7280',
-    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 16,
   },
-  textInput: {
+  fieldGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#D1D5DB',
+    marginBottom: 8,
+    letterSpacing: 0.1,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 16,
-    color: '#111827',
-    backgroundColor: 'white',
+    color: 'white',
   },
   inputError: {
     borderColor: '#EF4444',
   },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  characterCount: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  searchSection: {
-    marginBottom: 24,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-  },
-  cropsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  cropsList: {
-    gap: 12,
-  },
-  cropCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  cropCardSelected: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cropCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cropEmoji: {
-    fontSize: 32,
-    marginRight: 16,
-  },
-  cropDetails: {
-    flex: 1,
-  },
-  cropHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  cropName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  popularBadge: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#10B981',
-  },
-  popularBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#10B981',
-  },
-  cropBadges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  cropBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  beginnerBadge: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
-  },
-  intermediateBadge: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
-  },
-  cropBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
-    marginLeft: 4,
-  },
-  cropBenefits: {
-    fontSize: 12,
-    color: '#6B7280',
-    lineHeight: 16,
-  },
-  bottomContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-  },
-  nextButtonActive: {
-    backgroundColor: '#10B981',
-  },
-  nextButtonDisabled: {
-    backgroundColor: '#E5E7EB',
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  nextButtonTextActive: {
-    color: 'white',
-  },
-  nextButtonTextDisabled: {
-    color: '#9CA3AF',
-  },
-  nextButtonIcon: {
-    marginLeft: 8,
-  },
-  cropsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  cropGridCard: {
-    width: '48%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    marginBottom: 12,
-  },
-  cropGridCardSelected: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cropGridHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cropGridEmoji: {
-    fontSize: 28,
-    marginRight: 8,
-  },
-  cropGridTitleContainer: {
-    flex: 1,
-  },
-  cropGridTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  popularBadgeSmall: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#10B981',
-    alignSelf: 'flex-start',
-  },
-  cropGridBadges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 8,
-  },
-  cropGridBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  cropGridBadgeText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#374151',
-    marginLeft: 2,
-  },
-  cropGridDescription: {
-    fontSize: 11,
-    color: '#6B7280',
-    lineHeight: 14,
-  },
-  coordinatesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  coordinateInput: {
-    flex: 1,
-  },
   textArea: {
     minHeight: 80,
     paddingTop: 12,
-    paddingBottom: 12,
+    textAlignVertical: 'top',
+  },
+  hint: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 5,
+    textAlign: 'right',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#F87171',
+    marginTop: 5,
+  },
+  row: {
+    flexDirection: 'row',
+  },
+  cropGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  cropCard: {
+    width: '30.5%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  cropCardSelected: {
+    backgroundColor: 'rgba(26,161,121,0.15)',
+    borderColor: '#1aa179',
+  },
+  cropCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#1aa179',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cropEmoji: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  cropName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D1D5DB',
+    textAlign: 'center',
+    marginBottom: 3,
+  },
+  cropNameSelected: {
+    color: '#1aa179',
+  },
+  cropFreq: {
+    fontSize: 10,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  popularBadge: {
+    marginTop: 5,
+    backgroundColor: 'rgba(26,161,121,0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(26,161,121,0.3)',
+  },
+  popularBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#1aa179',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 16,
+    backgroundColor: 'rgba(17,24,39,0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1aa179',
+    borderRadius: 14,
+    paddingVertical: 16,
+  },
+  ctaButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  ctaText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: -0.2,
+  },
+  ctaTextDisabled: {
+    color: '#4B5563',
   },
 });
 
-export default SetupPlotScreen; 
+export default SetupPlotScreen;

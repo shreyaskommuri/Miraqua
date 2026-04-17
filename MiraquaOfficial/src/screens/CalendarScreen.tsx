@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,6 +11,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getMockScheduleEntry } from '../utils/mockSchedule';
+import { environment } from '../config/environment';
 
 interface ScheduleEntry {
   liters: number;
@@ -38,34 +41,65 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
   const { plotId } = route.params;
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry>>({});
+  const [loading, setLoading] = useState(true);
 
-  const generateScheduleData = (): Record<string, ScheduleEntry> => {
-    const data: Record<string, ScheduleEntry> = {};
-    const today = new Date();
-    const times = ['5:30 AM', '6:00 AM', '6:15 AM', '5:45 AM'];
-    const explanations = [
-      'ET₀ deficit accumulated. Optimal watering window before peak heat.',
-      'Soil moisture below threshold. Morning irrigation scheduled.',
-      'Low rainfall forecast. Scheduled based on crop water demand.',
-      'Weekly water budget requires irrigation today.',
-    ];
+  useFocusEffect(useCallback(() => {
+    const fetchSchedule = async () => {
+      setLoading(true);
+      const today = new Date();
+      const realDates = new Set<string>();
+      const data: Record<string, ScheduleEntry> = {};
 
-    for (let i = -5; i < 25; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const dateStr = localDateStr(date);
+      try {
+        const res = await fetch(`${environment.apiUrl}/get_plan`, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plot_id: plotId, use_original: false, force_refresh: false }),
+        });
 
-      if (Math.random() > 0.55) {
-        const liters = Math.floor(Math.random() * 14) + 8;
-        data[dateStr] = {
-          liters,
-          optimal_time: times[Math.floor(Math.random() * times.length)],
-          explanation: explanations[Math.floor(Math.random() * explanations.length)],
-        };
+        if (res.ok) {
+          const json = await res.json();
+          const schedule: any[] = json.schedule || [];
+          // Any dates not in the real schedule will be filled with mock below
+          schedule.forEach((entry: any) => {
+            if (!entry.date) return;
+            const parts = entry.date.split('/');
+            if (parts.length !== 3) return;
+            const [month, day, year] = parts;
+            const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+            const dateStr = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            realDates.add(dateStr);
+            if (entry.liters > 0) {
+              data[dateStr] = {
+                liters: entry.liters,
+                optimal_time: entry.optimal_time || '',
+                explanation: entry.explanation,
+              };
+            }
+          });
+
+        }
+      } catch (_) {
+        // fall through to mock
       }
-    }
-    return data;
-  };
+
+      // Fill surrounding dates (past 5 days + beyond 14 days up to +30) with mock
+      for (let i = -5; i < 30; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const dateStr = localDateStr(d);
+        if (realDates.has(dateStr)) continue; // don't overwrite real data
+        const mock = getMockScheduleEntry(dateStr);
+        if (mock) data[dateStr] = mock;
+      }
+
+      setScheduleData(data);
+      setLoading(false);
+    };
+
+    fetchSchedule();
+  }, [plotId]));
+
 
   const generateMonthDays = (): CalendarDay[] => {
     const today = new Date();
@@ -120,10 +154,6 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
     return days;
   };
 
-  useEffect(() => {
-    setScheduleData(generateScheduleData());
-  }, []);
-
   const calendarDays = generateMonthDays();
 
   const monthWateringDays = calendarDays.filter(d => d.isCurrentMonth && d.hasWatering).length;
@@ -143,7 +173,9 @@ const CalendarScreen = ({ route, navigation }: CalendarScreenProps) => {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Schedule</Text>
-          <Text style={styles.headerSubtitle}>AI-generated irrigation plan</Text>
+          <Text style={styles.headerSubtitle}>
+            {loading ? 'Loading…' : 'Model-generated irrigation plan'}
+          </Text>
         </View>
         <View style={{ width: 40 }} />
       </View>

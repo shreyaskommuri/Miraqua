@@ -42,11 +42,7 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
-  useEffect(() => {
-    fetchPlots();
-  }, []);
-
-  // Refresh plots when screen comes into focus (e.g., after adding a plot)
+  // Fetch plots on mount and whenever screen regains focus (e.g., after adding a plot)
   useFocusEffect(
     React.useCallback(() => {
       fetchPlots();
@@ -182,9 +178,11 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Notifications')}
           >
             <Ionicons name="notifications" size={20} color="white" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationCount}>3</Text>
-            </View>
+            {plots.length > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationCount}>{plots.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
