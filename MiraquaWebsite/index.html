@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miraqua — Intelligent Irrigation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:      #060d08;
+      --surface: #0b1810;
+      --border:  #182c1b;
+      --green:   #4ade80;
+      --green2:  #22c55e;
+      --teal:    #2dd4bf;
+      --text:    #f1f5f0;
+      --muted:   #7ea98a;
+      --font:    'Inter', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+    /* ─── NAVBAR ─────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      padding: 1.4rem 4.5rem;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: background .3s, box-shadow .3s;
+    }
+    nav.solid {
+      background: rgba(6,13,8,.94);
+      box-shadow: 0 1px 0 var(--border);
+      backdrop-filter: blur(16px);
+    }
+    .nav-logo { font-size: 1.15rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text); text-decoration: none; }
+    .nav-logo b { color: var(--green); font-weight: 800; }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: .82rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; transition: color .2s; }
+    .nav-links a:hover { color: var(--green); }
+    .nav-btn {
+      background: var(--green); color: #060d08; padding: .6rem 1.4rem; border-radius: 6px;
+      font-size: .82rem; font-weight: 700; text-decoration: none; letter-spacing: .02em;
+      transition: opacity .2s, transform .2s;
+    }
+    .nav-btn:hover { opacity: .85; transform: translateY(-1px); }
+
+    /* ─── HERO ───────────────────────────────────────── */
+    #hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+      padding: 9rem 2rem 5rem; position: relative; overflow: hidden;
+    }
+    /* subtle dot grid */
+    #hero::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(74,222,128,.12) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 80%);
+      pointer-events: none;
+    }
+    #hero::after {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 55% at 50% 35%, rgba(34,197,94,.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-pill {
+      position: relative; z-index: 1;
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.22);
+      color: var(--green); padding: .38rem 1rem; border-radius: 100px;
+      font-size: .73rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 2rem;
+    }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.6)} }
+    #hero h1 {
+      position: relative; z-index: 1;
+      font-size: clamp(2.8rem, 6.5vw, 5.6rem); font-weight: 800; line-height: 1.04;
+      letter-spacing: -.035em; max-width: 960px; margin-bottom: 1.4rem;
+    }
+    #hero h1 mark { background: none; color: var(--green); }
+    .hero-sub {
+      position: relative; z-index: 1;
+      font-size: 1.12rem; color: var(--muted); max-width: 560px; line-height: 1.78; margin-bottom: 2.5rem;
+    }
+    .hero-ctas { position: relative; z-index: 1; display: flex; gap: 1rem; align-items: center; }
+    .btn-primary {
+      background: var(--green); color: #060d08; padding: .9rem 2rem; border-radius: 8px;
+      font-size: .95rem; font-weight: 700; text-decoration: none; transition: opacity .2s, transform .2s;
+    }
+    .btn-primary:hover { opacity: .85; transform: translateY(-2px); }
+    .btn-outline {
+      border: 1px solid var(--border); color: var(--muted); padding: .9rem 2rem;
+      border-radius: 8px; font-size: .95rem; font-weight: 500; text-decoration: none; transition: color .2s, border-color .2s;
+    }
+    .btn-outline:hover { color: var(--text); border-color: var(--muted); }
+    .scroll-cue {
+      position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: .4rem;
+      color: var(--muted); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+      animation: cue 2.4s infinite;
+    }
+    .scroll-cue-bar { width: 1px; height: 36px; background: linear-gradient(to bottom, var(--muted), transparent); }
+    @keyframes cue { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(8px)} }
+
+    /* ─── STATS ──────────────────────────────────────── */
+    .stats {
+      display: flex; justify-content: center;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .stat { flex: 1; max-width: 280px; padding: 2.4rem 2rem; text-align: center; border-right: 1px solid var(--border); }
+    .stat:last-child { border-right: none; }
+    .stat-n { font-size: 2.6rem; font-weight: 800; color: var(--green); line-height: 1; margin-bottom: .35rem; }
+    .stat-l { font-size: .82rem; color: var(--muted); }
+
+    /* ─── SCROLLYTELLING ─────────────────────────────── */
+    #journey { position: relative; }
+    .journey-outer { height: 450vh; position: relative; }
+    .journey-inner {
+      position: sticky; top: 0; height: 100vh; overflow: hidden;
+      display: grid; grid-template-columns: 1fr 1fr;
+    }
+
+    /* LEFT */
+    .j-left {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 4rem 3rem 4rem 5rem; position: relative;
+    }
+    .j-rail { position: absolute; left: 2.6rem; top: 18%; bottom: 18%; width: 2px; background: var(--border); border-radius: 2px; }
+    .j-rail-fill { width: 100%; background: var(--green); border-radius: 2px; transition: height .08s linear; }
+    .j-eyebrow { font-size: .7rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--green); margin-bottom: 2.5rem; }
+
+    .step-dots { display: flex; flex-direction: column; gap: .15rem; margin-bottom: 2.8rem; }
+    .sdot { display: flex; align-items: center; gap: .8rem; padding: .42rem 0; cursor: pointer; }
+    .sdot-circle { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; transition: background .3s, transform .3s; }
+    .sdot.on .sdot-circle { background: var(--green); transform: scale(1.55); }
+    .sdot-lbl { font-size: .76rem; color: var(--muted); font-weight: 500; transition: color .3s; }
+    .sdot.on .sdot-lbl { color: var(--text); }
+
+    .step-wrap { position: relative; min-height: 240px; }
+    .spanel {
+      position: absolute; top: 0; left: 0; width: 100%;
+      opacity: 0; transform: translateY(16px);
+      transition: opacity .45s ease, transform .45s ease; pointer-events: none;
+    }
+    .spanel.on { opacity: 1; transform: none; pointer-events: auto; position: relative; }
+    .spanel-num { font-size: .7rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--green); margin-bottom: .7rem; }
+    .spanel-title { font-size: clamp(1.65rem, 2.8vw, 2.4rem); font-weight: 800; line-height: 1.12; letter-spacing: -.025em; margin-bottom: 1.1rem; }
+    .spanel-desc { font-size: .97rem; color: var(--muted); line-height: 1.8; max-width: 400px; }
+    .spanel-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1.4rem; }
+    .tag {
+      background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.18);
+      color: var(--green); padding: .3rem .8rem; border-radius: 100px; font-size: .74rem; font-weight: 500;
+    }
+
+    /* RIGHT — SVG animation panel */
+    .j-right {
+      position: relative; background: var(--surface); overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .j-right::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 50% 30%, rgba(74,222,128,.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .journey-svg { width: 100%; height: 100%; max-width: 480px; max-height: 680px; }
+
+    /* SVG element states */
+    .node-glow { transition: opacity .5s ease; }
+    .node-stroke { transition: stroke .5s ease, opacity .5s ease; }
+    .signal-ring { transform-origin: center; animation: none; }
+    .signal-ring.animate { animation: ring-out 1.8s ease-out infinite; }
+    @keyframes ring-out {
+      0% { r: 5; opacity: .7; }
+      100% { r: 22; opacity: 0; }
+    }
+    .data-packet { opacity: 0; transition: opacity .4s; }
+    .data-packet.visible { opacity: 1; }
+
+    /* Floating chips beside the SVG */
+    .chip {
+      position: absolute; z-index: 10;
+      background: rgba(11,24,16,.92); border: 1px solid var(--border);
+      border-radius: 8px; padding: .42rem .85rem;
+      font-size: .7rem; font-weight: 500; color: var(--text);
+      backdrop-filter: blur(10px); display: flex; align-items: center; gap: .4rem;
+      opacity: 0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease;
+    }
+    .chip.show { opacity: 1; transform: none; }
+    .cdot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .cdot.t { background: var(--teal); }
+    .c1 { top: 10%; right: 6%; transition-delay: .05s; }
+    .c2 { top: 22%; left: 4%; transition-delay: .2s; }
+    .c3 { bottom: 22%; right: 5%; transition-delay: .12s; }
+    .c4 { bottom: 12%; left: 5%; transition-delay: .28s; }
+
+    /* ─── FEATURES ───────────────────────────────────── */
+    #features { padding: 8rem 5rem; max-width: 1280px; margin: 0 auto; }
+    .sec-head { text-align: center; margin-bottom: 4rem; }
+    .sec-ey { font-size: .7rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--green); display: block; margin-bottom: .9rem; }
+    .sec-h2 { font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.12; }
+
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+    .feat {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem;
+      opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s ease, border-color .3s;
+    }
+    .feat.show { opacity: 1; transform: none; }
+    .feat:hover { border-color: rgba(74,222,128,.28); }
+    .feat-stat { font-size: .68rem; font-weight: 700; color: var(--green); letter-spacing: .06em; text-transform: uppercase; margin-bottom: .55rem; }
+    .feat-highlight {
+      border-color: rgba(74,222,128,.3);
+      background: linear-gradient(140deg, rgba(74,222,128,.07) 0%, var(--surface) 60%);
+    }
+    .feat-ic {
+      width: 42px; height: 42px; border-radius: 10px; background: rgba(74,222,128,.09);
+      display: flex; align-items: center; justify-content: center; margin-bottom: 1.2rem;
+    }
+    .feat-ic svg { width: 20px; height: 20px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .feat-t { font-size: 1.02rem; font-weight: 700; margin-bottom: .5rem; }
+    .feat-d { font-size: .87rem; color: var(--muted); line-height: 1.68; }
+
+    /* ─── CTA ────────────────────────────────────────── */
+    #cta {
+      padding: 9rem 4rem; text-align: center; position: relative; overflow: hidden;
+      border-top: 1px solid var(--border);
+    }
+    #cta::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 55% at 50% 50%, rgba(74,222,128,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    #cta::after {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(74,222,128,.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black, transparent 80%);
+      pointer-events: none;
+    }
+    .cta-inner { max-width: 680px; margin: 0 auto; position: relative; z-index: 1; }
+    #cta h2 { font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; margin-bottom: 1.3rem; }
+    #cta h2 mark { background: none; color: var(--green); }
+    #cta p { font-size: 1.08rem; color: var(--muted); line-height: 1.75; margin-bottom: 2.5rem; }
+
+    /* ─── FOOTER ─────────────────────────────────────── */
+    footer {
+      padding: 2.5rem 5rem; border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .foot-logo { font-size: .9rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .foot-logo b { color: var(--green); }
+    .foot-copy { font-size: .76rem; color: var(--muted); }
+
+    /* ─── PROBLEM / QUOTES ───────────────────────────── */
+    #problem {
+      padding: 7rem 5rem; border-bottom: 1px solid var(--border);
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center;
+      max-width: 1280px; margin: 0 auto;
+    }
+    .prob-left .sec-ey { margin-bottom: 1rem; display: block; }
+    .prob-left h2 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.15; margin-bottom: 1.2rem; }
+    .prob-left p { font-size: 1rem; color: var(--muted); line-height: 1.78; max-width: 420px; }
+    .prob-quotes { display: flex; flex-direction: column; gap: 1.2rem; }
+    .quote-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.6rem 1.8rem; position: relative;
+      transition: border-color .3s, transform .3s;
+    }
+    .quote-card:hover { border-color: rgba(74,222,128,.25); transform: translateY(-2px); }
+    .quote-card::before {
+      content: '\201C'; position: absolute; top: .8rem; left: 1.4rem;
+      font-size: 3rem; line-height: 1; color: var(--green); opacity: .3; font-family: Georgia, serif;
+    }
+    .quote-card::after {
+      content: '\201D'; position: absolute; bottom: .8rem; right: 1.4rem;
+      font-size: 3rem; line-height: 1; color: var(--green); opacity: .3; font-family: Georgia, serif;
+    }
+    .quote-text { font-size: 1rem; line-height: 1.65; color: var(--text); margin-bottom: .9rem; padding-top: .6rem; font-style: italic; }
+    .quote-author { font-size: .78rem; font-weight: 600; color: var(--green); letter-spacing: .04em; }
+    .quote-farm { font-size: .74rem; color: var(--muted); margin-top: .15rem; }
+
+    /* ─── APP SHOWCASE ───────────────────────────────── */
+    #showcase {
+      padding: 8rem 4rem; text-align: center; position: relative; overflow: hidden;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    #showcase::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 20%, rgba(74,222,128,.06) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .showcase-head { position: relative; z-index: 1; margin-bottom: 4rem; }
+    .showcase-head h2 { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.12; margin-bottom: .8rem; }
+    .showcase-head p { font-size: 1rem; color: var(--muted); max-width: 480px; margin: 0 auto; line-height: 1.7; }
+    /* two-phone showcase layout */
+    .showcase-duo {
+      position: relative; z-index: 1;
+      display: flex; align-items: flex-end; justify-content: center;
+      gap: 0; /* phones overlap via margin */
+    }
+    .showcase-phone {
+      width: 260px;
+      aspect-ratio: 9/19.5;
+      background: #070e09;
+      border-radius: 40px;
+      border: 2px solid #253a28;
+      box-shadow: 0 0 0 1px #182c1b, 0 40px 80px rgba(0,0,0,.7), inset 0 0 0 2px rgba(255,255,255,.03);
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+      transition: transform .5s ease;
+    }
+    .showcase-phone.left {
+      transform: perspective(900px) rotateX(4deg) rotateY(12deg) rotateZ(-1.5deg) translateX(28px);
+      z-index: 1;
+    }
+    .showcase-phone.right {
+      transform: perspective(900px) rotateX(4deg) rotateY(-12deg) rotateZ(1.5deg) translateX(-28px);
+      z-index: 2;
+    }
+    .showcase-phone.left:hover  { transform: perspective(900px) rotateX(1deg) rotateY(4deg)  rotateZ(0deg) translateX(20px); }
+    .showcase-phone.right:hover { transform: perspective(900px) rotateX(1deg) rotateY(-4deg) rotateZ(0deg) translateX(-20px); }
+    .showcase-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 90px; height: 26px; background: #070e09; border-radius: 0 0 18px 18px; z-index: 5;
+    }
+    .showcase-screen { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Shared placeholder styles */
+    .showcase-placeholder {
+      width: 100%; height: 100%; display: flex; flex-direction: column;
+      background: #111827; overflow: hidden;
+    }
+    .sp-header { padding: 2.4rem 1.1rem .85rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .sp-eyebrow { font-size: .55rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .25rem; }
+    .sp-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+    .sp-body { flex: 1; padding: .8rem 1.1rem; display: flex; flex-direction: column; gap: .6rem; overflow: hidden; }
+    .sp-card { background: #0d1f10; border: 1px solid #1a2e1d; border-radius: 9px; padding: .75rem; }
+    .sp-lbl { font-size: .54rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .28rem; }
+    .sp-val { font-size: .95rem; font-weight: 700; color: var(--green); }
+    .sp-sub { font-size: .57rem; color: #4b7a5e; margin-top: .12rem; }
+    .sp-rows { display: flex; flex-direction: column; }
+    .sp-row { display: flex; justify-content: space-between; align-items: center; padding: .28rem 0; border-bottom: 1px solid #1a2e1d; font-size: .57rem; }
+    .sp-row:last-child { border-bottom: none; }
+    .sp-day { color: var(--muted); }
+    .sp-amt { font-weight: 600; color: var(--text); }
+    .sp-skip { color: var(--teal); }
+    /* stat pills inside PlotDetails */
+    .sp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .sp-stat { background: #0d1f10; border: 1px solid #1a2e1d; border-radius: 8px; padding: .55rem .65rem; }
+    .sp-stat-n { font-size: .88rem; font-weight: 700; color: var(--green); }
+    .sp-stat-l { font-size: .52rem; color: var(--muted); margin-top: .1rem; }
+    /* Chat screen */
+    .sp-chat { flex: 1; padding: .7rem 1rem; display: flex; flex-direction: column; gap: .5rem; overflow: hidden; }
+    .sp-msg { max-width: 85%; font-size: .58rem; line-height: 1.5; padding: .45rem .65rem; border-radius: 10px; }
+    .sp-msg.user { background: var(--green); color: #060d08; font-weight: 600; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
+    .sp-msg.ai { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: var(--text); align-self: flex-start; border-radius: 10px 10px 10px 2px; }
+    .sp-chat-input {
+      margin: .5rem 1rem .8rem; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px; padding: .45rem .9rem; font-size: .55rem; color: var(--muted);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sp-send { width: 18px; height: 18px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .sp-send svg { width: 9px; height: 9px; fill: #060d08; }
+    /* label under each phone */
+    .phone-label { margin-top: 1rem; font-size: .72rem; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+    /* Floating chips */
+    .showcase-chips { position: absolute; inset: 0; pointer-events: none; }
+    .sc-chip {
+      position: absolute; background: rgba(6,13,8,.92); border: 1px solid var(--border);
+      border-radius: 10px; padding: .48rem .9rem; font-size: .7rem; font-weight: 500;
+      color: var(--text); backdrop-filter: blur(12px);
+      display: flex; align-items: center; gap: .45rem;
+      opacity: 0; transform: translateY(12px);
+      animation: chipin .6s ease forwards;
+    }
+    .sc-chip:nth-child(1) { top: 12%; left: 1%;  animation-delay: .1s; }
+    .sc-chip:nth-child(2) { top: 28%; right: 0%; animation-delay: .25s; }
+    .sc-chip:nth-child(3) { bottom: 28%; left: 0%; animation-delay: .15s; }
+    .sc-chip:nth-child(4) { bottom: 12%; right: 1%; animation-delay: .3s; }
+    @keyframes chipin { to { opacity: 1; transform: translateY(0); } }
+    .sc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .sc-dot.t { background: var(--teal); }
+
+    /* ─── PRICING ────────────────────────────────────── */
+    #pricing { padding: 8rem 5rem; max-width: 1100px; margin: 0 auto; }
+    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 3.5rem; }
+    .price-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+      padding: 2.5rem; transition: border-color .3s, transform .3s;
+    }
+    .price-card:hover { transform: translateY(-4px); }
+    .price-card.featured {
+      border-color: rgba(74,222,128,.4);
+      background: linear-gradient(135deg, rgba(74,222,128,.06) 0%, var(--surface) 60%);
+    }
+    .price-badge {
+      display: inline-block; background: var(--green); color: #060d08;
+      font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      padding: .25rem .75rem; border-radius: 100px; margin-bottom: 1.5rem;
+    }
+    .price-name { font-size: 1.1rem; font-weight: 700; margin-bottom: .4rem; }
+    .price-desc { font-size: .88rem; color: var(--muted); line-height: 1.6; margin-bottom: 2rem; }
+    .price-amount { display: flex; align-items: baseline; gap: .3rem; margin-bottom: .4rem; }
+    .price-num { font-size: 3.2rem; font-weight: 800; letter-spacing: -.04em; color: var(--text); }
+    .price-unit { font-size: .9rem; color: var(--muted); font-weight: 400; }
+    .price-note { font-size: .78rem; color: var(--muted); margin-bottom: 2rem; }
+    .price-divider { border: none; border-top: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .price-features { display: flex; flex-direction: column; gap: .75rem; }
+    .pf { display: flex; align-items: flex-start; gap: .7rem; font-size: .88rem; color: var(--muted); line-height: 1.5; }
+    .pf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; margin-top: .45rem; }
+    .pf strong { color: var(--text); }
+    .price-bundle {
+      margin-top: 1.5rem; border: 1px solid rgba(74,222,128,.3); border-radius: 16px;
+      background: linear-gradient(135deg, rgba(74,222,128,.07) 0%, var(--surface) 60%);
+      padding: 1.8rem 2rem; display: flex; justify-content: space-between; align-items: center; gap: 2rem;
+    }
+    .bundle-label { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: .4rem; }
+    .bundle-desc { font-size: .88rem; color: var(--muted); line-height: 1.6; max-width: 480px; }
+    .bundle-right { display: flex; align-items: center; gap: 1.5rem; flex-shrink: 0; }
+    .bundle-total { font-size: 1.5rem; font-weight: 800; color: var(--text); white-space: nowrap; }
+    .bundle-total span { font-size: .9rem; font-weight: 400; color: var(--muted); }
+
+    /* ─── RESPONSIVE ─────────────────────────────────── */
+    @media (max-width: 960px) {
+      nav { padding: 1.2rem 1.5rem; }
+      .nav-links { display: none; }
+      .journey-inner { grid-template-columns: 1fr; }
+      .j-right { display: none; }
+      .j-left { padding: 3rem 1.5rem 3rem 3rem; }
+      .j-rail { left: 1.2rem; }
+      #problem { grid-template-columns: 1fr; gap: 2.5rem; padding: 4rem 1.5rem; }
+      #showcase { padding: 5rem 1.5rem; }
+      .showcase-duo { flex-direction: column; align-items: center; }
+      .showcase-phone { transform: none !important; width: 220px; }
+      .showcase-phone.left, .showcase-phone.right { transform: none !important; }
+      .showcase-chips { display: none; }
+      #features { padding: 5rem 1.5rem; }
+      .feat-grid { grid-template-columns: 1fr; }
+      #pricing { padding: 5rem 1.5rem; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      #cta { padding: 5rem 1.5rem; }
+      footer { flex-direction: column; gap: 1rem; text-align: center; padding: 2rem 1.5rem; }
+      .stats { flex-wrap: wrap; }
+      .stat { flex: 1 1 140px; border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav id="nav">
+  <a href="#" class="nav-logo">Mira<b>qua</b></a>
+  <ul class="nav-links">
+    <li><a href="#journey">How It Works</a></li>
+    <li><a href="#showcase">App</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <a href="mailto:shreyas@miraqua.com" class="nav-btn">Request Demo</a>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section id="hero">
+  <div class="hero-pill"><div class="pulse"></div>Early access open</div>
+  <h1>Smart irrigation,<br><mark>made simple</mark></h1>
+  <p class="hero-sub">Farms waste water on fixed schedules that never adapt. Miraqua gives every crop real-time, data-driven irrigation — automatically.</p>
+  <div class="hero-ctas">
+    <a href="#journey" class="btn-primary">See How It Works</a>
+    <a href="#features" class="btn-outline">View Features</a>
+  </div>
+  <div class="scroll-cue">Scroll<div class="scroll-cue-bar"></div></div>
+</section>
+
+<!-- ═══ STATS ═══ -->
+<div class="stats">
+  <div class="stat"><div class="stat-n">15–30%</div><div class="stat-l">Less water used</div></div>
+  <div class="stat"><div class="stat-n">10–30%</div><div class="stat-l">Higher yields</div></div>
+  <div class="stat"><div class="stat-n">1 season</div><div class="stat-l">ROI payback period</div></div>
+</div>
+
+<!-- ═══ PROBLEM / QUOTES ═══ -->
+<div style="border-bottom:1px solid var(--border);">
+  <section id="problem">
+    <div class="prob-left">
+      <span class="sec-ey">The Problem</span>
+      <h2>Farms still irrigate<br>on gut feel</h2>
+      <p>Most farms rely on fixed schedules and manual decisions that never account for real weather, soil conditions, or crop stage — wasting 30–60% of their water in the process.</p>
+    </div>
+    <div class="prob-quotes">
+      <div class="quote-card">
+        <p class="quote-text">We adjust irrigation manually every day. It takes hours and we still get it wrong when the weather changes.</p>
+        <div class="quote-author">Cindy LashBrook</div>
+        <div class="quote-farm">Family Farm Owner, Central Valley CA</div>
+      </div>
+      <div class="quote-card">
+        <p class="quote-text">I stick my hand into the dirt to figure out if I need to water. There's no better way to know.</p>
+        <div class="quote-author">Chavez Family Farm</div>
+        <div class="quote-farm">Specialty Crop Grower, Fresno CA</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══ JOURNEY SCROLLYTELLING ═══ -->
+<section id="journey">
+  <div class="journey-outer">
+    <div class="journey-inner">
+
+      <!-- LEFT: steps -->
+      <div class="j-left">
+        <div class="j-rail"><div class="j-rail-fill" id="jfill"></div></div>
+        <p class="j-eyebrow">How It Works</p>
+
+        <div class="step-dots" id="sdots">
+          <div class="sdot on" data-s="0"><div class="sdot-circle"></div><span class="sdot-lbl">Valves &amp; soil sensors</span></div>
+          <div class="sdot" data-s="1"><div class="sdot-circle"></div><span class="sdot-lbl">Crop model + live data</span></div>
+          <div class="sdot" data-s="2"><div class="sdot-circle"></div><span class="sdot-lbl">Farmer knowledge layer</span></div>
+          <div class="sdot" data-s="3"><div class="sdot-circle"></div><span class="sdot-lbl">Automatic execution</span></div>
+        </div>
+
+        <div class="step-wrap">
+          <div class="spanel on" id="sp0">
+            <p class="spanel-num">Step 01</p>
+            <h2 class="spanel-title">Valves and soil sensors in the field</h2>
+            <p class="spanel-desc">Miraqua's solar-powered controller connects to your existing valves and reads soil moisture directly from in-ground sensors — giving you real conditions, not estimates.</p>
+            <div class="spanel-tags">
+              <span class="tag">Soil sensors</span><span class="tag">Existing valves</span>
+              <span class="tag">Solar powered</span><span class="tag">No wiring</span>
+            </div>
+          </div>
+          <div class="spanel" id="sp1">
+            <p class="spanel-num">Step 02</p>
+            <h2 class="spanel-title">Researched crop model meets live data</h2>
+            <p class="spanel-desc">Sensor readings combine with live weather and evapotranspiration data. Researched crop modeling formulas — based on FAO and USDA agronomy — compute the exact water demand for your crop's current growth stage.</p>
+            <div class="spanel-tags">
+              <span class="tag">ET&#8320; model</span><span class="tag">Crop coefficients</span>
+              <span class="tag">FAO &amp; USDA formulas</span><span class="tag">Live weather</span>
+            </div>
+          </div>
+          <div class="spanel" id="sp2">
+            <p class="spanel-num">Step 03</p>
+            <h2 class="spanel-title">Farmer knowledge shapes the final plan</h2>
+            <p class="spanel-desc">Farmers know their crops better than any model. Your inputs and preferences pass through an AI layer that adapts the recommendation — so the plan reflects your expertise, not just the numbers.</p>
+            <div class="spanel-tags">
+              <span class="tag">Farmer preferences</span><span class="tag">AI adaptation</span>
+              <span class="tag">Per-zone plan</span><span class="tag">Skip on rain</span>
+            </div>
+          </div>
+          <div class="spanel" id="sp3">
+            <p class="spanel-num">Step 04</p>
+            <h2 class="spanel-title">Automatic execution — or just ask</h2>
+            <p class="spanel-desc">Miraqua executes the plan automatically through your existing valves and systems. Or use the AI assistant for real-time control: "Skip tomorrow" or "What changed this week?" — answered instantly.</p>
+            <div class="spanel-tags">
+              <span class="tag">Automatic execution</span><span class="tag">Existing systems</span>
+              <span class="tag">AI assistant</span><span class="tag">Natural language</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: animated SVG journey -->
+      <div class="j-right" id="jright">
+
+        <!-- Chips -->
+        <div class="chip c1" id="ch1"><div class="cdot"></div>ET&#8320;: 5.2 mm/day</div>
+        <div class="chip c2" id="ch2"><div class="cdot t"></div>Satellite link: active</div>
+        <div class="chip c3" id="ch3"><div class="cdot"></div>Soil: 34% moisture</div>
+        <div class="chip c4" id="ch4"><div class="cdot t"></div>Saved: 280 gal today</div>
+
+        <svg class="journey-svg" viewBox="0 0 480 680" fill="none" xmlns="http://www.w3.org/2000/svg" id="jsvg">
+          <defs>
+            <radialGradient id="spaceGrad" cx="50%" cy="20%" r="55%">
+              <stop offset="0%" stop-color="#0a1f0c"/>
+              <stop offset="100%" stop-color="#060d08"/>
+            </radialGradient>
+            <radialGradient id="satGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#4ade80" stop-opacity=".18"/>
+              <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="farmGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#4ade80" stop-opacity=".12"/>
+              <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="phoneGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#4ade80" stop-opacity=".15"/>
+              <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="blur4"><feGaussianBlur stdDeviation="4"/></filter>
+            <filter id="blur8"><feGaussianBlur stdDeviation="8"/></filter>
+            <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+          </defs>
+
+          <!-- Background -->
+          <rect width="480" height="680" fill="url(#spaceGrad)"/>
+
+          <!-- Stars -->
+          <circle cx="42"  cy="28"  r="1.2" fill="white" opacity=".35"/>
+          <circle cx="105" cy="15"  r=".8"  fill="white" opacity=".25"/>
+          <circle cx="158" cy="44"  r="1"   fill="white" opacity=".3"/>
+          <circle cx="210" cy="22"  r=".7"  fill="#4ade80" opacity=".4"/>
+          <circle cx="290" cy="38"  r="1.1" fill="white" opacity=".28"/>
+          <circle cx="340" cy="12"  r=".9"  fill="white" opacity=".22"/>
+          <circle cx="400" cy="50"  r="1"   fill="white" opacity=".32"/>
+          <circle cx="440" cy="25"  r=".7"  fill="#2dd4bf" opacity=".3"/>
+          <circle cx="70"  cy="95"  r=".8"  fill="white" opacity=".2"/>
+          <circle cx="420" cy="105" r=".9"  fill="white" opacity=".18"/>
+          <circle cx="22"  cy="140" r=".7"  fill="#4ade80" opacity=".25"/>
+          <circle cx="460" cy="160" r="1"   fill="white" opacity=".15"/>
+          <circle cx="130" cy="75"  r=".6"  fill="white" opacity=".3"/>
+          <circle cx="375" cy="80"  r=".8"  fill="white" opacity=".22"/>
+          <circle cx="260" cy="60"  r=".6"  fill="white" opacity=".2"/>
+
+          <!-- Atmosphere horizon line -->
+          <path d="M 0,420 Q 240,395 480,418" stroke="#182c1b" stroke-width="1" opacity=".5"/>
+          <path d="M 0,440 Q 240,418 480,438" stroke="#182c1b" stroke-width=".5" opacity=".3"/>
+
+          <!-- Atmosphere glow behind satellite -->
+          <ellipse id="satGlowEl" cx="240" cy="95" rx="80" ry="60" fill="url(#satGlow)" opacity="0" class="node-glow" filter="url(#blur8)"/>
+
+          <!-- ── SATELLITE ──────────────────── -->
+          <g id="satellite" transform="translate(240,95)">
+            <!-- glow blob -->
+            <ellipse cx="0" cy="0" rx="55" ry="40" fill="url(#satGlow)" opacity="0" id="satBlob" filter="url(#blur4)"/>
+            <!-- left solar panel -->
+            <rect x="-78" y="-7" width="58" height="14" rx="2.5" fill="#0a2240" stroke="#2dd4bf" stroke-width="1.2" id="satPanelL"/>
+            <line x1="-60" y1="-7" x2="-60" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <line x1="-42" y1="-7" x2="-42" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <line x1="-24" y1="-7" x2="-24" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <!-- right solar panel -->
+            <rect x="20" y="-7" width="58" height="14" rx="2.5" fill="#0a2240" stroke="#2dd4bf" stroke-width="1.2" id="satPanelR"/>
+            <line x1="38" y1="-7" x2="38" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <line x1="56" y1="-7" x2="56" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <line x1="74" y1="-7" x2="74" y2="7" stroke="#2dd4bf" stroke-width=".6" opacity=".6"/>
+            <!-- body -->
+            <rect x="-20" y="-12" width="40" height="24" rx="4" fill="#0b1810" stroke="#4ade80" stroke-width="1.5" id="satBody"/>
+            <!-- LED row -->
+            <circle cx="-10" cy="0" r="2" fill="#4ade80" opacity=".5" id="satLed1"/>
+            <circle cx="0"   cy="0" r="2" fill="#4ade80" opacity=".8" id="satLed2"/>
+            <circle cx="10"  cy="0" r="2" fill="#4ade80" opacity=".5" id="satLed3"/>
+            <!-- antenna -->
+            <line x1="0" y1="-12" x2="0" y2="-32" stroke="#4ade80" stroke-width="1" id="satAntenna"/>
+            <!-- dish -->
+            <circle cx="0" cy="-35" r="5" fill="none" stroke="#4ade80" stroke-width="1.2" id="satDish"/>
+            <!-- signal rings (animate when satellite active) -->
+            <circle cx="0" cy="-35" r="5"  fill="none" stroke="#4ade80" stroke-width=".8" opacity="0" id="satRing1" class="signal-ring"/>
+            <circle cx="0" cy="-35" r="5"  fill="none" stroke="#4ade80" stroke-width=".6" opacity="0" id="satRing2" class="signal-ring"/>
+          </g>
+
+          <!-- ── GROUND / TERRAIN ───────────── -->
+          <!-- Sky-to-ground gradient strip -->
+          <rect x="0" y="430" width="480" height="250" fill="#0c1810" opacity=".6"/>
+          <!-- Terrain surface -->
+          <path d="M 0,545 Q 60,535 120,542 Q 200,551 280,540 Q 360,530 480,545 L 480,680 L 0,680 Z" fill="#0d1f10" stroke="#1a3020" stroke-width="1"/>
+
+          <!-- Farm glow -->
+          <ellipse id="farmGlowEl" cx="185" cy="548" rx="90" ry="50" fill="url(#farmGlow)" opacity="0" class="node-glow" filter="url(#blur8)"/>
+
+          <!-- Underground pipes -->
+          <line x1="40"  y1="578" x2="230" y2="578" stroke="#182c1b" stroke-width="2" stroke-dasharray="6,4"/>
+          <line x1="40"  y1="592" x2="230" y2="592" stroke="#182c1b" stroke-width="1.5" stroke-dasharray="6,4" opacity=".5"/>
+          <!-- vertical drops from surface to pipe -->
+          <line x1="90"  y1="555" x2="90"  y2="578" stroke="#182c1b" stroke-width="1.5"/>
+          <line x1="160" y1="551" x2="160" y2="578" stroke="#182c1b" stroke-width="1.5"/>
+
+          <!-- ── VALVE A (left) ─────────────── -->
+          <g id="valveA" transform="translate(90,545)">
+            <!-- pipe cap glow -->
+            <circle cx="0" cy="0" r="20" fill="#4ade80" opacity="0" id="vAglow" filter="url(#blur4)" class="node-glow"/>
+            <!-- horizontal pipe segment -->
+            <line x1="-22" y1="8" x2="22" y2="8" stroke="#253a28" stroke-width="4" stroke-linecap="round"/>
+            <!-- valve body -->
+            <rect x="-9" y="2" width="18" height="12" rx="2" fill="#0c1810" stroke="#4ade80" stroke-width="1.4" id="vABody"/>
+            <!-- valve wheel -->
+            <circle cx="0" cy="-5" r="9" fill="none" stroke="#4ade80" stroke-width="1.4" id="vAWheel"/>
+            <line x1="-9" y1="-5" x2="9" y2="-5" stroke="#4ade80" stroke-width="1" id="vAWheelH"/>
+            <line x1="0" y1="-14" x2="0" y2="4" stroke="#4ade80" stroke-width="1" id="vAStem"/>
+            <!-- water flow dots (animated when valve open) -->
+            <circle cx="-14" cy="8" r="2" fill="#4ade80" opacity="0" id="vAFlow1" class="water-drop"/>
+            <circle cx="0"   cy="8" r="2" fill="#4ade80" opacity="0" id="vAFlow2" class="water-drop"/>
+            <circle cx="14"  cy="8" r="2" fill="#4ade80" opacity="0" id="vAFlow3" class="water-drop"/>
+          </g>
+
+          <!-- ── SOLAR CONTROLLER ───────────── -->
+          <g id="controller" transform="translate(185,525)">
+            <!-- glow -->
+            <circle cx="0" cy="0" r="40" fill="#4ade80" opacity="0" id="ctrlGlow" filter="url(#blur8)" class="node-glow"/>
+            <!-- post -->
+            <rect x="-3" y="15" width="6" height="38" rx="2" fill="#1a3020" id="ctrlPost"/>
+            <!-- controller box -->
+            <rect x="-22" y="-20" width="44" height="34" rx="5" fill="#0b1810" stroke="#4ade80" stroke-width="1.5" id="ctrlBox"/>
+            <!-- screen inside box -->
+            <rect x="-14" y="-14" width="28" height="14" rx="2" fill="#060d08" id="ctrlScreen"/>
+            <!-- LED dots on screen -->
+            <circle cx="-8" cy="-7" r="2.5" fill="#4ade80" opacity=".7" id="cLed1"/>
+            <circle cx="0"  cy="-7" r="2.5" fill="#4ade80" opacity=".4" id="cLed2"/>
+            <circle cx="8"  cy="-7" r="2.5" fill="#22c55e" opacity=".5" id="cLed3"/>
+            <!-- status bar in box -->
+            <rect x="-14" y="2" width="18" height="3" rx="1" fill="#4ade80" opacity=".4"/>
+            <!-- solar panel (tilted, above box) -->
+            <rect x="-22" y="-46" width="44" height="22" rx="3" fill="#0a2240" stroke="#2dd4bf" stroke-width="1.2" transform="rotate(-8, 0, -35)" id="solar"/>
+            <!-- panel grid -->
+            <line x1="-8" y1="-51" x2="-5" y2="-28" stroke="#2dd4bf" stroke-width=".7" opacity=".6" transform="rotate(-8,0,-35)"/>
+            <line x1="6"  y1="-51" x2="9"  y2="-28" stroke="#2dd4bf" stroke-width=".7" opacity=".6" transform="rotate(-8,0,-35)"/>
+            <line x1="-22" y1="-39" x2="22" y2="-41" stroke="#2dd4bf" stroke-width=".7" opacity=".5" transform="rotate(-8,0,-35)"/>
+            <!-- wireless signal rings from controller -->
+            <circle cx="22" cy="-5" r="6"  fill="none" stroke="#4ade80" stroke-width=".8" opacity="0" id="ctrlSig1" class="signal-ring"/>
+            <circle cx="22" cy="-5" r="12" fill="none" stroke="#4ade80" stroke-width=".6" opacity="0" id="ctrlSig2" class="signal-ring"/>
+          </g>
+
+          <!-- ── PHONE ──────────────────────── -->
+          <g id="phone" transform="translate(370,530)">
+            <!-- glow -->
+            <ellipse cx="0" cy="20" rx="40" ry="30" fill="url(#phoneGlow)" opacity="0" id="phoneGlow" filter="url(#blur8)" class="node-glow"/>
+            <!-- frame shadow -->
+            <rect x="-26" y="-52" width="52" height="96" rx="11" fill="#060d08" opacity=".6" transform="translate(3,4)"/>
+            <!-- phone frame -->
+            <rect x="-26" y="-52" width="52" height="96" rx="11" fill="#0b1810" stroke="#4ade80" stroke-width="1.5" id="phoneFrame"/>
+            <!-- notch -->
+            <rect x="-10" y="-52" width="20" height="9" rx="4" fill="#0b1810"/>
+            <!-- screen area -->
+            <rect x="-20" y="-42" width="40" height="80" rx="5" fill="#060d08" id="phoneScreen"/>
+            <!-- app content: header -->
+            <rect x="-16" y="-38" width="32" height="8" rx="2" fill="#0d1f10"/>
+            <rect x="-16" y="-38" width="18" height="3" rx="1" fill="#4ade80" opacity=".6" transform="translate(0,2)"/>
+            <!-- schedule rows -->
+            <rect x="-16" y="-26" width="32" height="6" rx="1.5" fill="#0d1f10"/>
+            <rect x="-16" y="-26" width="22" height="6" rx="1.5" fill="#4ade80" opacity=".25"/>
+            <rect x="-16" y="-17" width="32" height="6" rx="1.5" fill="#0d1f10"/>
+            <rect x="-16" y="-17" width="28" height="6" rx="1.5" fill="#4ade80" opacity=".2"/>
+            <rect x="-16" y="-8"  width="32" height="6" rx="1.5" fill="#0d1f10"/>
+            <rect x="-16" y="-8"  width="12" height="6" rx="1.5" fill="#2dd4bf" opacity=".3"/>
+            <!-- big number (gallons) -->
+            <rect x="-16" y="5" width="32" height="20" rx="3" fill="#0d1f10"/>
+            <rect x="-14" y="7" width="28" height="3" rx="1" fill="#4ade80" opacity=".5"/>
+            <rect x="-14" y="12" width="20" height="3" rx="1" fill="#4ade80" opacity=".3"/>
+            <rect x="-14" y="17" width="14" height="3" rx="1" fill="#4ade80" opacity=".2"/>
+            <!-- bottom action bar -->
+            <rect x="-20" y="30" width="40" height="8" rx="3" fill="#4ade80" opacity=".12"/>
+            <rect x="-6" y="32" width="12" height="4" rx="1" fill="#4ade80" opacity=".5"/>
+          </g>
+
+          <!-- ── JOURNEY PATH (outgoing: controller → satellite → phone) ── -->
+          <path id="jpathBg"
+            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            stroke="#1a3020" stroke-width="2" stroke-dasharray="8,6" opacity=".4"/>
+
+          <path id="jpath"
+            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            stroke="#4ade80" stroke-width="2.5" stroke-linecap="round"
+            stroke-dasharray="1000" stroke-dashoffset="1000"
+            filter="url(#blur2)" opacity=".9"/>
+
+          <path id="jpathCrisp"
+            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            stroke="#4ade80" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="1000" stroke-dashoffset="1000" opacity=".7"/>
+
+          <!-- ── RETURN PATH (phone → satellite → controller, teal, offset arc) ── -->
+          <path id="jreturnBg"
+            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            stroke="#1a3020" stroke-width="1.5" stroke-dasharray="6,5" opacity=".3"/>
+
+          <path id="jreturn"
+            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            stroke="#2dd4bf" stroke-width="2" stroke-linecap="round"
+            stroke-dasharray="1000" stroke-dashoffset="1000"
+            filter="url(#blur2)" opacity=".8"/>
+
+          <path id="jreturnCrisp"
+            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            stroke="#2dd4bf" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="5,4"
+            stroke-dashoffset="1000" opacity=".6"/>
+
+          <!-- Outgoing data packets (green, controller → phone) -->
+          <circle r="4" fill="#4ade80" opacity="0" id="pkt1">
+            <animateMotion dur="3s" repeatCount="indefinite" begin="0s">
+              <mpath href="#jpath"/>
+            </animateMotion>
+          </circle>
+          <circle r="2.5" fill="#4ade80" opacity="0" id="pkt2">
+            <animateMotion dur="3s" repeatCount="indefinite" begin="1.5s">
+              <mpath href="#jpath"/>
+            </animateMotion>
+          </circle>
+
+          <!-- Return data packets (teal, phone → controller) -->
+          <circle r="3.5" fill="#2dd4bf" opacity="0" id="rpkt1">
+            <animateMotion dur="3.2s" repeatCount="indefinite" begin="0s">
+              <mpath href="#jreturn"/>
+            </animateMotion>
+          </circle>
+          <circle r="2" fill="#2dd4bf" opacity="0" id="rpkt2">
+            <animateMotion dur="3.2s" repeatCount="indefinite" begin="1.6s">
+              <mpath href="#jreturn"/>
+            </animateMotion>
+          </circle>
+
+          <!-- Connection dots at endpoints -->
+          <circle cx="185" cy="505" r="5" fill="#4ade80" opacity=".3" id="dotCtrl"/>
+          <circle cx="240" cy="60"  r="5" fill="#4ade80" opacity=".3" id="dotSat"/>
+          <circle cx="370" cy="478" r="5" fill="#4ade80" opacity=".3" id="dotPhone"/>
+
+        </svg>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ APP SHOWCASE ═══ -->
+<section id="showcase">
+  <div class="showcase-head">
+    <span class="sec-ey">The App</span>
+    <h2>Your farm's daily brief,<br>before sunrise</h2>
+    <p>A clear recommendation every morning — irrigate, skip, or adjust. One tap to execute, or let it run automatically.</p>
+  </div>
+
+  <div style="position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:0;">
+
+
+    <div class="showcase-duo">
+
+      <!-- Phone 1: Plot Details (matches actual app light theme) -->
+      <!-- SWAP: <img src="plot-details-screenshot.png" class="showcase-screen"> inside the phone div -->
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="showcase-phone left">
+          <div class="showcase-notch"></div>
+          <div style="width:100%;height:100%;background:#111827;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;">
+            <!-- Header -->
+            <div style="background:#111827;padding:1.7rem .75rem .45rem;display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:.45rem;">
+                <div style="font-size:1.35rem;line-height:1;">&#127807;</div>
+                <div>
+                  <div style="font-size:.72rem;font-weight:700;color:white;letter-spacing:-.01em;">Tomato Plot</div>
+                  <div style="font-size:.46rem;color:rgba(255,255,255,.55);margin-top:.1rem;">Cherry Roma &nbsp;&#183;&nbsp; Sweet 100</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:.25rem;background:rgba(26,161,121,.15);border:1px solid rgba(26,161,121,.35);border-radius:20px;padding:.18rem .45rem;">
+                <div style="width:4px;height:4px;border-radius:50%;background:#1aa179;"></div>
+                <span style="font-size:.4rem;font-weight:600;color:#1aa179;">AI Active</span>
+              </div>
+            </div>
+
+            <div style="flex:1;overflow:hidden;padding:0 .6rem .45rem;display:flex;flex-direction:column;gap:.38rem;">
+
+              <!-- Hero card -->
+              <div style="background:rgba(255,255,255,.05);border-radius:10px;overflow:hidden;">
+                <div style="background:rgba(26,161,121,.15);border-bottom:1px solid rgba(26,161,121,.2);padding:.5rem;display:flex;flex-direction:column;align-items:center;">
+                  <div style="width:1.8rem;height:1.8rem;border-radius:50%;background:rgba(26,161,121,.25);border:1.5px solid rgba(26,161,121,.5);display:flex;align-items:center;justify-content:center;font-size:.75rem;margin-bottom:.25rem;">&#127807;</div>
+                  <div style="font-size:.65rem;font-weight:800;color:white;letter-spacing:-.02em;">Tomato Plot</div>
+                  <div style="font-size:.44rem;color:#9CA3AF;margin-top:.1rem;">Tomatoes &nbsp;&#183;&nbsp; Sweet 100</div>
+                </div>
+                <div style="display:flex;padding:.4rem;">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.1rem;">
+                    <div style="font-size:.55rem;">&#10084;&#65039;</div>
+                    <div style="font-size:.65rem;font-weight:700;color:white;">84%</div>
+                    <div style="font-size:.4rem;color:rgba(255,255,255,.55);">Health</div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.1rem;">
+                    <div style="font-size:.55rem;">&#128197;</div>
+                    <div style="font-size:.65rem;font-weight:700;color:white;">6w</div>
+                    <div style="font-size:.4rem;color:rgba(255,255,255,.55);">Crop Age</div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.1rem;">
+                    <div style="font-size:.55rem;">&#128167;</div>
+                    <div style="font-size:.65rem;font-weight:700;color:white;">22%</div>
+                    <div style="font-size:.4rem;color:rgba(255,255,255,.55);">Water Saved</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Insights -->
+              <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.22);border-radius:10px;padding:.5rem .6rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem;">
+                  <div style="display:flex;align-items:center;gap:.28rem;">
+                    <span style="font-size:.6rem;">&#10024;</span>
+                    <span style="font-size:.58rem;font-weight:600;color:white;">AI Insights</span>
+                  </div>
+                  <span style="font-size:.52rem;color:rgba(255,255,255,.35);">&#8635;</span>
+                </div>
+                <div style="font-size:.46rem;color:rgba(255,255,255,.85);line-height:1.55;">Tomatoes entering fruit set — a critical hydration window. At 62% moisture &amp; ET&#8320; of 6.1 mm/day, today's 420 gal run is optimal. Thursday skipped — 0.6&#8243; rain incoming. Adjust Friday if soil stays above 70%.</div>
+              </div>
+
+              <!-- Schedule card -->
+              <div style="background:rgba(255,255,255,.05);border-radius:10px;overflow:hidden;">
+                <div style="background:rgba(26,161,121,.12);border-bottom:1px solid rgba(26,161,121,.2);padding:.42rem .55rem;display:flex;align-items:center;gap:.35rem;">
+                  <div style="width:1.25rem;height:1.25rem;border-radius:5px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:.52rem;">&#128197;</div>
+                  <div style="flex:1;">
+                    <div style="font-size:.56rem;font-weight:700;color:white;">Next 2 Weeks</div>
+                    <div style="font-size:.4rem;color:rgba(255,255,255,.65);">Optimized Schedule</div>
+                  </div>
+                  <span style="font-size:.55rem;color:rgba(255,255,255,.45);">&#8250;</span>
+                </div>
+                <div style="padding:.42rem .5rem .38rem;">
+                  <!-- Day headers -->
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:.28rem;">
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Sun</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Mon</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Tue</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Wed</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Thu</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Fri</div>
+                    <div style="text-align:center;font-size:.38rem;font-weight:600;color:rgba(255,255,255,.5);">Sat</div>
+                  </div>
+                  <!-- Week 1: Apr 13–19, today=Fri Apr 18 -->
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:.18rem;margin-bottom:.2rem;">
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">13</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">14</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">15</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">16</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">17</div>
+                    </div>
+                    <!-- TODAY -->
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(16,185,129,.2);border:2px solid #1aa179;">
+                      <div style="font-size:.44rem;font-weight:700;color:#1aa179;">18</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">19</div>
+                    </div>
+                  </div>
+                  <!-- Week 2: Apr 20–26 -->
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:.18rem;margin-bottom:.32rem;">
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">20</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">21</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">22</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">23</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">24</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">25</div>
+                    </div>
+                    <div style="text-align:center;padding:.27rem .05rem;border-radius:5px;background:rgba(59,130,246,.2);border:1px solid #3B82F6;">
+                      <div style="font-size:.44rem;font-weight:700;color:white;">26</div>
+                      <div style="font-size:.36rem;color:#3B82F6;">&#128167;</div>
+                    </div>
+                  </div>
+                  <!-- Legend -->
+                  <div style="display:flex;gap:.55rem;">
+                    <div style="display:flex;align-items:center;gap:.18rem;">
+                      <div style="width:.5rem;height:.5rem;background:rgba(16,185,129,.2);border:2px solid #1aa179;border-radius:2px;"></div>
+                      <span style="font-size:.38rem;color:rgba(255,255,255,.6);">Today</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:.18rem;">
+                      <div style="width:.5rem;height:.5rem;background:rgba(59,130,246,.2);border:2px solid #3B82F6;border-radius:2px;"></div>
+                      <span style="font-size:.38rem;color:rgba(255,255,255,.6);">Scheduled</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:.18rem;">
+                      <div style="width:.5rem;height:.5rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:2px;"></div>
+                      <span style="font-size:.38rem;color:rgba(255,255,255,.6);">Available</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sensor grid -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.38rem;">
+                <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:.5rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.32rem;">
+                    <div style="width:1.4rem;height:1.4rem;border-radius:6px;background:rgba(59,130,246,.1);display:flex;align-items:center;justify-content:center;font-size:.55rem;">&#128167;</div>
+                    <div style="background:rgba(255,255,255,.1);border-radius:3px;padding:.08rem .28rem;font-size:.36rem;color:white;">optimal</div>
+                  </div>
+                  <div style="font-size:.9rem;font-weight:700;color:white;">62%</div>
+                  <div style="font-size:.42rem;color:#9CA3AF;margin-top:.12rem;">Soil Moisture</div>
+                  <div style="font-size:.38rem;color:#6B7280;margin-top:.18rem;">2 min ago</div>
+                </div>
+                <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:.5rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.32rem;">
+                    <div style="width:1.4rem;height:1.4rem;border-radius:6px;background:rgba(245,158,11,.1);display:flex;align-items:center;justify-content:center;font-size:.55rem;">&#127777;&#65039;</div>
+                    <div style="background:rgba(255,255,255,.1);border-radius:3px;padding:.08rem .28rem;font-size:.36rem;color:white;">optimal</div>
+                  </div>
+                  <div style="font-size:.9rem;font-weight:700;color:white;">71°F</div>
+                  <div style="font-size:.42rem;color:#9CA3AF;margin-top:.12rem;">Temperature</div>
+                  <div style="font-size:.38rem;color:#6B7280;margin-top:.18rem;">1 min ago</div>
+                </div>
+              </div>
+
+              <!-- Bottom buttons -->
+              <div style="display:flex;gap:.45rem;margin-top:auto;">
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:.28rem;background:rgba(26,161,121,.08);border:1px solid rgba(26,161,121,.25);border-radius:8px;padding:.45rem .3rem;">
+                  <span style="font-size:.52rem;">&#128172;</span>
+                  <span style="font-size:.5rem;font-weight:600;color:#1aa179;">Ask Miraqua</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:.28rem;background:#1aa179;border-radius:8px;padding:.45rem .3rem;">
+                  <span style="font-size:.52rem;">&#128167;</span>
+                  <span style="font-size:.5rem;font-weight:600;color:white;">Water Now</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <div class="phone-label">Plot Details</div>
+      </div>
+
+      <!-- Phone 2: Chat / AI Assistant -->
+      <!-- SWAP: <img src="chat-screenshot.png" class="showcase-screen"> inside the phone div -->
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="showcase-phone right">
+          <div class="showcase-notch"></div>
+          <div class="showcase-placeholder">
+            <div class="sp-header">
+              <div class="sp-eyebrow">AI Assistant</div>
+              <div class="sp-title">Miraqua Chat</div>
+            </div>
+            <div class="sp-chat">
+              <div class="sp-msg user">Skip watering tomorrow</div>
+              <div class="sp-msg ai">Done — Zone 1 is cancelled for Tuesday. Soil is at 42% so you're in good shape to wait.</div>
+              <div class="sp-msg user">What's my plan this week?</div>
+              <div class="sp-msg ai">Mon: 420 gal &nbsp;·&nbsp; Tue: skipped (your request) &nbsp;·&nbsp; Wed: 380 gal &nbsp;·&nbsp; Thu: skipped (rain) &nbsp;·&nbsp; Fri: 290 gal. You're on track to save ~18% vs last week.</div>
+              <div class="sp-msg user">Why did it rain-skip Thursday?</div>
+              <div class="sp-msg ai">0.6&Prime; of rain forecast — enough to cover Thursday's ET&#8320; demand. I'll check Friday morning and adjust if the soil needs it.</div>
+            </div>
+            <div class="sp-chat-input">
+              <span>Ask anything about your farm…</span>
+              <div class="sp-send"><svg viewBox="0 0 10 10"><path d="M1 5h8M6 2l3 3-3 3" stroke="#060d08" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-label">AI Assistant</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="sec-head">
+    <span class="sec-ey">What you get</span>
+    <h2 class="sec-h2">Everything a farm needs.<br>Nothing it doesn't.</h2>
+  </div>
+
+  <div class="feat-grid">
+
+    <div class="feat">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div class="feat-stat">Every morning, automatically</div>
+      <div class="feat-t">A new plan before you wake up</div>
+      <div class="feat-d">Every morning, Miraqua rebuilds your irrigation plan from scratch using fresh weather, soil, and crop data. Rain coming? Skipped. Heat spike? Volume adjusted. You never touch a schedule again.</div>
+    </div>
+
+    <div class="feat">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="feat-stat">Knows your crop's growth stage</div>
+      <div class="feat-t">Irrigation that understands plants</div>
+      <div class="feat-d">A tomato in flowering needs different water than one just sprouted. Miraqua tracks growth stage and adjusts crop coefficients automatically — so every gallon lands when it has the most impact on yield.</div>
+    </div>
+
+    <div class="feat">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="feat-stat">No learning curve</div>
+      <div class="feat-t">Just talk to it</div>
+      <div class="feat-d">"Skip Zone 2 tomorrow" or "Why did it irrigate twice this week?" — the AI responds like a farm advisor who's always available. No dashboards to learn, no settings to dig through.</div>
+    </div>
+
+    <div class="feat">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+      <div class="feat-stat">No new infrastructure needed</div>
+      <div class="feat-t">Installs on your existing valves</div>
+      <div class="feat-d">Solar-powered controller, no electrician, no trenching. Attaches to the valves you already have in an afternoon. Not ready for hardware? The software works standalone from day one.</div>
+    </div>
+
+    <div class="feat feat-highlight">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div class="feat-stat">10–20 hours back every week</div>
+      <div class="feat-t">Stop managing irrigation manually</div>
+      <div class="feat-d">Checking soil by hand, adjusting schedules, reacting to weather — it adds up fast. Miraqua monitors, decides, and executes automatically. Most farmers reclaim a full work day every week.</div>
+    </div>
+
+    <div class="feat">
+      <div class="feat-ic"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div class="feat-stat">ROI before the season ends</div>
+      <div class="feat-t">Pays for itself in water savings</div>
+      <div class="feat-d">$10/acre/month — most farms recover the full cost of software and hardware through reduced water bills alone before harvest. No long-term contracts. ~70% gross margins. Cancel anytime.</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ PRICING ═══ -->
+<section id="pricing">
+  <div class="sec-head">
+    <span class="sec-ey">Pricing</span>
+    <h2 class="sec-h2">Simple, transparent pricing</h2>
+  </div>
+  <div class="pricing-grid">
+
+    <div class="price-card featured">
+      <div class="price-badge">Software — recurring</div>
+      <div class="price-name">Miraqua Intelligence</div>
+      <div class="price-desc">The decision engine. Pulls live weather, soil, and crop data daily and outputs a precise irrigation plan for every zone — with AI assistant included.</div>
+      <div class="price-amount">
+        <span class="price-num">$10</span>
+        <span class="price-unit">/ acre / month</span>
+      </div>
+      <div class="price-note">Billed monthly &nbsp;&middot;&nbsp; Cancel anytime</div>
+      <hr class="price-divider">
+      <div class="price-features">
+        <div class="pf"><div class="pf-dot"></div><span>Daily irrigation plan, <strong>per zone</strong></span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Live weather + ET&#8320; integration</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>FAO/USDA crop modeling formulas</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>AI assistant — natural language control</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Adaptive schedule with automatic rain skip</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>iOS &amp; Android app</span></div>
+      </div>
+    </div>
+
+    <div class="price-card">
+      <div class="price-badge" style="background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.25);">Hardware — one-time</div>
+      <div class="price-name">Solar Controller Kit</div>
+      <div class="price-desc">The field unit. Reads soil conditions in real time and executes the software's decisions automatically — opening and closing your existing valves without any manual input.</div>
+      <div class="price-amount">
+        <span class="price-num">$600</span>
+        <span class="price-unit">per controller</span>
+      </div>
+      <div class="price-note">Covers up to 4 zones &nbsp;&middot;&nbsp; No electrician needed</div>
+      <hr class="price-divider">
+      <div class="price-features">
+        <div class="pf"><div class="pf-dot"></div><span>Solar-powered — <strong>installs in an afternoon</strong></span></div>
+        <div class="pf"><div class="pf-dot"></div><span>In-ground soil moisture sensors</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Flow meter for real-time usage tracking</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Automatic valve actuation</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Works with existing valve infrastructure</span></div>
+        <div class="pf"><div class="pf-dot"></div><span>Starlink / cellular connectivity</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Combined total -->
+  <div class="price-bundle">
+    <div class="bundle-left">
+      <div class="bundle-label">Full system</div>
+      <div class="bundle-desc">Software + hardware together. The controller reads your field and executes the plan — fully automatic, no daily decisions required.</div>
+    </div>
+    <div class="bundle-right">
+      <div class="bundle-total">$600 <span>+ $10/acre/mo</span></div>
+      <a href="mailto:shreyas@miraqua.com" class="btn-primary" style="font-size:.85rem;padding:.7rem 1.5rem;">Request Early Access</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section id="cta">
+  <div class="cta-inner">
+    <span class="sec-ey" style="display:block;margin-bottom:1.4rem;">Get started</span>
+    <h2>15–30% less water.<br><mark>10–30% higher yields.</mark></h2>
+    <p>Real-time, crop-specific irrigation — executed automatically through your existing systems. ROI in one season, starting at $10/acre/month.</p>
+    <a href="mailto:shreyas@miraqua.com" class="btn-primary">Request Early Access</a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="foot-logo">Mira<b>qua</b></div>
+  <div class="foot-copy">&copy; 2026 Miraqua &mdash; Intelligent irrigation for modern farms.</div>
+</footer>
+
+<script>
+  // ── Navbar ─────────────────────────────────────────────
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => nav.classList.toggle('solid', scrollY > 50), {passive:true});
+
+  // ── Path setup ─────────────────────────────────────────
+  const jpath        = document.getElementById('jpath');
+  const jpathCrisp   = document.getElementById('jpathCrisp');
+  const jreturn      = document.getElementById('jreturn');
+  const jreturnCrisp = document.getElementById('jreturnCrisp');
+  const jfill        = document.getElementById('jfill');
+
+  let pathLen   = 1000;
+  let returnLen = 1000;
+  window.addEventListener('DOMContentLoaded', () => {
+    try { pathLen   = jpath.getTotalLength();    } catch(e) {}
+    try { returnLen = jreturn.getTotalLength();  } catch(e) {}
+    [jpath, jpathCrisp].forEach(p => {
+      p.style.strokeDasharray  = pathLen;
+      p.style.strokeDashoffset = pathLen;
+    });
+    [jreturn, jreturnCrisp].forEach(p => {
+      p.style.strokeDasharray  = returnLen;
+      p.style.strokeDashoffset = returnLen;
+    });
+  });
+
+  // ── Scrollytelling ─────────────────────────────────────
+  const outer   = document.querySelector('.journey-outer');
+  const panels  = document.querySelectorAll('.spanel');
+  const dots    = document.querySelectorAll('.sdot');
+  const chips   = document.querySelectorAll('.chip');
+
+  // SVG nodes
+  const satBlob   = document.getElementById('satBlob');
+  const satBody   = document.getElementById('satBody');
+  const satRing1  = document.getElementById('satRing1');
+  const satRing2  = document.getElementById('satRing2');
+  const satGlowEl = document.getElementById('satGlowEl');
+  const vAglow    = document.getElementById('vAglow');
+  const ctrlGlow  = document.getElementById('ctrlGlow');
+  const ctrlSig1  = document.getElementById('ctrlSig1');
+  const ctrlSig2  = document.getElementById('ctrlSig2');
+  const farmGlowEl= document.getElementById('farmGlowEl');
+  const phoneGlowEl = document.getElementById('phoneGlow');
+  const pkt1  = document.getElementById('pkt1');
+  const pkt2  = document.getElementById('pkt2');
+  const rpkt1 = document.getElementById('rpkt1');
+  const rpkt2 = document.getElementById('rpkt2');
+
+  let cur = 0;
+
+  function setStep(i) {
+    if (i === cur && panels[i]?.classList.contains('on')) return;
+    cur = i;
+    panels.forEach((p,j) => p.classList.toggle('on', j===i));
+    dots.forEach((d,j)   => d.classList.toggle('on', j===i));
+    chips.forEach((c,j)  => c.classList.toggle('show', j<=i));
+  }
+
+  function setFarmActive(on) {
+    vAglow.style.opacity    = on ? '.6' : '0';
+    ctrlGlow.style.opacity  = on ? '.5' : '0';
+    farmGlowEl.style.opacity = on ? '.8' : '0';
+    ctrlSig1.classList.toggle('animate', on);
+    ctrlSig2.classList.toggle('animate', on);
+    if (on) {
+      ctrlSig1.style.opacity = '1';
+      ctrlSig2.style.opacity = '1';
+    } else {
+      ctrlSig1.style.opacity = '0';
+      ctrlSig2.style.opacity = '0';
+    }
+  }
+
+  function setSatActive(on) {
+    satBlob.style.opacity    = on ? '1' : '0';
+    satGlowEl.style.opacity  = on ? '1' : '0';
+    satRing1.classList.toggle('animate', on);
+    satRing2.classList.toggle('animate', on);
+    if (on) {
+      satRing1.style.opacity = '1';
+      satRing2.style.opacity = '1';
+    } else {
+      satRing1.style.opacity = '0';
+      satRing2.style.opacity = '0';
+    }
+  }
+
+  function setPhoneActive(on) {
+    phoneGlowEl.style.opacity = on ? '1' : '0';
+    pkt1.style.opacity  = on ? '1' : '0';
+    pkt2.style.opacity  = on ? '1' : '0';
+  }
+
+  function setReturnActive(on) {
+    rpkt1.style.opacity = on ? '1' : '0';
+    rpkt2.style.opacity = on ? '1' : '0';
+  }
+
+  function onScroll() {
+    if (!outer) return;
+    const rect     = outer.getBoundingClientRect();
+    const scrolled = -rect.top;
+    const scrollable = outer.offsetHeight - window.innerHeight;
+    const pct = Math.max(0, Math.min(1, scrolled / scrollable));
+
+    // progress rail
+    if (jfill) jfill.style.height = (pct * 100) + '%';
+
+    // outgoing path: draws over full scroll range
+    const offset = pathLen * (1 - pct);
+    jpath.style.strokeDashoffset      = offset;
+    jpathCrisp.style.strokeDashoffset = offset;
+
+    // return path: starts drawing once outgoing path reaches phone (~75%)
+    const returnPct    = Math.max(0, Math.min(1, (pct - 0.72) / 0.28));
+    const returnOffset = returnLen * (1 - returnPct);
+    jreturn.style.strokeDashoffset      = returnOffset;
+    jreturnCrisp.style.strokeDashoffset = returnOffset;
+
+    // step panels
+    let step = 0;
+    if (pct >= .75) step = 3;
+    else if (pct >= .5) step = 2;
+    else if (pct >= .25) step = 1;
+    setStep(step);
+
+    // node activations
+    setFarmActive(pct > .05);
+    setSatActive(pct > .5);
+    setPhoneActive(pct > .72);
+    setReturnActive(pct > .85);
+  }
+
+  window.addEventListener('scroll', onScroll, {passive:true});
+  document.addEventListener('DOMContentLoaded', onScroll);
+
+  // dot nav click
+  dots.forEach(d => {
+    d.addEventListener('click', () => {
+      const i = parseInt(d.dataset.s, 10);
+      const rect = outer.getBoundingClientRect();
+      const scrollable = outer.offsetHeight - window.innerHeight;
+      window.scrollTo({ top: scrollY + rect.top + (i/4 + .02)*scrollable, behavior:'smooth' });
+    });
+  });
+
+  // signal ring animation (CSS @keyframes handles r expansion)
+  // We use a JS interval to re-trigger animation by cloning nodes
+  function pulseRing(el, delay) {
+    if (!el.classList.contains('animate')) return;
+    el.style.animationPlayState = 'running';
+  }
+
+  // ── Feature cards fade-in ──────────────────────────────
+  const feats = document.querySelectorAll('.feat');
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
+  }, { threshold: .12 });
+  feats.forEach(f => io.observe(f));
+</script>
+
+</body>
+</html>
