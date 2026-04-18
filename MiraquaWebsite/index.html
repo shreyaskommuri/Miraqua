@@ -699,10 +699,10 @@
           <path d="M 0,440 Q 240,418 480,438" stroke="#182c1b" stroke-width=".5" opacity=".3"/>
 
           <!-- Atmosphere glow behind satellite -->
-          <ellipse id="satGlowEl" cx="240" cy="95" rx="80" ry="60" fill="url(#satGlow)" opacity="0" class="node-glow" filter="url(#blur8)"/>
+          <ellipse id="satGlowEl" cx="240" cy="120" rx="80" ry="60" fill="url(#satGlow)" opacity="0" class="node-glow" filter="url(#blur8)"/>
 
           <!-- ── SATELLITE ──────────────────── -->
-          <g id="satellite" transform="translate(240,95)">
+          <g id="satellite" transform="translate(240,120)">
             <!-- glow blob -->
             <ellipse cx="0" cy="0" rx="55" ry="40" fill="url(#satGlow)" opacity="0" id="satBlob" filter="url(#blur4)"/>
             <!-- left solar panel -->
@@ -825,33 +825,33 @@
 
           <!-- ── JOURNEY PATH (outgoing: controller → satellite → phone) ── -->
           <path id="jpathBg"
-            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            d="M 185,505 C 80,360 130,185 240,85 C 330,180 395,340 370,478"
             stroke="#1a3020" stroke-width="2" stroke-dasharray="8,6" opacity=".4"/>
 
           <path id="jpath"
-            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            d="M 185,505 C 80,360 130,185 240,85 C 330,180 395,340 370,478"
             stroke="#4ade80" stroke-width="2.5" stroke-linecap="round"
             stroke-dasharray="1000" stroke-dashoffset="1000"
             filter="url(#blur2)" opacity=".9"/>
 
           <path id="jpathCrisp"
-            d="M 185,505 C 80,360 130,160 240,60 C 330,155 395,340 370,478"
+            d="M 185,505 C 80,360 130,185 240,85 C 330,180 395,340 370,478"
             stroke="#4ade80" stroke-width="1.5" stroke-linecap="round"
             stroke-dasharray="1000" stroke-dashoffset="1000" opacity=".7"/>
 
           <!-- ── RETURN PATH (phone → satellite → controller, teal, offset arc) ── -->
           <path id="jreturnBg"
-            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            d="M 370,478 C 440,310 320,135 240,85 C 165,135 60,330 185,505"
             stroke="#1a3020" stroke-width="1.5" stroke-dasharray="6,5" opacity=".3"/>
 
           <path id="jreturn"
-            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            d="M 370,478 C 440,310 320,135 240,85 C 165,135 60,330 185,505"
             stroke="#2dd4bf" stroke-width="2" stroke-linecap="round"
             stroke-dasharray="1000" stroke-dashoffset="1000"
             filter="url(#blur2)" opacity=".8"/>
 
           <path id="jreturnCrisp"
-            d="M 370,478 C 440,310 320,110 240,60 C 165,110 60,330 185,505"
+            d="M 370,478 C 440,310 320,135 240,85 C 165,135 60,330 185,505"
             stroke="#2dd4bf" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="5,4"
             stroke-dashoffset="1000" opacity=".6"/>
 
