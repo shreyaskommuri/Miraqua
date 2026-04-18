@@ -399,7 +399,7 @@
 
     /* ─── PRICING ────────────────────────────────────── */
     #pricing { padding: 8rem 5rem; max-width: 1100px; margin: 0 auto; }
-    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 3.5rem; }
+    .pricing-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1.5rem; margin-top: 3.5rem; align-items: center; }
     .price-card {
       background: #ffffff; border: 1px solid var(--border); border-radius: 20px;
       padding: 2.5rem; transition: border-color .3s, transform .3s, box-shadow .3s;
@@ -453,6 +453,7 @@
       .feat-grid { grid-template-columns: 1fr; }
       #pricing { padding: 5rem 1.5rem; }
       .pricing-grid { grid-template-columns: 1fr; }
+      .pricing-grid > div:nth-child(2) { display: none; }
       #cta { padding: 5rem 1.5rem; }
       footer { flex-direction: column; gap: 1rem; text-align: center; padding: 2rem 1.5rem; }
       .stats { flex-wrap: wrap; }
@@ -1121,7 +1122,7 @@
     <span class="sec-ey">Pricing</span>
     <h2 class="sec-h2">Simple, transparent pricing</h2>
   </div>
-  <div class="pricing-grid">
+  <div class="pricing-grid" style="align-items:center;">
 
     <div class="price-card featured">
       <div class="price-badge">Software — recurring</div>
@@ -1141,6 +1142,10 @@
         <div class="pf"><div class="pf-dot"></div><span>Adaptive schedule with automatic rain skip</span></div>
         <div class="pf"><div class="pf-dot"></div><span>iOS &amp; Android app</span></div>
       </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:.5rem;">
+      <div style="font-size:2rem;font-weight:800;color:var(--muted);">+</div>
     </div>
 
     <div class="price-card">
@@ -1163,18 +1168,6 @@
       </div>
     </div>
 
-  </div>
-
-  <!-- Combined total -->
-  <div class="price-bundle">
-    <div class="bundle-left">
-      <div class="bundle-label">Full system</div>
-      <div class="bundle-desc">Software + hardware together. The controller reads your field and executes the plan — fully automatic, no daily decisions required.</div>
-    </div>
-    <div class="bundle-right">
-      <div class="bundle-total">$600 <span>+ $10/acre/mo</span></div>
-      <a href="mailto:shreyas@miraqua.com" class="btn-primary" style="font-size:.85rem;padding:.7rem 1.5rem;">Request Early Access</a>
-    </div>
   </div>
 </section>
 
