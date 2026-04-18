@@ -2,6 +2,13 @@
 **/.DS_Store
 node_modules/
 **/node_modules/
+MiraquaOfficial/node_modules 2/
+MiraquaOfficial/node_modules 3/
+MiraquaOfficial/.cache 2.sqlite
+MiraquaOfficial/.gitignore 2
+MiraquaOfficial/README 2.md
+MiraquaOfficial/package 2.json
+MiraquaOfficial/package-lock 2.json
 .expo/
 ios/
 android/
