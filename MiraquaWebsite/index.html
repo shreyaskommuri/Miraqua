@@ -438,28 +438,83 @@
     .bundle-total { font-size: 1.5rem; font-weight: 800; color: var(--text); white-space: nowrap; }
     .bundle-total span { font-size: .9rem; font-weight: 400; color: var(--muted); }
 
+    /* ─── HAMBURGER ──────────────────────────────────── */
+    .nav-hamburger {
+      display: none; flex-direction: column; gap: 5px; cursor: pointer;
+      padding: .4rem; background: none; border: none;
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 2px; background: var(--text);
+      border-radius: 2px; transition: transform .3s, opacity .3s;
+    }
+    .nav-drawer {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,.98); backdrop-filter: blur(16px);
+      z-index: 199; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2rem;
+    }
+    .nav-drawer.open { display: flex; }
+    .nav-drawer a { font-size: 1.5rem; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -.01em; }
+    .nav-drawer a:hover { color: var(--green); }
+    .nav-drawer-close {
+      position: absolute; top: 1.4rem; right: 1.5rem;
+      font-size: 1.8rem; background: none; border: none; cursor: pointer; color: var(--text); line-height: 1;
+    }
+    .nav-drawer .nav-drawer-btn {
+      background: var(--green); color: white; padding: .9rem 2.5rem;
+      border-radius: 8px; font-size: 1rem; font-weight: 700; margin-top: .5rem;
+    }
+
     /* ─── RESPONSIVE ─────────────────────────────────── */
     @media (max-width: 960px) {
-      nav { padding: 1.2rem 1.5rem; }
+      nav { padding: 1.1rem 1.5rem; }
       .nav-links { display: none; }
-      .j-right { display: none; }
-      .j-left { width: 100%; background: rgba(6,13,8,.97); padding: 3rem 1.5rem 3rem 3rem; }
-      .j-rail { left: 1.2rem; }
-      #problem { grid-template-columns: 1fr; gap: 2.5rem; padding: 4rem 1.5rem; }
-      #showcase { padding: 5rem 1.5rem; }
-      .showcase-duo { flex-direction: column; align-items: center; }
-      .showcase-phone { transform: none !important; width: 220px; }
-      .showcase-phone.left, .showcase-phone.right { transform: none !important; }
-      .showcase-chips { display: none; }
-      #features { padding: 5rem 1.5rem; }
-      .feat-grid { grid-template-columns: 1fr; }
-      #pricing { padding: 5rem 1.5rem; }
-      .pricing-grid { grid-template-columns: 1fr; }
-      .pricing-grid > div:nth-child(2) { display: none; }
-      #cta { padding: 5rem 1.5rem; }
-      footer { flex-direction: column; gap: 1rem; text-align: center; padding: 2rem 1.5rem; }
+      .nav-btn { display: none; }
+      .nav-hamburger { display: flex; }
+
+      #hero { padding: 7rem 1.5rem 4rem; }
+      #hero h1 { font-size: clamp(2.2rem, 9vw, 3.5rem); }
+      .hero-sub { font-size: 1rem; }
+      .hero-ctas { flex-direction: column; width: 100%; }
+      .btn-primary, .btn-outline { width: 100%; text-align: center; padding: 1rem; }
+
       .stats { flex-wrap: wrap; }
       .stat { flex: 1 1 140px; border-right: none; border-bottom: 1px solid var(--border); }
+
+      .journey-outer { height: 380vh; }
+      .j-right { display: none; }
+      .j-left {
+        width: 100%; position: relative; background: #060d08;
+        padding: 4rem 1.5rem 4rem 3.5rem;
+      }
+
+      #problem { grid-template-columns: 1fr; gap: 2rem; padding: 4rem 1.5rem; }
+      .prob-left h2 { font-size: clamp(1.6rem, 6vw, 2.4rem); }
+
+      #showcase { padding: 4rem 1.5rem; }
+      .showcase-head h2 { font-size: clamp(1.6rem, 6vw, 2.4rem); }
+      .showcase-duo { flex-direction: column; align-items: center; gap: 2rem; }
+      .showcase-phone { transform: none !important; width: min(260px, 72vw); }
+      .showcase-phone.left, .showcase-phone.right { transform: none !important; }
+
+      #features { padding: 4rem 1.5rem; }
+      .feat-grid { grid-template-columns: 1fr; gap: .9rem; }
+
+      #pricing { padding: 4rem 1.5rem; }
+      .pricing-grid { grid-template-columns: 1fr; gap: 1.2rem; }
+      .pricing-grid > div:nth-child(2) { display: none; }
+      .price-card { height: auto; }
+
+      #cta { padding: 5rem 1.5rem; }
+      #cta h2 { font-size: clamp(1.8rem, 7vw, 3rem); }
+
+      footer { flex-direction: column; gap: 1rem; text-align: center; padding: 2rem 1.5rem; }
+    }
+
+    @media (max-width: 480px) {
+      #hero h1 { font-size: 2.1rem; }
+      .stat-n { font-size: 2rem; }
+      .price-num { font-size: 2.6rem; }
     }
   </style>
 </head>
@@ -474,7 +529,19 @@
     <li><a href="#pricing">Pricing</a></li>
   </ul>
   <a href="mailto:miraquaco@gmail.com" class="nav-btn">Request Demo</a>
+  <button class="nav-hamburger" id="hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+
+<!-- ═══ MOBILE DRAWER ═══ -->
+<div class="nav-drawer" id="navDrawer">
+  <button class="nav-drawer-close" id="drawerClose">&times;</button>
+  <a href="#journey" class="drawer-link">How It Works</a>
+  <a href="#showcase" class="drawer-link">App</a>
+  <a href="#pricing" class="drawer-link">Pricing</a>
+  <a href="mailto:miraquaco@gmail.com" class="nav-drawer-btn">Request Demo</a>
+</div>
 
 <!-- ═══ HERO ═══ -->
 <section id="hero">
@@ -1350,6 +1417,17 @@
     es.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
   }, { threshold: .12 });
   feats.forEach(f => io.observe(f));
+</script>
+
+<script>
+  const hamburger = document.getElementById('hamburger');
+  const drawer = document.getElementById('navDrawer');
+  const drawerClose = document.getElementById('drawerClose');
+  const drawerLinks = drawer.querySelectorAll('a');
+
+  hamburger.addEventListener('click', () => drawer.classList.add('open'));
+  drawerClose.addEventListener('click', () => drawer.classList.remove('open'));
+  drawerLinks.forEach(l => l.addEventListener('click', () => drawer.classList.remove('open')));
 </script>
 
 </body>
