@@ -3,7 +3,7 @@ import json
 from flask import Blueprint, request, jsonify
 from dotenv import load_dotenv
 from supabase import create_client
-import google.generativeai as genai
+from google import genai
 from utils.forecast_utils import get_forecast, CROP_KC
 from datetime import datetime, timedelta
 import re
@@ -21,7 +21,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_MODEL = "models/gemini-2.5-flash"
 
 ai_blueprint = Blueprint("ai", __name__)
 
@@ -54,8 +55,6 @@ def generate_summary(crop, lat, lon, schedule):
 def generate_gem_summary(crop, lat, lon, schedule, plot_name, plot_id):
     try:
         # Initialize the model
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-
         # If there's no schedule data, bail out immediately
         if not schedule:
             return "No irrigation schedule found for this plot."
@@ -79,7 +78,7 @@ Write a short, 3-sentence forecast summary. Include water usage, possible skips 
 """
 
         # Generate and return the summary
-        response = model.generate_content(prompt)
+        response = gemini.models.generate_content(model=GEMINI_MODEL, contents=prompt)
         return response.text.strip()
 
     except Exception as e:
@@ -163,7 +162,7 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
     from datetime import datetime, timedelta
     from dateutil import parser as date_parser
     from uuid import uuid4
-    import google.generativeai as genai
+    from google import genai
 
     print(f"🤖 process_chat_command called with:")
     print(f"   crop: {crop}")
@@ -243,9 +242,12 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 7. Never say "I don't have access" - the data is literally shown above
 
 YOUR ANSWER:"""
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-            response = model.generate_content(prompt_template)
-            return {"schedule_updated": False, "reply": response.text.strip()}
+            try:
+                response = gemini.models.generate_content(model=GEMINI_MODEL, contents=prompt_template)
+                return {"schedule_updated": False, "reply": response.text.strip()}
+            except Exception as e:
+                print(f"Gemini error: {e}")
+            return {"schedule_updated": False, "reply": "I'm having trouble connecting right now. Try again in a moment."}
 
         # For specific plots, load schedules
         try:
@@ -307,7 +309,7 @@ YOUR ANSWER:"""
             for idx in target_indices:
                 updated_schedule[idx]["optimal_time"] = new_time
                 updated_schedule[idx]["note"] = f"Time moved to {new_time}"
-                reply_lines.append(f"✅ Shifted {updated_schedule[idx]['day']} to {new_time}.")
+                reply_lines.append(f"Shifted {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}) to {new_time}.")
             schedule_changed = True
 
         # === 4. Skip or Set ===
@@ -319,12 +321,12 @@ YOUR ANSWER:"""
                 if skip_cmd:
                     updated_schedule[idx]["liters"] = 0
                     updated_schedule[idx]["note"] = "User-skip"
-                    reply_lines.append(f"✅ Skipped {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}) — 0L.")
+                    reply_lines.append(f"Skipped {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}).")
                 elif set_match:
                     new_val = float(set_match.group(1))
                     updated_schedule[idx]["liters"] = new_val
                     updated_schedule[idx]["note"] = f"User-set to {new_val}L"
-                    reply_lines.append(f"✅ Set {new_val}L on {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}).")
+                    reply_lines.append(f"Set {updated_schedule[idx]['day']} ({updated_schedule[idx]['date']}) to {new_val}L.")
             schedule_changed = True
 
         # === 5. Pause N Days ===
@@ -334,62 +336,36 @@ YOUR ANSWER:"""
             for i in range(min(num_days, len(updated_schedule))):
                 updated_schedule[i]["liters"] = 0
                 updated_schedule[i]["note"] = "Paused by user"
-                reply_lines.append(f"⏸️ Paused watering on {updated_schedule[i]['day']} ({updated_schedule[i]['date']}).")
+                reply_lines.append(f"Paused {updated_schedule[i]['day']} ({updated_schedule[i]['date']}).")
             schedule_changed = True
 
-        # === 5b. Increase/Decrease All Days ===
-        # Matches: "water more", "increase by 20%", "decrease all", "reduce watering"
-        increase_match = re.search(r"(?:increase|more|add).*?(\d+)\s*%?", prompt_lower)
-        decrease_match = re.search(r"(?:decrease|less|reduce).*?(\d+)\s*%?", prompt_lower)
-
-        # Check for whole-week modifiers
+        # === 5b. Percentage increase/decrease (requires % sign or explicit "percent") ===
+        increase_pct_match = re.search(r"(?:increase|raise|bump).*?(\d+)\s*%|(\d+)\s*%.*(?:increase|more)", prompt_lower)
+        decrease_pct_match = re.search(r"(?:decrease|reduce|lower|cut).*?(\d+)\s*%|(\d+)\s*%.*(?:decrease|less)", prompt_lower)
         whole_week = any(word in prompt_lower for word in ["all", "every", "week", "entire"])
 
-        if (increase_match or decrease_match) and (whole_week or not target_indices):
-            # Apply to all days if no specific days mentioned
+        if (increase_pct_match or decrease_pct_match) and (whole_week or not target_indices):
             if not target_indices:
                 target_indices = set(range(len(updated_schedule)))
 
-            if increase_match:
-                percent = int(increase_match.group(1))
+            if increase_pct_match:
+                percent = int(increase_pct_match.group(1) or increase_pct_match.group(2))
                 for idx in target_indices:
                     old_val = updated_schedule[idx]["liters"]
-                    new_val = round(old_val * (1 + percent / 100), 2)
+                    new_val = round(old_val * (1 + percent / 100), 1)
                     updated_schedule[idx]["liters"] = new_val
                     updated_schedule[idx]["note"] = f"Increased by {percent}%"
-                    reply_lines.append(f"✅ Increased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (+{percent}%)")
+                reply_lines.append(f"Done — increased all days by {percent}%.")
                 schedule_changed = True
 
-            elif decrease_match:
-                percent = int(decrease_match.group(1))
+            elif decrease_pct_match:
+                percent = int(decrease_pct_match.group(1) or decrease_pct_match.group(2))
                 for idx in target_indices:
                     old_val = updated_schedule[idx]["liters"]
-                    new_val = round(old_val * (1 - percent / 100), 2)
-                    updated_schedule[idx]["liters"] = max(0, new_val)
+                    new_val = round(max(0, old_val * (1 - percent / 100)), 1)
+                    updated_schedule[idx]["liters"] = new_val
                     updated_schedule[idx]["note"] = f"Decreased by {percent}%"
-                    reply_lines.append(f"✅ Decreased {updated_schedule[idx]['day']} from {old_val}L to {new_val}L (-{percent}%)")
-                schedule_changed = True
-
-        # === 5c. Simple "more" or "less" without percentage ===
-        if not schedule_changed and whole_week:
-            if "more" in prompt_lower or "increase" in prompt_lower:
-                # Default to 20% increase
-                for idx in range(len(updated_schedule)):
-                    old_val = updated_schedule[idx]["liters"]
-                    new_val = round(old_val * 1.2, 2)
-                    updated_schedule[idx]["liters"] = new_val
-                    updated_schedule[idx]["note"] = "Increased by 20%"
-                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (+20%)")
-                schedule_changed = True
-
-            elif "less" in prompt_lower or "reduce" in prompt_lower:
-                # Default to 20% decrease
-                for idx in range(len(updated_schedule)):
-                    old_val = updated_schedule[idx]["liters"]
-                    new_val = round(old_val * 0.8, 2)
-                    updated_schedule[idx]["liters"] = new_val
-                    updated_schedule[idx]["note"] = "Decreased by 20%"
-                    reply_lines.append(f"✅ {updated_schedule[idx]['day']}: {old_val}L → {new_val}L (-20%)")
+                reply_lines.append(f"Done — reduced all days by {percent}%.")
                 schedule_changed = True
 
         # === 6. Revert to Original ===
@@ -398,20 +374,14 @@ YOUR ANSWER:"""
                 supabase.table("plot_schedules").update({
                     "schedule": og_schedule
                 }).eq("plot_id", plot_id).execute()
-                return {
-                    "schedule_updated": True,
-                    "reply": "🔄 Reverted to the original schedule."
-                }
+                return {"schedule_updated": True, "reply": "Reverted to the original AI schedule."}
             else:
-                return {
-                    "schedule_updated": False,
-                    "reply": "⚠️ No original schedule found to revert to."
-                }
+                return {"schedule_updated": False, "reply": "No original schedule saved to revert to."}
 
         # === 7. Schedule Summary ===
         if "how much" in prompt_lower or "total" in prompt_lower or "my plan" in prompt_lower:
             total = sum(day.get("liters", 0) for day in schedule)
-            reply = f"📊 Your plan includes {round(total, 2)} liters over {len(schedule)} days."
+            reply = f"Your plan totals {round(total, 1)}L over {len(schedule)} days, averaging {round(total/max(len(schedule),1), 1)}L/day."
             return {"schedule_updated": False, "reply": reply}
 
         # === 8. Constraint Editing ===
@@ -442,115 +412,104 @@ YOUR ANSWER:"""
                 "new_schedule": updated_schedule,
                 "reason": prompt.strip()
             }).execute()
-            return {"schedule_updated": True, "reply": "\n".join(reply_lines)}
+            return {"schedule_updated": True, "reply": " ".join(reply_lines)}
 
-        # === 9. Fallback to Gemini ===
-        # Handle case where schedule is empty
-        if not schedule:
-            prompt_template = f"""
-You are FarmerBot, helping a user with their garden plot.
+        # === 9. "Why" question — use explanation field from schedule day ===
+        why_match = re.search(r"\b(why|reason|explain|how come)\b", prompt_lower)
+        if why_match:
+            mentioned_day = None
+            for key, idx in date_map.items():
+                if key in prompt_lower:
+                    mentioned_day = schedule[idx] if idx < len(schedule) else None
+                    break
+            if not mentioned_day and target_indices:
+                mentioned_day = schedule[next(iter(target_indices))]
+            if mentioned_day and mentioned_day.get("explanation"):
+                day_context = (
+                    f"On {mentioned_day['date']}, {mentioned_day['liters']}L was scheduled at "
+                    f"{mentioned_day.get('optimal_time','N/A')}. Reason: {mentioned_day['explanation']}"
+                )
+            elif mentioned_day:
+                day_context = f"On {mentioned_day['date']}, {mentioned_day['liters']}L was scheduled at {mentioned_day.get('optimal_time','N/A')}."
+            else:
+                day_context = ""
+        else:
+            day_context = ""
 
-Plot Info:
-- Crop: {crop}
-- Location: ({lat:.4f}, {lon:.4f})
-- Area: {plot.get("area", 1.0)} m²
-- Crop Age: {age} months
-
-User asked: "{prompt.strip()}"
-
-Provide helpful gardening advice based on the crop and location. Be specific and actionable.
-"""
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-            response = model.generate_content(prompt_template)
-            return {"schedule_updated": False, "reply": response.text.strip()}
-
+        # === 10. Fallback to Gemini ===
         schedule_lines = "\n".join(
-            f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
+            f"  {day['date']}: {day['liters']}L at {day.get('optimal_time','N/A')}"
+            + (f"  [{day['explanation']}]" if day.get('explanation') else "")
             for day in schedule
-        )
+        ) if schedule else "No schedule yet."
 
-        # Summarize recent watering
-        watering_summary = "No recent watering"
-        if logs:
-            last_watered = logs[0].get("watered_at", "Unknown")
-            watering_summary = f"Last watered: {last_watered}"
-
-        # Create chat history summary for plot-specific queries
-        history_summary = ""
+        # Chat history for conversational context
+        history_block = ""
         recent_chats = plot.get("recent_chats", [])
         if recent_chats:
-            history_lines = []
-            for chat in recent_chats[-3:]:  # Last 3 exchanges
-                history_lines.append(f"User: {chat['prompt'][:100]}")
-                history_lines.append(f"Bot: {chat['reply'][:100]}")
-            history_summary = f"\n\n=== RECENT CONVERSATION ===\n" + "\n".join(history_lines)
+            lines = []
+            for c in recent_chats[-6:]:
+                if c.get("prompt"): lines.append(f"User: {c['prompt'][:120]}")
+                if c.get("reply"):  lines.append(f"Miraqua: {c['reply'][:120]}")
+            if lines:
+                history_block = "Recent conversation:\n" + "\n".join(lines) + "\n\n"
 
-        # Summarize weather from hourly data (OpenWeather format)
-        weather_summary = "Weather data unavailable"
-        if hourly and len(hourly) > 0:
-            # Extract next 24 hours of weather
-            weather_items = []
-            for i in range(0, min(24, len(hourly)), 8):  # Every 8 hours (3 times per day)
-                item = hourly[i]
-                dt_txt = item.get('dt_txt', 'Unknown time')
-                temp = item.get('main', {}).get('temp', 'N/A')
-                weather_desc = item.get('weather', [{}])[0].get('description', 'Unknown')
-                pop = item.get('pop', 0) * 100  # Probability of precipitation
-                weather_items.append(f"{dt_txt}: {temp}°F, {weather_desc}, {pop:.0f}% rain chance")
-            weather_summary = "\n".join(weather_items)
-        elif daily:
-            # Fallback to daily if available
-            weather_items = []
-            for day in daily[:3]:
-                weather_items.append(f"{day.get('date', 'Unknown')}: Temp {day.get('temp', 'N/A')}°F")
-            weather_summary = "\n".join(weather_items) if weather_items else "Weather data unavailable"
+        # Weather summary
+        weather_summary = ""
+        if daily and len(daily) > 0:
+            d = daily[0]
+            t_max = d.get('temp_max_f') or d.get('temperature_2m_max') or d.get('temp_max', '?')
+            t_min = d.get('temp_min_f') or d.get('temperature_2m_min') or d.get('temp_min', '?')
+            rain = d.get('rain_prob') or d.get('precipitation_probability_max') or d.get('pop', '?')
+            weather_summary = f"Today: high {t_max}°F, low {t_min}°F, rain {rain}%"
+        elif hourly and len(hourly) > 0:
+            h = hourly[0]
+            temp = h.get('main', {}).get('temp') or h.get('temperature_2m', '?')
+            pop = round((h.get('pop', 0) or 0) * 100)
+            weather_summary = f"Current: {temp}°F, {pop}% rain chance"
 
-        prompt_template = f"""
-You are FarmerBot. Use the data below to answer the question.
+        system_prompt = f"""You are Miraqua, an AI irrigation assistant. You're direct and conversational — like a knowledgeable friend, never a chatbot.
 
-=== WEATHER FORECAST (QUOTE THESE NUMBERS) ===
-{weather_summary}
+Style rules:
+- Short sentences. No filler like "Certainly!" or "Great question!".
+- Round numbers: "around 6L" not "6.0 liters exactly".
+- 2-4 sentences for most answers. Only go longer if asked.
+- No bullet points unless listing multiple schedule days.
+- If asked WHY a day is scheduled a certain way, explain the evapotranspiration / weather / soil reasoning plainly.
+- To change the schedule, the user can say: skip [day], set [day] to [X]L, shift [day] to [time], or pause for [N] days.
+- Never reveal lat/lon.
 
-=== IRRIGATION SCHEDULE ===
+Plot: {plot_name} | Crop: {crop} | Area: {plot.get("area","?")} m² | Age: {age} months
+Constraints: {plot.get("custom_constraints") or "none"}
+{f"Weather: {weather_summary}" if weather_summary else ""}
+
+Schedule (with reasoning where available):
 {schedule_lines}
 
-=== PLOT INFO ===
-{crop} plot "{plot_name}" - {age} months old, {plot.get("area", 1.0)}m²
-{watering_summary}
-{history_summary}
+{f"Day context: {day_context}" if day_context else ""}{history_block}User: {prompt.strip()}"""
 
-=== CURRENT QUESTION ===
-"{prompt.strip()}"
+        # Try chat models in order
+        try:
+            response = gemini.models.generate_content(model=GEMINI_MODEL, contents=system_prompt)
+            return {"schedule_updated": False, "reply": response.text.strip()}
+        except Exception as model_err:
+            print(f"⚠️ Gemini error: {model_err}")
 
-=== RESPONSE RULES ===
-1. QUOTE specific temps and rain % from weather data above
-2. Example BAD: "check the forecast" ❌
-3. Example GOOD: "With 57°F and 0% rain tomorrow, water the scheduled 6.5L" ✅
-4. If rain % > 40%, tell them to skip watering
-5. If rain % < 10%, confirm they should water
-6. Reference their actual schedule times/amounts
-7. If they ask a follow-up question, use the recent conversation above for context
-8. Keep answer SHORT (2-3 sentences)
-9. NEVER say you don't have weather data - it's shown above
-
-YOUR ANSWER:"""
-
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-        response = model.generate_content(prompt_template)
-        return {"schedule_updated": False, "reply": response.text.strip()}
+        return {"schedule_updated": False, "reply": "I'm having trouble connecting right now. Try again in a moment."}
 
     except Exception as e:
         print(f"❌ Error in process_chat_command: {e}")
+        import traceback; traceback.print_exc()
         return {
             "schedule_updated": False,
-            "reply": "⚠️ Something went wrong. Please try again or rephrase your request."
+            "reply": "Something went wrong on my end. Try rephrasing or ask again."
         }
 
         
 
 
 def generate_ai_schedule(plot, daily, hourly, logs):
-    import google.generativeai as genai
+    from google import genai
     from datetime import datetime, timedelta
     import json, re
 
@@ -665,29 +624,18 @@ Respond with only a valid JSON array containing **exactly 7 objects** (one per d
         
         for model_name in models_to_try:
             try:
-                print(f"🤖 Trying AI model: {model_name}")
-                model = genai.GenerativeModel(model_name)
-                
-                # Generate with timeout handling
                 import time
+                print(f"🤖 Trying AI model: {model_name}")
                 start_time = time.time()
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=2048,
-                        temperature=0.1,  # Lower temperature for more consistent output
-                    )
-                )
-                
+                response = gemini.models.generate_content(model=model_name, contents=prompt)
                 elapsed = time.time() - start_time
                 print(f"✅ AI generation successful with {model_name} in {elapsed:.2f}s")
                 break
-                
             except Exception as e:
                 last_error = e
                 print(f"❌ Model {model_name} failed: {str(e)[:100]}...")
                 continue
-        
+
         if response is None:
             raise last_error or Exception("All AI models failed")
             
@@ -729,8 +677,7 @@ Return ONLY a JSON array with 7 objects, each with: day, date (MM/DD/YY), liters
 Keep it simple and practical.
 """
             
-            fallback_model = genai.GenerativeModel("models/gemini-2.0-flash")
-            fallback_response = fallback_model.generate_content(simple_prompt)
+            fallback_response = gemini.models.generate_content(model=GEMINI_MODEL, contents=simple_prompt)
             fallback_text = fallback_response.text.strip()
             
             # Try to parse the simpler AI response

@@ -392,6 +392,21 @@ def chat():
         .order("watered_at", desc=True).limit(7).execute()
     logs = logs_res.data or []
 
+    # 💬 Fetch recent chat history for this session (for Gemini context)
+    history_res = supabase.table("farmerAI_chatlog") \
+        .select("prompt, reply, created_at") \
+        .eq("plot_id", plot_id) \
+        .eq("chat_session_id", chat_session_id) \
+        .order("created_at", desc=True) \
+        .limit(6) \
+        .execute()
+    chat_history = []
+    for row in reversed(history_res.data or []):
+        if row.get("prompt"):
+            chat_history.append({"sender": "user", "text": row["prompt"]})
+        if row.get("reply"):
+            chat_history.append({"sender": "bot", "text": row["reply"]})
+
     # 📥 Call AI chat processor
     result = process_chat_command(
         prompt=prompt,
@@ -405,19 +420,17 @@ def chat():
         daily=daily,
         hourly=hourly,
         logs=logs,
-        age=age  # ✅ passed in
+        age=age,
+        chat_history=chat_history,
     )
     reply = result["reply"]
+    schedule_updated = result.get("schedule_updated", False)
 
-    # 🔁 Get updated schedule (if changed)
+    # 🔁 Get updated schedule after potential change
     refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
     updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
 
-    # 🗓️ Get original schedule for log
-    schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-    original_schedule = schedule_res.data[0]["schedule"] if schedule_res.data else []
-
-    # 📝 Save chat history
+    # 📝 Save chat log
     supabase.table("farmerAI_chatlog").insert({
         "id": str(uuid4()),
         "plot_id": plot_id,
@@ -425,7 +438,7 @@ def chat():
         "prompt": prompt,
         "reply": reply,
         "created_at": datetime.utcnow().isoformat(),
-        "original_schedule": original_schedule,
+        "original_schedule": updated_schedule,
         "modified_schedule": updated_schedule,
         "reverted": False,
         "is_user_message": True,
@@ -436,7 +449,7 @@ def chat():
         "edited": False
     }).execute()
 
-    return jsonify({"success": True, "reply": reply})
+    return jsonify({"success": True, "reply": reply, "schedule_updated": schedule_updated})
 
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,34 +9,19 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import uuid from 'react-native-uuid';
-
-interface PlotData {
-  id: number;
-  name: string;
-  crop: string;
-  moisture: number;
-  temperature: number;
-  sunlight: number;
-  status: string;
-  nextWatering: string;
-  location: string;
-  waterUsage: number;
-  sensorStatus: string;
-  batteryLevel: number;
-  soilPh: number;
-  lastWatered: string;
-}
 
 interface Message {
   id: number;
   sender: 'user' | 'bot';
   text: string;
-  time: string;
   plotId?: string | null;
   isWelcome?: boolean;
+  scheduleUpdated?: boolean;
 }
 
 interface ChatScreenProps {
@@ -44,427 +29,258 @@ interface ChatScreenProps {
   route?: any;
 }
 
+const SUGGESTIONS = [
+  { label: 'Water today?', icon: 'water-outline' },
+  { label: 'Skip a day', icon: 'close-circle-outline' },
+  { label: 'Health check', icon: 'leaf-outline' },
+  { label: 'This week', icon: 'calendar-outline' },
+  { label: 'Adjust schedule', icon: 'settings-outline' },
+];
+
+function TypingIndicator() {
+  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+
+  useEffect(() => {
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 150),
+          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.delay(600 - i * 150),
+        ])
+      )
+    );
+    animations.forEach(a => a.start());
+    return () => animations.forEach(a => a.stop());
+  }, []);
+
+  return (
+    <View style={styles.typingRow}>
+      <View style={styles.botDot} />
+      <View style={styles.typingBubble}>
+        {dots.map((dot, i) => (
+          <Animated.View
+            key={i}
+            style={[styles.typingDot, { opacity: dot, transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }] }]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   const plotIdFromRoute = route?.params?.plotId;
   const contextDateFromRoute = route?.params?.contextDate as string | undefined;
   const contextScheduleFromRoute = route?.params?.contextSchedule as { liters: number; optimal_time: string } | null | undefined;
 
-  const [message, setMessage] = useState('');
-  const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
-  const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute || 'general');
-  const [showPlotSelector, setShowPlotSelector] = useState(false);
-  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
   const [realPlots, setRealPlots] = useState<any[]>([]);
-  const [isLoadingPlots, setIsLoadingPlots] = useState(false);
+  const [plotsLoading, setPlotsLoading] = useState(true);
+  const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdFromRoute ? String(plotIdFromRoute) : 'general');
+  const [selectedPlot, setSelectedPlot] = useState<any>(null);
+  const [showPlotSelector, setShowPlotSelector] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  // Active day context (set when navigating from SpecificDayScreen)
   const [contextDate, setContextDate] = useState<string | null>(contextDateFromRoute ?? null);
-  const [contextSchedule, setContextSchedule] = useState<{ liters: number; optimal_time: string } | null>(
-    contextScheduleFromRoute ?? null
-  );
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      sender: 'bot',
-      text: "Hi! I'm Miraqua. I manage your irrigation automatically — but you're always in control. Ask me to adjust schedules, explain any decision, or give you a forecast.",
-      time: 'now',
-      plotId: null // General message
-    }
-  ]);
-  const [filteredMessages, setFilteredMessages] = useState<Message[]>([
-    {
-      id: 1,
-      sender: 'bot',
-      text: "Hi! I'm Miraqua. I manage your irrigation automatically — but you're always in control. Ask me to adjust schedules, explain any decision, or give you a forecast.",
-      time: 'now',
-      plotId: null // General message
-    }
-  ]);
+  const [contextSchedule, setContextSchedule] = useState<{ liters: number; optimal_time: string } | null>(contextScheduleFromRoute ?? null);
 
-  // Stable session ID per plot so history is always recoverable
-  const getSessionId = (plotId: string) => plotId === 'general' ? 'general' : `plot_${plotId}`;
-  const scrollViewRef = useRef<ScrollView>(null);
-  const historyLoadedFor = useRef<Set<string>>(new Set());
+  const scrollRef = useRef<ScrollView>(null);
+  const historyLoaded = useRef<Set<string>>(new Set());
+  const inputRef = useRef<TextInput>(null);
 
+  const getSessionId = (id: string) => id === 'general' ? 'general' : `plot_${id}`;
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [messages, isTyping]);
+
+  // Init: get user, fetch plots
   useEffect(() => {
-    const timer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
-    return () => clearTimeout(timer);
-  }, [filteredMessages]);
-
-  // Get current user ID, then load history for any already-selected plot
-  useEffect(() => {
-    const getCurrentUser = async () => {
+    const init = async () => {
       try {
         const { supabase } = await import('../utils/supabase');
         const { data: { user } } = await supabase.auth.getUser();
-        if (user?.id) {
-          setUserId(user.id);
-          // If a plot was already selected before auth resolved, load its history now
-          if (selectedPlotId && selectedPlotId !== 'general') {
-            loadChatHistory(selectedPlotId, user.id);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to get user:', error);
-      }
-    };
-    getCurrentUser();
-  }, []);
-
-  // Load previous chat history for current plot
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      if (!userId) return;
+        if (user?.id) setUserId(user.id);
+      } catch (_) {}
 
       try {
-        console.log(`📚 Loading chat history for user=${userId}, plot=${selectedPlotId}`);
-        const response = await fetch('http://localhost:5050/get_chat_log', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            plot_id: selectedPlotId === 'general' ? 'general' : selectedPlotId
-          })
-        });
-
-        if (response.ok) {
-          const history = await response.json();
-          if (history && history.length > 0) {
-            // Convert backend format to frontend format
-            const loadedMessages = history.map((msg: any, index: number) => ({
-              id: index + 2, // Start after welcome message
-              sender: msg.sender,
-              text: msg.text,
-              time: new Date(msg.timestamp).toLocaleTimeString(),
-              plotId: selectedPlotId === 'general' ? null : selectedPlotId
-            }));
-
-            // Append loaded messages after welcome message
-            setMessages(prev => [...prev, ...loadedMessages]);
-            console.log(`✅ Loaded ${loadedMessages.length} previous messages`);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load chat history:', error);
+        const { getPlots } = await import('../api/plots');
+        const res = await getPlots();
+        if (res.success) setRealPlots(res.plots || []);
+      } catch (_) {} finally {
+        setPlotsLoading(false);
       }
     };
-
-    loadChatHistory();
-  }, [userId, selectedPlotId]);
-
-  // Filter messages based on selected plot
-  useEffect(() => {
-    if (selectedPlotId === 'general') {
-      // Show general messages (plotId is null or undefined)
-      setFilteredMessages(messages.filter(msg => !msg.plotId));
-    } else {
-      // Show messages for the specific plot
-      setFilteredMessages(messages.filter(msg => msg.plotId === selectedPlotId));
-    }
-  }, [selectedPlotId, messages]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [filteredMessages]);
-
-  const quickActions = selectedPlot ? [
-    "Water",
-    "Skip", 
-    "Health",
-    "Adjust"
-  ] : [
-    "Water",
-    "Skip", 
-    "Health",
-    "Adjust"
-  ];
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  // Fetch real plots from your database
-  const fetchRealPlots = async () => {
-    setIsLoadingPlots(true);
-    try {
-      const { getPlots } = await import('../api/plots');
-      const result = await getPlots();
-      if (result.success && result.plots) {
-        setRealPlots(result.plots);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching plots:', error);
-    } finally {
-      setIsLoadingPlots(false);
-    }
-  };
-
-  // Load plots when component mounts
-  useEffect(() => {
-    fetchRealPlots();
+    init();
   }, []);
 
-  const loadChatHistory = async (plotId: string, currentUserId: string) => {
-    if (plotId === 'general' || historyLoadedFor.current.has(plotId)) return;
-    historyLoadedFor.current.add(plotId);
+  // Set initial welcome message once we know the state
+  useEffect(() => {
+    if (plotsLoading) return;
+
+    if (!plotIdFromRoute) {
+      // General mode
+      if (realPlots.length === 0) {
+        setMessages([{ id: 1, sender: 'bot', text: "You don't have any plots set up yet. Head to the home screen to add your first plot, then come back to chat about it.", plotId: null, isWelcome: true }]);
+      } else {
+        setMessages([{ id: 1, sender: 'bot', text: "Ask me about any of your plots — schedules, skips, crop health, or upcoming conditions.", plotId: null, isWelcome: true }]);
+      }
+      return;
+    }
+
+    const plot = realPlots.find(p => String(p.id) === String(plotIdFromRoute));
+    if (!plot) {
+      setMessages([{ id: 1, sender: 'bot', text: "Couldn't find that plot. It may have been removed.", plotId: null, isWelcome: true }]);
+      return;
+    }
+
+    setSelectedPlot(plot);
+    const cropName = (plot.crop || 'your crop').toLowerCase();
+    let welcomeText: string;
+    if (contextDateFromRoute) {
+      const [yr, mo, dy] = contextDateFromRoute.split('-').map(Number);
+      const label = new Date(yr, mo - 1, dy).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const hasWater = contextScheduleFromRoute && contextScheduleFromRoute.liters > 0;
+      welcomeText = hasWater
+        ? `What would you like to change about ${label}? It's currently scheduled for ${contextScheduleFromRoute!.liters}L at ${contextScheduleFromRoute!.optimal_time}.`
+        : `${label} is a skip day. Want to add irrigation or ask about the surrounding schedule?`;
+    } else {
+      welcomeText = `What's up! Ask me anything about **${plot.name}** — schedule adjustments, skips, ${cropName} health, or what's coming up this week.`;
+    }
+
+    setMessages([{ id: 1, sender: 'bot', text: welcomeText, plotId: String(plot.id), isWelcome: true }]);
+  }, [plotsLoading, plotIdFromRoute, realPlots.length]);
+
+  // Load chat history once userId + plotId are known
+  useEffect(() => {
+    if (!userId || !plotIdFromRoute) return;
+    const key = String(plotIdFromRoute);
+    if (historyLoaded.current.has(key)) return;
+    historyLoaded.current.add(key);
+    loadHistory(key, userId);
+  }, [userId, plotIdFromRoute]);
+
+  const loadHistory = async (plotId: string, uid: string) => {
     try {
       const { environment } = await import('../config/environment');
       const res = await fetch(`${environment.apiUrl}/get_chat_log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUserId,
-          plot_id: plotId,
-          chat_session_id: getSessionId(plotId),
-        }),
+        body: JSON.stringify({ user_id: uid, plot_id: plotId, chat_session_id: getSessionId(plotId) }),
       });
       if (!res.ok) return;
-      const history: { sender: string; text: string; timestamp: string }[] = await res.json();
-      if (!history || history.length === 0) return;
-
+      const history: { sender: string; text: string }[] = await res.json();
+      if (!Array.isArray(history) || !history.length) return;
       const loaded: Message[] = history.map((h, i) => ({
         id: Date.now() + i,
-        sender: h.sender as 'user' | 'bot',
-        text: h.text,
-        time: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sender: h.sender === 'user' ? 'user' : 'bot',
+        text: h.text || '',
         plotId,
       }));
-      // Prepend history, replacing any welcome message for this plot
       setMessages(prev => {
-        const withoutWelcome = prev.filter(
-          m => !(m.plotId === plotId && m.isWelcome)
-        );
+        // Only inject if we're still on the same plot (don't pollute after a switch)
+        const stillRelevant = prev.some(m => m.plotId === plotId || (m.isWelcome && m.plotId === plotId));
+        if (!stillRelevant && prev.some(m => m.plotId && m.plotId !== plotId)) return prev;
+        const withoutWelcome = prev.filter(m => !m.isWelcome);
         return [...loaded, ...withoutWelcome];
       });
-    } catch (e) {
-      console.error('❌ Failed to load chat history:', e);
+    } catch (_) {}
+  };
+
+  const send = async (text?: string) => {
+    const msg = (text ?? input).trim();
+    if (!msg || isTyping) return;
+
+    // If tapping a suggestion in general mode with no plot selected, prompt to pick one
+    if (selectedPlotId === 'general' && text && realPlots.length > 0) {
+      setShowPlotSelector(true);
+      return;
+    }
+
+    setInput('');
+
+    const plotCtx = selectedPlotId === 'general' ? null : String(selectedPlotId);
+    const userMsg: Message = { id: Date.now(), sender: 'user', text: msg, plotId: plotCtx };
+    setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+      const { environment } = await import('../config/environment');
+      const prompt = contextDate
+        ? `[Context: the user is looking at ${contextDate}${contextSchedule ? `, currently ${contextSchedule.liters}L at ${contextSchedule.optimal_time}` : ', a skip day'}] ${msg}`
+        : msg;
+
+      const res = await fetch(`${environment.apiUrl}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          plotId: plotCtx,
+          chat_session_id: getSessionId(selectedPlotId),
+          current_date: new Date().toISOString().split('T')[0],
+        }),
+      });
+
+      const data = res.ok ? await res.json() : null;
+      const reply = data?.reply || "Sorry, I couldn't reach the server. Try again in a moment.";
+      setMessages(prev => [...prev, {
+        id: Date.now(), sender: 'bot', text: reply, plotId: plotCtx,
+        scheduleUpdated: data?.schedule_updated === true,
+      }]);
+      setContextDate(null);
+      setContextSchedule(null);
+    } catch (_) {
+      setMessages(prev => [...prev, { id: Date.now(), sender: 'bot', text: "Couldn't connect to the server. Check your network and try again.", plotId: plotCtx }]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
-  // Auto-select plot when opened from a specific plot
-  useEffect(() => {
-    if (plotIdFromRoute && plotIdFromRoute !== 'general' && realPlots.length > 0) {
-      // Auto-select the plot when opened from plot details
-      const realPlot = realPlots.find(p => p.id === plotIdFromRoute);
-      if (realPlot) {
-        setSelectedPlot({
-          id: plotIdFromRoute,
-          name: realPlot.name || `Plot ${plotIdFromRoute.slice(0, 8)}`,
-          crop: realPlot.crop || "Unknown",
-          moisture: realPlot.moisture || 0,
-          temperature: realPlot.temperature || 0,
-          sunlight: realPlot.sunlight || 0,
-          status: realPlot.status || "unknown",
-          nextWatering: realPlot.next_watering || "Unknown",
-          location: realPlot.location || "Unknown",
-          waterUsage: realPlot.water_usage || 0,
-          sensorStatus: realPlot.sensor_status || "unknown",
-          batteryLevel: realPlot.battery_level || 0,
-          soilPh: realPlot.soil_ph || 0,
-          lastWatered: realPlot.last_watered || "Unknown"
-        });
-        
-        // Add welcome message (only once, history load may replace it)
-        const hasPlotMessage = messages.some(msg => msg.plotId === plotIdFromRoute && msg.sender === 'bot');
-        if (!hasPlotMessage) {
-          const cropName = realPlot.crop ? realPlot.crop.toLowerCase() : 'your crop';
-          let welcomeText: string;
-          if (contextDateFromRoute) {
-            const [yr, mo, dy] = contextDateFromRoute.split('-').map(Number);
-            const dayLabel = new Date(yr, mo - 1, dy).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            if (contextScheduleFromRoute && contextScheduleFromRoute.liters > 0) {
-              welcomeText = `What would you like to change about ${dayLabel}? It's currently scheduled for ${contextScheduleFromRoute.liters}L at ${contextScheduleFromRoute.optimal_time}.`;
-            } else {
-              welcomeText = `${dayLabel} is currently a skip day. Want to add irrigation, or ask about the schedule around it?`;
-            }
-          } else {
-            welcomeText = `What's up! Ask me anything about ${realPlot.name || 'your plot'} — schedule, skips, ${cropName} health, or what's coming up this week.`;
-          }
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            sender: 'bot',
-            text: welcomeText,
-            time: 'now',
-            plotId: realPlot.id,
-            isWelcome: true,
-          }]);
-        }
-
-        // Load chat history for this plot
-        if (userId) loadChatHistory(plotIdFromRoute, userId);
-      }
-    }
-  }, [plotIdFromRoute, realPlots.length, userId]);
-
-  const handlePlotSelection = (plotId: string) => {
-    // Update the selected plot ID
-    setSelectedPlotId(plotId);
+  const switchPlot = (plotId: string) => {
     setShowPlotSelector(false);
-    
+    setSelectedPlotId(plotId);
+    setContextDate(null);
+    setContextSchedule(null);
+
     if (plotId === 'general') {
       setSelectedPlot(null);
-      // Check if we already have a general mode message
-      const hasGeneralMessage = messages.some(msg => msg.plotId === null && msg.sender === 'bot');
-      if (!hasGeneralMessage) {
-        // Add a message when switching to general mode
-        const generalMessage: Message = {
-          id: Date.now(),
-          sender: 'bot',
-          text: "I'm now in general mode. Ask me about any of your plots, upcoming schedules, or irrigation decisions. What would you like to know?",
-          time: 'now',
-          plotId: null
-        };
-        setMessages(prev => [...prev, generalMessage]);
-      }
+      setMessages([{ id: Date.now(), sender: 'bot', text: "Ask me about any of your plots — schedules, skips, health, or upcoming conditions.", plotId: null, isWelcome: true }]);
     } else {
-      // Find the real plot from the fetched plots
-      const realPlot = realPlots.find(p => p.id === plotId);
-      if (realPlot) {
-        setSelectedPlot({
-          id: plotId,
-          name: realPlot.name || `Plot ${plotId.slice(0, 8)}`,
-          crop: realPlot.crop || "Unknown",
-          moisture: realPlot.moisture || 0,
-          temperature: realPlot.temperature || 0,
-          sunlight: realPlot.sunlight || 0,
-          status: realPlot.status || "unknown",
-          nextWatering: realPlot.next_watering || "Unknown",
-          location: realPlot.location || "Unknown",
-          waterUsage: realPlot.water_usage || 0,
-          sensorStatus: realPlot.sensor_status || "unknown",
-          batteryLevel: realPlot.battery_level || 0,
-          soilPh: realPlot.soil_ph || 0,
-          lastWatered: realPlot.last_watered || "Unknown"
-        });
-        
-        // Add welcome message if no history for this plot yet
-        const hasPlotMessage = messages.some(msg => msg.plotId === plotId);
-        if (!hasPlotMessage) {
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            sender: 'bot',
-            text: `What's up! Ask me anything about ${realPlot.name || 'your plot'} — schedule, skips, ${(realPlot.crop || 'crop').toLowerCase()} health, or what's coming up this week.`,
-            time: 'now',
-            plotId: realPlot.id,
-            isWelcome: true,
-          }]);
+      const plot = realPlots.find(p => String(p.id) === String(plotId));
+      if (plot) {
+        setSelectedPlot(plot);
+        setMessages([{ id: Date.now(), sender: 'bot', text: `Switched to **${plot.name}**. What would you like to know?`, plotId: String(plot.id), isWelcome: true }]);
+        if (userId && !historyLoaded.current.has(plotId)) {
+          historyLoaded.current.add(plotId);
+          loadHistory(plotId, userId);
         }
-        // Clear any day context when switching plots manually
-        setContextDate(null);
-        setContextSchedule(null);
-
-        // Load history for this plot
-        if (userId) loadChatHistory(plotId, userId);
       }
     }
   };
 
-  const handleQuickAction = (action: string) => {
-    setMessage(action);
-    handleSendMessage(action);
-  };
+  const visibleMessages = selectedPlotId === 'general'
+    ? messages.filter(m => !m.plotId)
+    : messages.filter(m => String(m.plotId) === String(selectedPlotId) || (m.isWelcome && !m.plotId));
 
-  const handleSendMessage = async (customMessage?: string) => {
-    const messageToSend = customMessage || message;
-    if (messageToSend.trim()) {
-      const newMessage: Message = {
-        id: Date.now(),
-        sender: 'user',
-        text: messageToSend,
-        time: 'now',
-        plotId: selectedPlotId === 'general' ? null : selectedPlotId
-      };
-      setMessages(prev => [...prev, newMessage]);
-      setMessage('');
-      
-      // Set AI processing state
-      setIsAIProcessing(true);
-      
-      // Add typing indicator
-      const typingMessage: Message = {
-        id: Date.now() + 1,
-        sender: 'bot',
-        text: '● ● ●',
-        time: 'now',
-        plotId: selectedPlotId === 'general' ? null : selectedPlotId
-      };
-      setMessages(prev => [...prev, typingMessage]);
-      
-      try {
-        // Call the real AI backend
-        const { environment } = await import('../config/environment');
-        const response = await fetch(`${environment.apiUrl}/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            // If a specific day is in context, prefix it so the AI knows which date to act on
-            prompt: contextDate
-              ? `[Context: the user is looking at ${contextDate}${contextSchedule ? `, currently ${contextSchedule.liters}L at ${contextSchedule.optimal_time}` : ', a skip day'}] ${messageToSend}`
-              : messageToSend,
-            plotId: selectedPlotId === 'general' ? null : selectedPlotId,
-            chat_session_id: getSessionId(selectedPlotId),
-            current_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
-          })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Remove typing indicator and add real AI response
-          setMessages(prev => prev.filter(msg => msg.text !== '● ● ●'));
-          
-          const aiMessage: Message = {
-            id: Date.now() + 1,
-            sender: 'bot',
-            text: data.reply || 'I received your message but couldn\'t generate a response. Please try again.',
-            time: 'now',
-            plotId: selectedPlotId === 'general' ? null : selectedPlotId
-          };
-          setMessages(prev => [...prev, aiMessage]);
-          // Clear day context after first use so subsequent messages aren't prefixed
-          setContextDate(null);
-          setContextSchedule(null);
-        } else {
-          throw new Error(`HTTP ${response.status}`);
-        }
-      } catch (error) {
-        console.error('❌ AI chat error:', error);
-        
-        // Remove typing indicator
-        setMessages(prev => prev.filter(msg => msg.text !== '● ● ●'));
-        
-        // Fallback to smart mock response
-        let botResponse = "I understand. Let me analyze your plot data and provide personalized recommendations.";
-        
-        if (selectedPlot) {
-          if (messageToSend.toLowerCase().includes('water')) {
-            botResponse = `Based on ${selectedPlot.name}'s current moisture level of ${selectedPlot.moisture}%, I ${selectedPlot.moisture < 50 ? 'recommend watering soon' : 'suggest waiting until tomorrow'}. The soil pH of ${selectedPlot.soilPh} is ${selectedPlot.soilPh > 7 ? 'slightly alkaline' : selectedPlot.soilPh < 6.5 ? 'slightly acidic' : 'optimal'} for ${selectedPlot.crop}.`;
-          } else if (messageToSend.toLowerCase().includes('health') || messageToSend.toLowerCase().includes('problem')) {
-            botResponse = `Your ${selectedPlot.name} shows ${selectedPlot.status} status. With ${selectedPlot.sunlight}% sunlight and ${selectedPlot.temperature}°F temperature, conditions are ${selectedPlot.temperature > 80 ? 'quite warm' : selectedPlot.temperature < 60 ? 'cool' : 'good'} for ${selectedPlot.crop}. ${selectedPlot.batteryLevel < 30 ? 'Note: The sensor battery is low and should be replaced soon.' : ''}`;
-          } else if (messageToSend.toLowerCase().includes('schedule')) {
-            botResponse = `For ${selectedPlot.name}, the next watering is scheduled for ${selectedPlot.nextWatering}. Based on current moisture (${selectedPlot.moisture}%) and weather conditions, this timing looks ${selectedPlot.moisture > 70 ? 'possibly too frequent - consider extending the interval' : 'appropriate'}.`;
-          }
-        }
-        
-        const aiMessage: Message = {
-          id: Date.now() + 1,
-          sender: 'bot',
-          text: botResponse,
-          time: 'now',
-          plotId: selectedPlotId === 'general' ? null : selectedPlotId
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } finally {
-        setIsAIProcessing(false);
-      }
-    }
+  const showSuggestions = visibleMessages.filter(m => !m.isWelcome).length === 0;
+
+  const renderText = (text: string, isUser: boolean) => {
+    // Simple bold rendering: **text** → bold
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <Text style={isUser ? styles.userMsgText : styles.botMsgText}>
+        {parts.map((part, i) =>
+          part.startsWith('**') && part.endsWith('**')
+            ? <Text key={i} style={{ fontWeight: '700' }}>{part.slice(2, -2)}</Text>
+            : <Text key={i}>{part}</Text>
+        )}
+      </Text>
+    );
   };
 
   return (
@@ -473,528 +289,256 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="white" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color="white" />
         </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <View style={styles.botAvatarSmall}>
-            <Ionicons name="leaf" size={14} color="white" />
+        <View style={styles.headerMiddle}>
+          <View style={styles.avatarSmall}>
+            <Ionicons name="leaf" size={13} color="white" />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Miraqua AI</Text>
-            {selectedPlot && (
-              <Text style={styles.headerSubtitle}>{selectedPlot.name} · {selectedPlot.crop}</Text>
-            )}
+            <Text style={styles.headerTitle}>Miraqua</Text>
+            {selectedPlot && <Text style={styles.headerSub}>{selectedPlot.name} · {selectedPlot.crop}</Text>}
           </View>
         </View>
-
-        <TouchableOpacity style={styles.plotSelectorBtn} onPress={() => setShowPlotSelector(true)}>
-          <Text style={styles.plotSelectorBtnText} numberOfLines={1}>
-            {selectedPlot ? selectedPlot.name : 'All Plots'}
-          </Text>
-          <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.6)" />
+        <TouchableOpacity style={styles.plotPill} onPress={() => setShowPlotSelector(true)}>
+          <Text style={styles.plotPillText} numberOfLines={1}>{selectedPlot?.name ?? 'All Plots'}</Text>
+          <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.5)" />
         </TouchableOpacity>
       </View>
 
-      {/* Context banner when navigated from a plot */}
-      {selectedPlot && plotIdFromRoute && (
-        <View style={styles.contextBanner}>
-          <View style={styles.contextBannerDot} />
-          <Text style={styles.contextBannerText}>
-            Talking about <Text style={styles.contextBannerPlot}>{selectedPlot.name}</Text> — {selectedPlot.crop}
-          </Text>
-        </View>
-      )}
-
-      {/* Quick Action Chips */}
-      <View style={styles.quickActionsSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
-          {[
-            { label: 'Water today?', icon: 'water-outline' },
-            { label: 'Skip day', icon: 'calendar-outline' },
-            { label: 'Health check', icon: 'leaf-outline' },
-            { label: 'This week', icon: 'stats-chart-outline' },
-            { label: 'Adjust schedule', icon: 'settings-outline' },
-          ].map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.quickActionChip}
-              onPress={() => handleQuickAction(action.label)}
-            >
-              <Ionicons name={action.icon as any} size={13} color="#1aa179" />
-              <Text style={styles.quickActionChipText}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Plot Selector Modal */}
-      <Modal
-        visible={showPlotSelector}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowPlotSelector(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.plotSelectorModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Plot</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity 
-                  style={{ marginRight: 16, padding: 8 }}
-                  onPress={fetchRealPlots}
-                >
-                  <Ionicons name="refresh" size={20} color="#1aa179" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowPlotSelector(false)}>
-                  <Ionicons name="close" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+        >
+          {visibleMessages.map(msg => (
+            <View key={msg.id} style={msg.sender === 'user' ? styles.userRow : styles.botRow}>
+              {msg.sender === 'bot' && <View style={styles.botDot} />}
+              {msg.sender === 'user'
+                ? <View style={styles.userBubble}>{renderText(msg.text, true)}</View>
+                : (
+                  <View style={styles.botContent}>
+                    {renderText(msg.text, false)}
+                    {msg.scheduleUpdated && (
+                      <TouchableOpacity
+                        style={styles.scheduleUpdatedBadge}
+                        onPress={() => navigation.goBack()}
+                      >
+                        <Ionicons name="checkmark-circle" size={13} color="#1aa179" />
+                        <Text style={styles.scheduleUpdatedText}>Schedule updated · Tap to view</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
+              }
             </View>
-            <ScrollView style={styles.plotList}>
+          ))}
+
+          {isTyping && <TypingIndicator />}
+
+          {showSuggestions && !isTyping && (
+            <View style={styles.suggestions}>
+              {SUGGESTIONS.map((s, i) => (
+                <TouchableOpacity key={i} style={styles.suggestionChip} onPress={() => send(s.label)}>
+                  <Ionicons name={s.icon as any} size={13} color="#1aa179" />
+                  <Text style={styles.suggestionText}>{s.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Input */}
+        <View style={styles.inputBar}>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder="Message Miraqua…"
+            placeholderTextColor="#4B5563"
+            value={input}
+            onChangeText={setInput}
+            multiline
+            maxLength={1000}
+            onSubmitEditing={() => send()}
+            blurOnSubmit={false}
+            editable={!isTyping}
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, (!input.trim() || isTyping) && styles.sendBtnDisabled]}
+            onPress={() => send()}
+            disabled={!input.trim() || isTyping}
+          >
+            <Ionicons name="arrow-up" size={18} color="white" />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* Plot selector modal */}
+      <Modal visible={showPlotSelector} transparent animationType="slide" onRequestClose={() => setShowPlotSelector(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowPlotSelector(false)} />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Switch Plot</Text>
+          <ScrollView>
+            {[{ id: 'general', name: 'All Plots', crop: 'General assistant' }, ...realPlots].map(plot => (
               <TouchableOpacity
-                style={[
-                  styles.plotOption,
-                  selectedPlotId === "general" && styles.selectedPlotOption
-                ]}
-                onPress={() => handlePlotSelection("general")}
+                key={plot.id}
+                style={[styles.plotRow, String(selectedPlotId) === String(plot.id) && styles.plotRowActive]}
+                onPress={() => switchPlot(String(plot.id))}
               >
-                <View style={styles.plotOptionContent}>
-                  <Ionicons name="leaf" size={20} color="#1aa179" />
-                  <View style={styles.plotOptionText}>
-                    <Text style={styles.plotOptionTitle}>General Info</Text>
-                    <Text style={styles.plotOptionSubtitle}>Ask about all plots</Text>
-                  </View>
+                <View style={[styles.plotRowIcon, String(selectedPlotId) === String(plot.id) && styles.plotRowIconActive]}>
+                  <Ionicons name="leaf" size={16} color={String(selectedPlotId) === String(plot.id) ? 'white' : '#1aa179'} />
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.plotRowName}>{plot.name}</Text>
+                  <Text style={styles.plotRowCrop}>{plot.crop}</Text>
+                </View>
+                {String(selectedPlotId) === String(plot.id) && <Ionicons name="checkmark" size={16} color="#1aa179" />}
               </TouchableOpacity>
-              
-              {isLoadingPlots ? (
-                <View style={styles.plotOption}>
-                  <View style={styles.plotOptionContent}>
-                    <Ionicons name="hourglass" size={20} color="#6b7280" />
-                    <View style={styles.plotOptionText}>
-                      <Text style={styles.plotOptionTitle}>Loading plots...</Text>
-                      <Text style={styles.plotOptionSubtitle}>Please wait</Text>
-                    </View>
-                  </View>
-                </View>
-              ) : realPlots.length > 0 ? (
-                realPlots.map((plot) => (
-                  <TouchableOpacity
-                    key={plot.id}
-                    style={[
-                      styles.plotOption,
-                      selectedPlotId === plot.id && styles.selectedPlotOption
-                    ]}
-                    onPress={() => handlePlotSelection(plot.id)}
-                  >
-                    <View style={styles.plotOptionContent}>
-                      <Ionicons name="leaf" size={20} color="#1aa179" />
-                      <View style={styles.plotOptionText}>
-                        <Text style={styles.plotOptionTitle}>{plot.name || `Plot ${plot.id.slice(0, 8)}`}</Text>
-                        <Text style={styles.plotOptionSubtitle}>
-                          {plot.crop || 'Unknown crop'} • {plot.area || 0}m²
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.plotOption}>
-                  <View style={styles.plotOptionContent}>
-                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
-                    <View style={styles.plotOptionText}>
-                      <Text style={styles.plotOptionTitle}>No plots found</Text>
-                      <Text style={styles.plotOptionSubtitle}>Create a plot first</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          </View>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
-
-      {/* Messages */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.chatArea}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.messagesContainer}>
-          {filteredMessages.map((msg) => {
-            const isTyping = msg.text === '🤖 AI is thinking...';
-            return (
-              <View
-                key={msg.id}
-                style={[
-                  styles.messageRow,
-                  msg.sender === 'user' ? styles.userMessageRow : styles.botMessageRow,
-                ]}
-              >
-                {msg.sender === 'bot' && (
-                  <View style={styles.botAvatarMsg}>
-                    <Ionicons name="leaf" size={12} color="white" />
-                  </View>
-                )}
-                <View style={[
-                  styles.messageBubble,
-                  msg.sender === 'user' ? styles.userBubble : styles.botBubble,
-                  isTyping && styles.typingBubble,
-                ]}>
-                  <Text style={[styles.messageText, msg.sender === 'user' ? styles.userText : styles.botText]}>
-                    {isTyping ? '● ● ●' : msg.text}
-                  </Text>
-                  {!isTyping && (
-                    <Text style={[styles.messageTime, msg.sender === 'user' ? styles.userTime : styles.botTime]}>
-                      {msg.time}
-                    </Text>
-                  )}
-                </View>
-                {msg.sender === 'user' && (
-                  <View style={styles.userAvatarMsg}>
-                    <Ionicons name="person" size={12} color="white" />
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      {/* Input */}
-      <View style={styles.inputArea}>
-        <TextInput
-          style={styles.textInput}
-          placeholder={
-            isAIProcessing
-              ? 'Miraqua is thinking...'
-              : selectedPlot
-              ? `Ask about ${selectedPlot.name}...`
-              : 'Ask Miraqua anything...'
-          }
-          placeholderTextColor="#6B7280"
-          value={message}
-          onChangeText={setMessage}
-          onSubmitEditing={() => handleSendMessage()}
-          editable={!isAIProcessing}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!message.trim() || isAIProcessing) && styles.sendButtonDisabled]}
-          onPress={() => handleSendMessage()}
-          disabled={!message.trim() || isAIProcessing}
-        >
-          <Ionicons name="paper-plane" size={18} color="white" />
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111827',
-  },
+  container: { flex: 1, backgroundColor: '#0F1117' },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: 'rgba(255,255,255,0.07)',
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  botAvatarSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#1aa179',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: -0.2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 1,
-  },
-  plotSelectorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.11)',
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    maxWidth: 130,
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  plotSelectorBtnText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  contextBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(26,161,121,0.07)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(26,161,121,0.14)',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  contextBannerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  headerMiddle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarSmall: {
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: '#1aa179',
+    justifyContent: 'center', alignItems: 'center',
   },
-  contextBannerText: {
-    fontSize: 13,
-    color: '#9CA3AF',
+  headerTitle: { fontSize: 15, fontWeight: '700', color: 'white', letterSpacing: -0.2 },
+  headerSub: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  plotPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 120,
   },
-  contextBannerPlot: {
-    color: '#1aa179',
-    fontWeight: '600',
+  plotPillText: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500', flexShrink: 1 },
+
+  // Messages
+  messages: { flex: 1 },
+  messagesContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16, flexGrow: 1 },
+
+  botRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, gap: 10 },
+  botDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#1aa179', marginTop: 8, flexShrink: 0,
   },
-  quickActionsSection: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  quickActionsScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  quickActionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-  },
-  quickActionChipText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '500',
-  },
-  chatArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 12,
-  },
-  messagesContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 12,
-  },
-  userMessageRow: {
-    justifyContent: 'flex-end',
-  },
-  botMessageRow: {
-    justifyContent: 'flex-start',
-  },
-  botAvatarMsg: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1aa179',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    flexShrink: 0,
-  },
-  userAvatarMsg: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    flexShrink: 0,
-  },
-  messageBubble: {
-    maxWidth: '74%',
-    padding: 12,
-    borderRadius: 18,
-  },
+  botContent: { flex: 1 },
+  botMsgText: { fontSize: 16, lineHeight: 26, color: 'rgba(255,255,255,0.88)', fontWeight: '400', letterSpacing: -0.1 },
+
+  userRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 },
   userBubble: {
     backgroundColor: '#1aa179',
-    borderBottomRightRadius: 4,
+    borderRadius: 20, borderBottomRightRadius: 6,
+    paddingHorizontal: 16, paddingVertical: 10,
+    maxWidth: '78%',
   },
-  botBubble: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderBottomLeftRadius: 4,
-  },
+  userMsgText: { fontSize: 15, lineHeight: 22, color: 'white', fontWeight: '400' },
+
+  // Typing
+  typingRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, gap: 10 },
   typingBubble: {
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '400',
-  },
-  userText: {
-    color: 'white',
-  },
-  botText: {
-    color: 'rgba(255,255,255,0.9)',
-  },
-  messageTime: {
-    fontSize: 11,
-    marginTop: 6,
-  },
-  userTime: {
-    color: 'rgba(255,255,255,0.6)',
-  },
-  botTime: {
-    color: 'rgba(255,255,255,0.35)',
-  },
-  inputArea: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    gap: 10,
-  },
-  textInput: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    color: 'white',
-    fontSize: 15,
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
   },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1aa179',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
+  typingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#6B7280' },
+
+  // Schedule updated badge
+  scheduleUpdatedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    marginTop: 10,
+    backgroundColor: 'rgba(26,161,121,0.1)',
+    borderWidth: 1, borderColor: 'rgba(26,161,121,0.25)',
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+    alignSelf: 'flex-start',
   },
-  sendButtonDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  scheduleUpdatedText: { fontSize: 12, color: '#1aa179', fontWeight: '600' },
+
+  // Suggestions
+  suggestions: { marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  suggestionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  suggestionText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
+
+  // Input
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)',
+    gap: 10, backgroundColor: '#0F1117',
   },
-  plotSelectorModal: {
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
-    width: '85%',
-    maxHeight: '70%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+  input: {
+    flex: 1, minHeight: 44, maxHeight: 130,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 22, paddingHorizontal: 18, paddingTop: 11, paddingBottom: 11,
+    color: 'white', fontSize: 15, lineHeight: 22,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  sendBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#1aa179', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: 0.3,
+  sendBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.1)' },
+
+  // Modal
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalSheet: {
+    backgroundColor: '#1C2333',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40,
+    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    maxHeight: '60%',
   },
-  plotList: {
-    padding: 24,
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center', marginBottom: 20,
   },
-  plotOption: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    minHeight: 64,
+  modalTitle: { fontSize: 17, fontWeight: '700', color: 'white', marginBottom: 16, letterSpacing: -0.3 },
+  plotRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, paddingHorizontal: 14,
+    borderRadius: 14, marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  selectedPlotOption: {
-    backgroundColor: 'rgba(26, 161, 121, 0.12)',
-    borderWidth: 2,
-    borderColor: '#1aa179',
+  plotRowActive: { backgroundColor: 'rgba(26,161,121,0.12)', borderWidth: 1, borderColor: 'rgba(26,161,121,0.3)' },
+  plotRowIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(26,161,121,0.12)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  plotOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  plotOptionText: {
-    flex: 1,
-  },
-  plotOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 4,
-    letterSpacing: 0.2,
-  },
-  plotOptionSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '500',
-  },
-}); 
+  plotRowIconActive: { backgroundColor: '#1aa179' },
+  plotRowName: { fontSize: 15, fontWeight: '600', color: 'white', letterSpacing: -0.2 },
+  plotRowCrop: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+});

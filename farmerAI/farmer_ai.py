@@ -122,7 +122,7 @@ def chat():
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ✅ SMART AI-DRIVEN SCHEDULE EDITING
-def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, plot, daily, hourly, logs, age):
+def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, plot, daily, hourly, logs, age, chat_history=None):
     import re, json
     from datetime import datetime, timedelta
     from dateutil import parser as date_parser
@@ -133,9 +133,10 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
         prompt_lower = prompt.lower().strip()
 
         # === 1. Load schedules ===
-        schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).single().execute()
-        schedule = schedule_res.data.get("schedule", [])
-        og_schedule = schedule_res.data.get("og_schedule", [])
+        schedule_res = supabase.table("plot_schedules").select("*").eq("plot_id", plot_id).maybe_single().execute()
+        sched_data = schedule_res.data or {}
+        schedule = sched_data.get("schedule") or []
+        og_schedule = sched_data.get("og_schedule") or []
         original_schedule = json.loads(json.dumps(schedule))
 
         updated_schedule = [d.copy() for d in schedule]
@@ -299,54 +300,91 @@ def process_chat_command(prompt, crop, lat, lon, plot_name, plot_id, weather, pl
             }).execute()
             return {"schedule_updated": True, "reply": "\n".join(reply_lines)}
 
-        # === 9. Fallback to Gemini ===
+        # === 9. "Why" question — pull explanation from schedule day ===
+        why_match = re.search(r"\b(why|reason|explain|how come|what.*reason)\b", prompt_lower)
+        if why_match:
+            # Find which day they're asking about
+            mentioned_day = None
+            for key, idx in date_map.items():
+                if key in prompt_lower:
+                    mentioned_day = schedule[idx] if idx < len(schedule) else None
+                    break
+            if not mentioned_day and target_indices:
+                mentioned_day = schedule[next(iter(target_indices))]
+
+            if mentioned_day and mentioned_day.get("explanation"):
+                day_context = (
+                    f"On {mentioned_day['date']}, the schedule called for {mentioned_day['liters']}L "
+                    f"at {mentioned_day.get('optimal_time','N/A')}. "
+                    f"Reason: {mentioned_day['explanation']}"
+                )
+            elif mentioned_day:
+                day_context = (
+                    f"On {mentioned_day['date']}, the schedule called for {mentioned_day['liters']}L "
+                    f"at {mentioned_day.get('optimal_time','N/A')}."
+                )
+            else:
+                day_context = ""
+
+        else:
+            day_context = ""
+
+        # === 10. Fallback to Gemini (with conversation history) ===
         schedule_lines = "\n".join(
-            f"{day['date']}: {day['liters']}L at {day.get('optimal_time', 'N/A')}"
+            f"  {day['date']}: {day['liters']}L at {day.get('optimal_time','N/A')}"
+            + (f"  [reason: {day['explanation']}]" if day.get('explanation') else "")
             for day in schedule
         )
 
-        prompt_template = f"""
-You are Miraqua, an AI irrigation assistant. You're knowledgeable, direct, and conversational — like a smart friend who happens to know everything about farming and irrigation. You never sound like a robot or a database report.
+        history_block = ""
+        if chat_history:
+            history_lines = []
+            for msg in chat_history[-8:]:
+                role = "User" if msg.get("sender") == "user" else "Miraqua"
+                history_lines.append(f"{role}: {msg.get('text','')}")
+            history_block = "Recent conversation:\n" + "\n".join(history_lines) + "\n\n"
 
-Tone rules:
-- Casual and warm. Short sentences. No unnecessary filler.
-- If the user just says hi or something conversational, reply naturally — don't dump irrigation data on them.
-- When giving numbers, round them (say "around 58°F", not "57.97°F"; say "3L", not "3.0L").
-- Never say "Please proceed with..." or "I'll now provide personalized advice...". Just talk like a human.
-- Keep responses concise. 2-4 sentences for simple questions, more only when detail is genuinely needed.
-- No bullet points unless specifically listing a schedule or multiple items. Prefer flowing sentences.
-- Don't mention the user's coordinates unless they ask about location.
+        weather_summary = ""
+        if daily:
+            d = daily[0]
+            weather_summary = (
+                f"Today: high {d.get('temp_max_f', d.get('temp_max','?'))}°F, "
+                f"low {d.get('temp_min_f', d.get('temp_min','?'))}°F, "
+                f"rain prob {d.get('rain_prob', d.get('precipitation_prob','?'))}%"
+            )
 
-Context about this plot:
-- Plot name: {plot_name}
-- Crop: {crop}
-- Area: {plot.get("area")} m²
-- Crop age: {age} months
-- Constraints: {plot.get("custom_constraints") or "none"}
+        system_prompt = f"""You are Miraqua, an AI irrigation assistant. Be like a knowledgeable friend — direct, warm, never robotic.
 
-Upcoming irrigation schedule:
+Rules:
+- Short sentences. No filler phrases like "Certainly!" or "Great question!".
+- Round numbers. Say "around 6L", not "6.0 liters".
+- 2-4 sentences for simple questions. More only when the user explicitly asks for detail.
+- No bullet points unless listing multiple schedule days.
+- If asked WHY a certain amount was scheduled, explain the ET₀/weather/soil reasoning in plain English.
+- If the user wants to change the schedule, tell them what you can do: skip a day, set to a specific amount, shift the time, or pause for N days.
+- Never reveal lat/lon coordinates.
+
+Plot: {plot_name} | Crop: {crop} | Area: {plot.get("area")} m² | Age: {age} months
+Constraints: {plot.get("custom_constraints") or "none"}
+Weather today: {weather_summary or "unavailable"}
+
+Upcoming schedule (with reasons where available):
 {schedule_lines}
 
-Recent weather forecast:
-{json.dumps(daily[:3] if daily else [], indent=2)}
+{f"Day context: {day_context}" if day_context else ""}
+Recent watering logs: {json.dumps([{{"date": l.get("watered_at","")[:10], "minutes": l.get("duration_minutes")}} for l in (logs[-3:] if logs else [])], separators=(',',':'))}
 
-Recent watering logs:
-{json.dumps(logs[-5:] if logs else [], indent=2)}
-
-User message: "{prompt.strip()}"
-
-Reply naturally. If it's a greeting, greet back and maybe mention one useful thing about the plot. If it's an irrigation question, give a clear helpful answer with real data.
-"""
+{history_block}User: {prompt.strip()}"""
 
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt_template)
+        response = model.generate_content(system_prompt)
         return {"schedule_updated": False, "reply": response.text.strip()}
 
     except Exception as e:
         print(f"❌ Error in process_chat_command: {e}")
         return {
             "schedule_updated": False,
-            "reply": "⚠️ Something went wrong. Please try again or rephrase your request."
+            "reply": "Something went wrong on my end. Try rephrasing or ask again."
         }
 
         

@@ -698,45 +698,35 @@ def chat():
         age=age  # ✅ passed in
     )
     reply = result["reply"]
+    schedule_updated = result.get("schedule_updated", False)
 
-    # 🔁 Get updated schedule (if changed)
+    # 🔁 Get updated schedule
     refreshed = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).execute()
     updated_schedule = refreshed.data[0]["schedule"] if refreshed.data else []
 
-    # 🗓️ Get original schedule for log
-    schedule_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).limit(1).execute()
-    original_schedule = schedule_res.data[0]["schedule"] if refreshed.data else []
-
     # 📝 Save chat history
     try:
-        chat_log_data = {
+        supabase.table("farmerAI_chatlog").insert({
             "id": str(uuid4()),
             "plot_id": plot_id,
             "user_id": user_id,
             "prompt": prompt,
             "reply": reply,
             "created_at": datetime.utcnow().isoformat(),
-            "original_schedule": original_schedule,
+            "original_schedule": updated_schedule,
             "modified_schedule": updated_schedule,
             "reverted": False,
             "is_user_message": True,
             "role": "user",
             "message_index": 0,
             "context_summary": "",
-            "chat_session_id": str(uuid4()) if not chat_session_id else chat_session_id,
+            "chat_session_id": chat_session_id,
             "edited": False
-        }
-        print(f"📝 Attempting to save chat log: plot_id={plot_id}, user_id={user_id}, session={chat_session_id}")
-        result = supabase.table("farmerAI_chatlog").insert(chat_log_data).execute()
-        print(f"✅ Chat history saved successfully: {result.data}")
+        }).execute()
     except Exception as e:
         print(f"⚠️ Failed to save chat history: {e}")
-        print(f"   Data attempted: {chat_log_data}")
-        import traceback
-        print(f"   Full traceback: {traceback.format_exc()}")
-        # Continue without saving chat history - don't crash the chat
 
-    return jsonify({"success": True, "reply": reply})
+    return jsonify({"success": True, "reply": reply, "schedule_updated": schedule_updated})
 
 
 
