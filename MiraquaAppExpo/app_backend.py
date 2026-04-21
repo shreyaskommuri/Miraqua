@@ -124,21 +124,36 @@ def get_plan():
     cloud_vals = [h.get("clouds",{}).get("all") for h in hourly[:24] if "clouds" in h]
     sunlight = round(100 - np.mean(cloud_vals),0) if cloud_vals else 70.0
 
-    # ✅ Cached schedule path
+    # ✅ Cached schedule path — skip if stale (first day already passed)
+    def _schedule_is_stale(sched: list) -> bool:
+        if not sched:
+            return True
+        try:
+            first_date_str = sched[0].get("date", "")
+            try:
+                first_date = datetime.strptime(first_date_str, "%m/%d/%y").date()
+            except ValueError:
+                first_date = datetime.fromisoformat(first_date_str[:10]).date()
+            return first_date < datetime.utcnow().date()
+        except Exception:
+            return False
+
     if schedule_data and not force_refresh:
-        base = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
-        return jsonify({
-            "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
-            "schedule":    base or [],
-            "summary":     schedule_data.get("summary",""),
-            "gem_summary": schedule_data.get("gem_summary",""),
-            "current_temp_f": current_temp_f,
-            "moisture":       moisture,
-            "sunlight":       sunlight,
-            "total_crop_age": age,
-            "kc_used":        "AI-optimized",
-            "crop_stage":     get_crop_stage(plot["crop"], age)
-        })
+        cached = schedule_data.get("schedule") or []
+        if not _schedule_is_stale(cached):
+            base = schedule_data.get("og_schedule") if use_original else cached
+            return jsonify({
+                "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
+                "schedule":    base or [],
+                "summary":     schedule_data.get("summary",""),
+                "gem_summary": schedule_data.get("gem_summary",""),
+                "current_temp_f": current_temp_f,
+                "moisture":       moisture,
+                "sunlight":       sunlight,
+                "total_crop_age": age,
+                "kc_used":        "AI-optimized",
+                "crop_stage":     get_crop_stage(plot["crop"], age)
+            })
 
     # 🚀 Generate & save new schedule
     from farmer_ai import generate_ai_schedule, generate_summary, generate_gem_summary
