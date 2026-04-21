@@ -96,8 +96,12 @@ def get_crop_stage(crop, age_months):
 
 def get_lat_lon(zip_code):
     url = f"http://api.zippopotam.us/us/{zip_code}"
-    res = requests.get(url)
+    res = requests.get(url, timeout=5)
+    if res.status_code != 200:
+        raise ValueError(f"ZIP lookup returned {res.status_code}")
     data = res.json()
+    if not data.get('places'):
+        raise ValueError(f"No places found for ZIP {zip_code}")
     return float(data['places'][0]['latitude']), float(data['places'][0]['longitude'])
 
 @app.route("/get_plot_by_id", methods=["GET"])
@@ -752,7 +756,8 @@ def get_chat_log():
 
         chat_history = []
         for row in reversed(res.data):  # oldest first
-            prompt_ts = datetime.fromisoformat(row["created_at"])
+            from dateutil.parser import parse as parse_dt
+            prompt_ts = parse_dt(row["created_at"])
             reply_ts = prompt_ts + timedelta(seconds=1)  # offset reply to avoid duplication
 
             if row["prompt"]:
@@ -774,6 +779,34 @@ def get_chat_log():
     except Exception as e:
         print("❌ Error in /get_chat_log:", e)
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/update_manual_day", methods=["POST"])
+def update_manual_day():
+    data = request.get_json()
+    plot_id = data.get("plot_id")
+    date = data.get("date")
+    liters = data.get("liters")
+
+    if not plot_id or date is None or liters is None:
+        return jsonify({"success": False, "error": "Missing plot_id, date, or liters"}), 400
+
+    try:
+        sched_res = supabase.table("plot_schedules").select("schedule").eq("plot_id", plot_id).single().execute()
+        if not sched_res.data:
+            return jsonify({"success": False, "error": "Schedule not found"}), 404
+
+        schedule = sched_res.data.get("schedule") or []
+        for day in schedule:
+            if day.get("date") == date:
+                day["liters"] = liters
+                break
+
+        supabase.table("plot_schedules").update({"schedule": schedule}).eq("plot_id", plot_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"❌ Error in /update_manual_day: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

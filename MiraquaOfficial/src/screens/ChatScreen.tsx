@@ -91,7 +91,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
   const historyLoaded = useRef<Set<string>>(new Set());
   const inputRef = useRef<TextInput>(null);
 
-  const getSessionId = (id: string) => id === 'general' ? 'general' : `plot_${id}`;
+  const getSessionId = (id: string) => id;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
