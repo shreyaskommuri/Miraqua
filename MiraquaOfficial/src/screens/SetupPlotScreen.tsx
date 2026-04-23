@@ -90,7 +90,7 @@ const SetupPlotScreen = ({ navigation }: SetupPlotScreenProps) => {
       };
       const response = await addPlot(plotData);
       if (response.success) {
-        Alert.alert('Plot Created', 'Your AI irrigation system is now active.', [
+        Alert.alert('Plot Created', 'Your plot has been created successfully.', [
           { text: 'View Home', onPress: () => navigation.navigate('Home') },
         ]);
       } else {

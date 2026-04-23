@@ -533,28 +533,24 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
         {/* AI Summary */}
         <View style={styles.aiCard}>
-          <View style={styles.aiGradient}>
-            <View style={styles.aiHeader}>
-              <View style={styles.aiTitle}>
-                <Ionicons name="sparkles" size={20} color="white" />
-                <Text style={styles.aiTitleText}>AI Insights</Text>
+          <View style={styles.aiHeader}>
+            <View style={styles.aiTitle}>
+              <View style={styles.aiIconBadge}>
+                <Ionicons name="sparkles" size={14} color="#a78bfa" />
               </View>
-              <TouchableOpacity 
-                style={styles.aiRefreshButton}
-                onPress={generateAISummary}
-                disabled={generatingAI}
-              >
-                {generatingAI ? (
-                  <Ionicons name="refresh" size={16} color="white" style={styles.spinningIcon} />
-                ) : (
-                  <Ionicons name="refresh" size={16} color="white" />
-                )}
-              </TouchableOpacity>
+              <Text style={styles.aiTitleText}>AI Insights</Text>
             </View>
-            <Text style={styles.aiSummary}>
-              {aiSummary || "Generating personalized insights for your plot..."}
-            </Text>
+            <TouchableOpacity
+              style={styles.aiRefreshButton}
+              onPress={generateAISummary}
+              disabled={generatingAI}
+            >
+              <Ionicons name="refresh" size={15} color="rgba(255,255,255,0.4)" style={generatingAI ? styles.spinningIcon : undefined} />
+            </TouchableOpacity>
           </View>
+          <Text style={styles.aiSummary}>
+            {aiSummary || "Generating personalized insights for your plot..."}
+          </Text>
         </View>
 
 
@@ -653,13 +649,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
 
             <View style={styles.calendarContent}>
-            {/* Days of Week Header */}
-            <View style={styles.daysHeader}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <Text key={day} style={styles.dayHeader}>{day}</Text>
-              ))}
-            </View>
-
             {/* First Week */}
             <View style={styles.weekGrid}>
               {getScheduleData().slice(0, 7).map((day, index) => (
@@ -672,6 +661,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}
                   onPress={() => handleDayClick(day)}
                 >
+                  <Text style={styles.dayOfWeekLabel}>{day.dayOfWeek}</Text>
                   <Text style={[
                     styles.dayNumber,
                     day.isToday && styles.todayText,
@@ -679,8 +669,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}>
                     {day.day}
                   </Text>
-                  
-                  {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
                       <Ionicons name="water" size={10} color="#3B82F6" />
@@ -689,11 +677,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                       )}
                     </View>
                   )}
-                  
-                  {/* Today Indicator */}
-                  {day.isToday && (
-                    <View style={styles.todayPulse} />
-                  )}
+                  {day.isToday && <View style={styles.todayPulse} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -710,6 +694,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}
                   onPress={() => handleDayClick(day)}
                 >
+                  <Text style={styles.dayOfWeekLabel}>{day.dayOfWeek}</Text>
                   <Text style={[
                     styles.dayNumber,
                     day.isToday && styles.todayText,
@@ -717,8 +702,6 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                   ]}>
                     {day.day}
                   </Text>
-                  
-                  {/* Watering Information */}
                   {day.hasWatering && (
                     <View style={styles.wateringIndicator}>
                       <Ionicons name="water" size={10} color="#3B82F6" />
@@ -727,11 +710,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
                       )}
                     </View>
                   )}
-                  
-                  {/* Today Indicator */}
-                  {day.isToday && (
-                    <View style={styles.todayPulse} />
-                  )}
+                  {day.isToday && <View style={styles.todayPulse} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -792,31 +771,30 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
           ))}
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity 
-            style={styles.askMiraquaButton}
-            onPress={() => navigation.navigate('Chat', { plotId: plot.id })}
-          >
-            <Ionicons name="chatbubble" size={20} color="#6B7280" />
-            <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.waterNowBottomButton}
-            onPress={handleWaterNow}
-            disabled={watering}
-          >
-            {watering ? (
-              <Ionicons name="refresh" size={20} color="white" style={styles.spinningIcon} />
-            ) : (
-              <Ionicons name="water" size={20} color="white" />
-            )}
-            <Text style={styles.waterNowBottomText}>
-              {watering ? 'Watering...' : 'Water Now'}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      {/* Sticky Action Buttons */}
+      <View style={styles.bottomButtons}>
+        <TouchableOpacity
+          style={styles.askMiraquaButton}
+          onPress={() => navigation.navigate('Chat', { plotId: plot.id })}
+        >
+          <Ionicons name="chatbubble" size={20} color="#1aa179" />
+          <Text style={styles.askMiraquaText}>Ask Miraqua</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.waterNowBottomButton}
+          onPress={handleWaterNow}
+          disabled={watering}
+        >
+          {watering && (
+            <Ionicons name="refresh" size={18} color="white" style={styles.spinningIcon} />
+          )}
+          <Text style={styles.waterNowBottomText}>
+            {watering ? 'Watering...' : 'Water Now'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Manual Day Edit Modal */}
       <Modal visible={!!editingDay} transparent animationType="slide" onRequestClose={() => setEditingDay(null)}>
@@ -1056,39 +1034,45 @@ const styles = StyleSheet.create({
   },
   aiCard: {
     marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  aiGradient: {
-    padding: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-    borderRadius: 12,
+    borderColor: 'rgba(139, 92, 246, 0.18)',
+    padding: 18,
+  },
+  aiIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(167, 139, 250, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   aiTitle: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
   aiTitleText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: 'white',
-    marginLeft: 8,
+    letterSpacing: -0.2,
   },
   aiRefreshButton: {
-    padding: 8,
+    padding: 6,
   },
   aiSummary: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.82)',
+    lineHeight: 22,
+    letterSpacing: -0.1,
   },
   sensorsGrid: {
     flexDirection: 'row',
@@ -1471,16 +1455,12 @@ const styles = StyleSheet.create({
   calendarContent: {
     padding: 16,
   },
-  daysHeader: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  dayHeader: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 10,
+  dayOfWeekLabel: {
+    fontSize: 9,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    marginBottom: 2,
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -1488,7 +1468,7 @@ const styles = StyleSheet.create({
   },
   calendarDay: {
     width: (width - 80) / 7,
-    height: 50,
+    height: 62,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -1498,7 +1478,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     marginHorizontal: 1,
-    padding: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
   },
   todayDay: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',

@@ -61,10 +61,10 @@ const SignInScreen = ({ navigation }: any) => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="leaf" size={48} color="#10B981" />
+              <Ionicons name="leaf" size={32} color="white" />
             </View>
             <Text style={styles.title}>Welcome to Miraqua</Text>
-            <Text style={styles.subtitle}>Smart Garden AI</Text>
+            <Text style={styles.subtitle}>Smart Irrigation</Text>
           </View>
 
           {/* Form */}
