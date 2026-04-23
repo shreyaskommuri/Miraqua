@@ -315,7 +315,7 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
 
       if (response.ok) {
         const data = await response.json();
-        setAiSummary(data.gem_summary || data.summary || '');
+        setAiSummary(data.gem_summary || '');
       }
     } catch (error) {
       console.error('Error generating AI summary:', error);
