@@ -22,7 +22,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-GEMINI_MODEL = "models/gemini-2.5-flash"
+GEMINI_MODEL = "models/gemini-2.0-flash"
 
 ai_blueprint = Blueprint("ai", __name__)
 
