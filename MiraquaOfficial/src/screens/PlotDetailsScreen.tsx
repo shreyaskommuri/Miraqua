@@ -549,7 +549,11 @@ const PlotDetailsScreen = ({ route, navigation }: PlotDetailsScreenProps) => {
             </TouchableOpacity>
           </View>
           <Text style={styles.aiSummary}>
-            {aiSummary || "Generating personalized insights for your plot..."}
+            {aiSummary && !aiSummary.startsWith('Gemini') && !aiSummary.includes('failed') && !aiSummary.includes('RESOURCE') && !aiSummary.includes('UNAVAILABLE')
+              ? aiSummary
+              : generatingAI
+                ? "Generating personalized insights for your plot..."
+                : "AI insights are temporarily unavailable. Tap refresh to try again."}
           </Text>
         </View>
 

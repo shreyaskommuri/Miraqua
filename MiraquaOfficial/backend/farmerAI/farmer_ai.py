@@ -82,7 +82,8 @@ Write a short, 3-sentence forecast summary. Include water usage, possible skips 
         return response.text.strip()
 
     except Exception as e:
-        return f"Gemini summary generation failed: {str(e)}"
+        print(f"⚠️ Gemini summary error: {e}")
+        return None
 
 
 
