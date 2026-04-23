@@ -182,11 +182,29 @@ def get_plan():
     # ✅ Cached schedule path
     if schedule_data and not force_refresh:
         base = schedule_data.get("og_schedule") if use_original else schedule_data.get("schedule")
+        gem_summary = schedule_data.get("gem_summary") or ""
+
+        # If gem_summary is missing, generate it now and persist it
+        if not gem_summary:
+            try:
+                from farmer_ai import generate_gem_summary
+                gem_summary = generate_gem_summary(
+                    plot["crop"], lat, lon, base or [],
+                    plot.get("name", ""), plot_id
+                ) or ""
+                if gem_summary:
+                    supabase.table("plot_schedules") \
+                            .update({"gem_summary": gem_summary}) \
+                            .eq("plot_id", plot_id) \
+                            .execute()
+            except Exception as e:
+                print(f"⚠️ gem_summary backfill failed: {e}")
+
         return jsonify({
             "plot_name":   plot.get("name", f"Plot {plot_id[:5]}"),
             "schedule":    base or [],
             "summary":     schedule_data.get("summary",""),
-            "gem_summary": schedule_data.get("gem_summary",""),
+            "gem_summary": gem_summary,
             "current_temp_f": current_temp_f,
             "moisture":       moisture,
             "sunlight":       sunlight,

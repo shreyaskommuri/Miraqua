@@ -77,9 +77,15 @@ Here is the upcoming irrigation schedule:
 Write a short, 3-sentence forecast summary. Include water usage, possible skips due to weather or season, and anything helpful based on crop water needs. Make it clear, friendly, and concise. No bullet points, no markdown.
 """
 
-        # Generate and return the summary
-        response = gemini.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-        return response.text.strip()
+        # Try models in order until one succeeds
+        for model_name in ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-flash"]:
+            try:
+                response = gemini.models.generate_content(model=model_name, contents=prompt)
+                return response.text.strip()
+            except Exception as model_err:
+                print(f"⚠️ Gemini summary {model_name} failed: {model_err}")
+                continue
+        return None
 
     except Exception as e:
         print(f"⚠️ Gemini summary error: {e}")
@@ -243,11 +249,12 @@ You are FarmerBot. The weather forecast and plot data is shown below. You MUST u
 7. Never say "I don't have access" - the data is literally shown above
 
 YOUR ANSWER:"""
-            try:
-                response = gemini.models.generate_content(model=GEMINI_MODEL, contents=prompt_template)
-                return {"schedule_updated": False, "reply": response.text.strip()}
-            except Exception as e:
-                print(f"Gemini error: {e}")
+            for model_name in ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-flash"]:
+                try:
+                    response = gemini.models.generate_content(model=model_name, contents=prompt_template)
+                    return {"schedule_updated": False, "reply": response.text.strip()}
+                except Exception as e:
+                    print(f"⚠️ Chat model {model_name} failed: {e}")
             return {"schedule_updated": False, "reply": "I'm having trouble connecting right now. Try again in a moment."}
 
         # For specific plots, load schedules
@@ -490,11 +497,12 @@ Schedule (with reasoning where available):
 {f"Day context: {day_context}" if day_context else ""}{history_block}User: {prompt.strip()}"""
 
         # Try chat models in order
-        try:
-            response = gemini.models.generate_content(model=GEMINI_MODEL, contents=system_prompt)
-            return {"schedule_updated": False, "reply": response.text.strip()}
-        except Exception as model_err:
-            print(f"⚠️ Gemini error: {model_err}")
+        for model_name in ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-flash"]:
+            try:
+                response = gemini.models.generate_content(model=model_name, contents=system_prompt)
+                return {"schedule_updated": False, "reply": response.text.strip()}
+            except Exception as model_err:
+                print(f"⚠️ Chat model {model_name} failed: {model_err}")
 
         return {"schedule_updated": False, "reply": "I'm having trouble connecting right now. Try again in a moment."}
 
