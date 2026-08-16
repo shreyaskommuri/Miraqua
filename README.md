@@ -27,6 +27,51 @@ different stages:
 `MiraquaOfficial/` is the actively developed app; the rest are prior
 prototypes/experiments kept for reference.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client["📱 MiraquaOfficial (Expo / React Native)"]
+        UI[Plot dashboard, calendar & schedule views]
+        Chat[FarmerAI chat screen]
+    end
+
+    subgraph API["🧠 Flask API (MiraquaOfficial/backend)"]
+        Routes["/get_plots · /get_plan\n/generate_ai_schedule · /water_now"]
+        AI["FarmerAI blueprint\n/chat · /get_chat_log"]
+        Sched["schedule_utils\nAW / crop-coefficient scheduling"]
+        Fcst["forecast_utils\nweather + Kc lookup"]
+    end
+
+    subgraph External["☁️ External services"]
+        Meteo[(Open-Meteo\nweather API)]
+        Gemini[(Google Gemini\ngenerative AI)]
+        SB[(Supabase\nPostgres + Auth)]
+    end
+
+    subgraph ML["📊 automatedML"]
+        Model[aw_predictor / unified_aw_model\ntrained on historical weather data]
+    end
+
+    UI -->|REST| Routes
+    Chat -->|REST| AI
+    Routes --> Sched
+    Routes --> Fcst
+    AI --> Gemini
+    AI --> SB
+    Sched --> SB
+    Fcst --> Meteo
+    Model -. trains / feeds coefficients .-> Sched
+    Routes --> SB
+```
+
+**Request flow, end to end:**
+1. The Expo app requests a plot's schedule (`/get_plan`) or asks FarmerAI a question (`/chat`).
+2. The Flask backend pulls live/forecast weather from **Open-Meteo** and combines it with crop coefficients (`forecast_utils`).
+3. `schedule_utils` computes allowable-water-depletion-based watering days, informed by models trained offline in `automatedML/`.
+4. Plots, schedules, and chat history are persisted in **Supabase** (Postgres).
+5. For conversational queries, the `FarmerAI` blueprint calls **Gemini** with the plot's schedule/context and returns a plain-language answer.
+
 ## Tech stack
 
 - **Frontend:** React Native + Expo, React Navigation, `react-native-maps`,
