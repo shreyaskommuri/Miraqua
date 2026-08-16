@@ -3,10 +3,14 @@
 Miraqua turns weather data and crop parameters into precise, automated
 watering schedules. No guesswork, no overwatering, no dead plants.
 
-Give it a plot's location, crop, and area. It pulls live weather and
-forecast data, runs an allowable-water-depletion model against
-FAO-style crop coefficients, and outputs a day-by-day watering plan.
-`FarmerAI` explains the plan and answers questions about it directly.
+The schedule is **not** an AI guess. Give it a plot's location, crop, and
+area, and a deterministic agronomic model — FAO/USDA crop coefficients run
+against live weather and evapotranspiration data — computes the exact
+water demand and outputs a day-by-day plan. Every run on the same inputs
+produces the same plan. AI only enters after that: `FarmerAI` sits on top
+as an adaptive layer that folds in farmer preferences, answers questions,
+and explains why the model did what it did — it personalizes and narrates
+the plan, it does not replace the math.
 
 ## Repository layout
 
@@ -26,58 +30,67 @@ prototype, kept for reference.
 
 ## Architecture
 
+Model first, AI last. Every layer below only runs after the one above it
+has already produced a hard, reproducible answer.
+
 ```mermaid
-flowchart LR
-    subgraph Client["MiraquaOfficial — Expo / React Native"]
-        UI["Plot dashboard, calendar, schedule views"]
-        Chat["FarmerAI chat screen"]
+flowchart TB
+    subgraph Inputs["INPUTS"]
+        direction LR
+        Meteo[("Open-Meteo\nlive + forecast weather")]
+        Plot["Plot config\nlocation · crop · area"]
+        Hist["automatedML\nAW / Kc models trained on\nhistorical weather data"]
     end
 
-    subgraph API["Flask API — MiraquaOfficial/backend"]
-        Routes["/get_plots · /get_plan\n/generate_ai_schedule · /water_now"]
-        AI["FarmerAI blueprint\n/chat · /get_chat_log"]
-        Sched["schedule_utils\nAW / crop-coefficient scheduling"]
-        Fcst["forecast_utils\nweather + Kc lookup"]
+    subgraph Core["LAYER 1 — DETERMINISTIC MODEL  (schedule_utils / forecast_utils)"]
+        ET["Evapotranspiration + FAO/USDA\ncrop-coefficient calculation"]
+        AW["Allowable-water-depletion engine"]
+        Plan["Day-by-day watering plan"]
+        ET --> AW --> Plan
     end
 
-    subgraph External["External services"]
-        Meteo[("Open-Meteo\nweather API")]
-        Gemini[("Google Gemini\ngenerative AI")]
+    subgraph Store["PERSISTENCE"]
         SB[("Supabase\nPostgres + Auth")]
     end
 
-    subgraph ML["automatedML"]
-        Model["aw_predictor / unified_aw_model\ntrained on historical weather data"]
+    subgraph AI["LAYER 2 — AI  (FarmerAI blueprint)"]
+        Adapt["Adapts plan to farmer\npreferences / overrides"]
+        Explain["Explains, answers questions,\nexecutes chat commands"]
+        Gemini[("Google Gemini")]
+        Adapt --> Explain --> Gemini
     end
 
-    UI -->|REST| Routes
-    Chat -->|REST| AI
-    Routes --> Sched
-    Routes --> Fcst
-    Routes --> SB
-    AI --> Gemini
-    AI --> SB
-    Sched --> SB
-    Fcst --> Meteo
-    Model -. feeds coefficients .-> Sched
+    Meteo --> ET
+    Plot --> ET
+    Hist -. feeds coefficients .-> AW
+    Plan --> SB
+    SB --> Adapt
+    Explain --> SB
 
-    classDef client fill:#111111,stroke:#39ff14,stroke-width:2px,color:#39ff14
-    classDef api fill:#111111,stroke:#00e5ff,stroke-width:2px,color:#00e5ff
-    classDef ext fill:#111111,stroke:#ff3b30,stroke-width:2px,color:#ff3b30
-    classDef ml fill:#111111,stroke:#ffd60a,stroke-width:2px,color:#ffd60a
+    classDef input fill:#0a0a0a,stroke:#5a5a5a,stroke-width:2px,color:#cfcfcf
+    classDef core fill:#0a0a0a,stroke:#00e5ff,stroke-width:3px,color:#00e5ff
+    classDef store fill:#0a0a0a,stroke:#ffd60a,stroke-width:2px,color:#ffd60a
+    classDef ai fill:#0a0a0a,stroke:#ff3b30,stroke-width:2px,color:#ff3b30
 
-    class UI,Chat client
-    class Routes,AI,Sched,Fcst api
-    class Meteo,Gemini,SB ext
-    class Model ml
+    class Meteo,Plot,Hist input
+    class ET,AW,Plan core
+    class SB store
+    class Adapt,Explain,Gemini ai
 ```
 
+**Why it's built this way:** the watering plan has to be trustworthy and
+auditable — a fixed model computing exact water demand from weather and
+crop-stage data means the same inputs always yield the same plan, and a
+farmer can check the math. AI is layered on afterward, strictly for
+personalization (folding in preferences and overrides) and interface
+(chat, explanations, one-off commands like "skip tomorrow"). It never
+touches the core calculation.
+
 **Request flow:**
-1. Expo app hits `/get_plan` for a schedule, or `/chat` for FarmerAI.
-2. Backend pulls live/forecast weather from **Open-Meteo**, combines it with crop coefficients (`forecast_utils`).
-3. `schedule_utils` computes AW-based watering days, using coefficients from models trained offline in `automatedML/`.
-4. Plots, schedules, and chat history persist in **Supabase**.
-5. For chat, the `FarmerAI` blueprint calls **Gemini** with the plot's schedule and context, returns a plain-language answer.
+1. Expo app requests a plan (`/get_plan`) with a plot's location, crop, and area.
+2. **Layer 1** pulls live/forecast weather from Open-Meteo (`forecast_utils`), runs it through FAO/USDA crop coefficients and the allowable-water-depletion engine (`schedule_utils`) — using AW/Kc models pretrained offline in `automatedML/` — and produces the deterministic day-by-day plan.
+3. The plan is persisted to **Supabase**.
+4. **Layer 2** only engages on demand: the `FarmerAI` blueprint reads the stored plan from Supabase, adapts it to farmer preferences/overrides, and calls **Gemini** to answer questions or explain decisions in plain language (`/chat`, `/get_chat_log`).
 
 ## Tech stack
 
@@ -118,7 +131,7 @@ Full API docs and env var details: `MiraquaOfficial/BACKEND_SETUP.md` and `Miraq
 
 ## Core features
 
-- AI-generated, weather-aware watering schedules per plot
+- Deterministic, weather-aware watering schedules per plot — same inputs, same plan
+- AI layer that adapts the plan to farmer preferences and explains it in plain language
 - Manual override (`water now`) and schedule revert
-- Conversational assistant for irrigation questions
 - Multi-plot management with per-plot crop and area settings
